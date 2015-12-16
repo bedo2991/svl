@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.3
+// @version    2.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -10,12 +10,20 @@
 // @copyright  2015+, bedo2991
 // ==/UserScript==
 (function() {
+    
+    var DEBUG_ENABLED = false; //set it to false for production mode
+    
+    if(DEBUG_ENABLED)
+        consoleDebug= function()
+    {
+        if(DEBUG_ENABLED)
+        for (var i = 0; i < arguments.length; ++i)
+            console.debug(arguments[i]);
+    }
+    else
+        consoleDebug = function(){}    
 
-function wbwWazeBits() {
-    
-    console.warn("!Notice for developers! Street Vector Layer is disabling javascript's debug function. To avoid this comment line number 17 in the Street Vector Layer script.");
-    console.debug = function(){}; //Comment it out for production mode
-    
+function wbwWazeBits() {    
     //Utilities variable to avoid writing long names
     Waze = unsafeWindow.W;
     if(typeof(Waze) !== "undefined")
@@ -538,10 +546,10 @@ function savePreferences(preferences)
 function loadPreferences()
 {
     preferences = JSON.parse(localStorage.getItem('svl'));
-    console.debug("Loading preferences");
+    consoleDebug("Loading preferences");
     if(preferences == null)
     {
-        console.debug("Creating new preferences from default");
+        consoleDebug("Creating new preferences from default");
         saveDefaultPreferences();
         return false;
     }
@@ -552,7 +560,7 @@ function loadPreferences()
 function checkZoomLayer()
 {
     var zoom = wazeMap.getZoom();
-    console.debug("Zoom: "+ zoom);
+    consoleDebug("Zoom: "+ zoom);
     if(preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled)
     {
         roadLayer.setVisibility(false);
@@ -562,7 +570,7 @@ function checkZoomLayer()
         if(streetVector.visibility==false && vectorAutomDisabled)
         {
             vectorAutomDisabled=false;
-            console.debug("Setting vector visibility to true");
+            consoleDebug("Setting vector visibility to true");
            streetVector.setVisibility(true);
             doDraw();
             //streetVector.display(true)
@@ -598,11 +606,11 @@ function checkZoomLayer()
         }
         if(zoom <= 1)
         { //There is nothing to draw, enable road layer
-            console.debug("Road layer automatically enabled because of zoom out");
-            console.debug("Vector visibility: ", streetVector.visibility);
+            consoleDebug("Road layer automatically enabled because of zoom out");
+            consoleDebug("Vector visibility: ", streetVector.visibility);
             if(streetVector.visibility==true)
             {
-                console.debug("Setting vector visibility to false");
+                consoleDebug("Setting vector visibility to false");
                 streetVector.setVisibility(false);
                 vectorAutomDisabled=true;
             }
@@ -844,12 +852,12 @@ function getThreshold()
 function manageNodes(e)
 {
     //Toggle node layer visibility accordingly
-    console.debug("Manage nodes", e);
+    consoleDebug("Manage nodes", e);
     nodesVector.setVisibility(e.object.visibility);
 
     if(e.object.visibility)
     {
-        console.debug("Registering events");
+        consoleDebug("Registering events");
         W.model.segments.events.register("objectsadded",streetVector, addSegments); //TODO: This makes the creation of the segment not possible
         W.model.segments.events.register("objectschanged", streetVector, editSegments);
         W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
@@ -861,7 +869,7 @@ function manageNodes(e)
     }
     else
     {
-        console.debug("Unregistering events");
+        consoleDebug("Unregistering events");
         W.model.segments.events.unregister("objectsadded",streetVector, addSegments); //TODO: This makes the creation of the segment not possible
         W.model.segments.events.unregister("objectschanged", streetVector, editSegments);
         W.model.segments.events.unregister("objectsremoved",streetVector, removeSegments);
@@ -888,7 +896,7 @@ function drawSegment(model)
     var maxDistanceIndex=-1;
     var address = model.getAddress();
     var myFeatures = [];
-    console.debug(address);
+    consoleDebug(address);
     if(null != address.street && !address.street.isEmpty || (preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed)){
         for(var p=0; p<simplified.length-1; ++p) {
             var distance = simplified[p].distanceTo(simplified[p+1]);
@@ -903,8 +911,8 @@ function drawSegment(model)
     var lineFeature = null;
     if(null == attributes.primaryStreetID)
     {
-        console.debug("RED segment", model);
-        console.debug(pointList);
+        consoleDebug("RED segment", model);
+        consoleDebug(pointList);
         lineFeature = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  redStyle);
         myFeatures.push(lineFeature);
@@ -912,10 +920,10 @@ function drawSegment(model)
         var locked = false;
         var speed = null;
         speed = attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed;
-        console.debug("Road Type: ", attributes.roadType);
+        consoleDebug("Road Type: ", attributes.roadType);
         if(attributes.level>0) //it is a bridge
         {
-            console.debug("Bridge");
+            consoleDebug("Bridge");
             var bridgeStyle =
                 {
                 strokeColor: "#000",
@@ -931,7 +939,7 @@ function drawSegment(model)
         
         if(speed && !farZoom && preferences.showSLcolor) //it has a speed limit
         {
-            console.debug("SpeedLimit");
+            consoleDebug("SpeedLimit");
             
             speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
             speedStyle =
@@ -944,7 +952,7 @@ function drawSegment(model)
             
             if(attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
             {
-                console.debug("The segment has 2 different speed limits");
+                consoleDebug("The segment has 2 different speed limits");
                 speed = getColorSpeed(attributes.fwdMaxSpeed);
                 speedStyleLeft =
                 {
@@ -995,7 +1003,7 @@ function drawSegment(model)
                     {
                         var m= dy/dx;
                         var mb = -1/m;
-                        console.debug("m: ", m);
+                        consoleDebug("m: ", m);
                         if(Math.abs(m)<0.05)
                         {
                             //Segment is horizontal
@@ -1025,9 +1033,9 @@ function drawSegment(model)
                             right[1].move(-offset/temp, -offset*(mb/temp)); 
                         }
                     }
-                    console.debug("Adding 2 speeds");
-                    //console.debug(left);
-                    //console.debug(right);
+                    consoleDebug("Adding 2 speeds");
+                    //consoleDebug(left);
+                    //consoleDebug(right);
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(left), {myId:attributes.id},  speedStyleLeft);
                     myFeatures.push(lineFeature); 
@@ -1084,7 +1092,7 @@ function drawSegment(model)
         }
         if(null != attributes.junctionID)
         {//It is a roundabout
-            console.debug("Segment is a roundabout");
+            consoleDebug("Segment is a roundabout");
             var lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  roundaboutStyle);
             myFeatures.push(lineFeature);
@@ -1092,7 +1100,7 @@ function drawSegment(model)
 
         if(!locked && (attributes.fwdToll || attributes.revToll))
         {//It is a toll road
-            console.debug("Segment is toll");
+            consoleDebug("Segment is toll");
             var lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tollStyle);
             myFeatures.push(lineFeature);
@@ -1100,7 +1108,7 @@ function drawSegment(model)
         if(attributes.fwdRestrictions){
             if(attributes.fwdRestrictions.length>0 || attributes.revRestrictions.length>0 )
             {//It has restrictions
-                console.debug("Segment has restrictions");
+                consoleDebug("Segment has restrictions");
                 var lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  restrStyle);
                 myFeatures.push(lineFeature);
@@ -1116,7 +1124,7 @@ function drawSegment(model)
 
         if((attributes.fwdDirection == false || attributes.revDirection == false))
         {
-            console.debug("The segment is oneway or has unknown direction");
+            consoleDebug("The segment is oneway or has unknown direction");
             var simplifiedPoints = points;
             if(attributes.junctionID==null && attributes.length / points.length < arrowDeclutter){
                 simplifiedPoints = simplified;
@@ -1213,13 +1221,13 @@ function drawSegment(model)
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   tunnelFlagStyle2);
         myFeatures.push(lineFeature); 
     }
-    console.debug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
+    consoleDebug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
     if(thresholdDistance && maxDistance >= thresholdDistance)
     {
         var labelFeature = null;
         if((attributes.fwdMaxSpeed|attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))
         {
-            console.debug("Label inserted");
+            consoleDebug("Label inserted");
             labelFeature = new OpenLayers.Feature.Vector(lineString.getCentroid(true),{myId:attributes.id});/*Important pass true parameter otherwise it will return start point as centroid*/
             var streetPart = (!address.street.isEmpty?address.street.name:"");
             
@@ -1331,7 +1339,7 @@ function drawAllSegments()
 {
     streetVector.destroyFeatures();
     var segments = W.model.segments.objects;
-    console.debug(W.model.segments);
+    consoleDebug(W.model.segments);
     if(Object.keys(segments).length == 0) return; // exit now if there are no segments to draw, otherwise remainder of function will bomb out
     var keysSorted = Object.keys(segments).sort(function(a,b){return segments[a].attributes.level-segments[b].attributes.level;});
     var myFeatures = [];
@@ -1347,7 +1355,7 @@ function drawAllNodes()
     nodesVector.destroyFeatures();
         var nodeFeatures = [];
     var nodes = W.model.nodes.objects;
-    console.debug("nodes", nodes);
+    consoleDebug("nodes", nodes);
     for(var node in nodes)
     {
         if (nodes.hasOwnProperty(node)) {
@@ -1359,7 +1367,7 @@ function drawAllNodes()
 
 function doDraw()
 {
-    console.debug("Drawing everything anew");
+    consoleDebug("Drawing everything anew");
     drawAllSegments();
     
     if(!farZoom)
@@ -1368,9 +1376,9 @@ function doDraw()
 
 function addSegments(e)
 {
-    console.debug("Segments added to model");
+    consoleDebug("Segments added to model");
     e = e.filter(function(value){return value != undefined;})
-    console.debug(e);
+    consoleDebug(e);
     e.sort(function(a,b){return (a.attributes.level-b.attributes.level)});
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
@@ -1378,7 +1386,7 @@ function addSegments(e)
         if(e[i] != null){
             var features = drawSegment(e[i]);
             for(var j=0; j<features.length; j++){
-                console.debug(j, features[j]);
+                consoleDebug(j, features[j]);
                 if( features[j] != undefined) //TODO scoprire cosa lo rende undefined
                     myFeatures.push(features[j]);
             }
@@ -1389,7 +1397,7 @@ function addSegments(e)
 
 function editSegments(e)
 {
-    console.debug("Segments modifed", e);
+    consoleDebug("Segments modifed", e);
     for(var i=0; i<e.length; i++)
     {
         if(typeof(e[i]._prevID) !== "undefined")
@@ -1407,12 +1415,12 @@ function editSegments(e)
 
 function removeSegmentById(id)
 {
-    console.debug("RemoveById", id, typeof(id));
+    consoleDebug("RemoveById", id, typeof(id));
     streetVector.destroyFeatures(streetVector.getFeaturesByAttribute("myId", id));
 }
 
 function removeSegments(e){
-    console.debug("Segments removed from model");
+    consoleDebug("Segments removed from model");
     for(var i=0; i<e.length; i++)
     {
         removeSegmentById(e[i].attributes.id);
@@ -1426,7 +1434,7 @@ function removeNodeById(id)
 
 function removeNodes(e)
 {
-    console.debug("Remove nodes");
+    consoleDebug("Remove nodes");
     for(var i=0; i<e.length; i++)
     {
         removeNodeById(e[i].attributes.id);
@@ -1438,7 +1446,7 @@ function addNodes(e)
 {
     if(farZoom)
         return;
-    console.debug("Add nodes");
+    consoleDebug("Add nodes");
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
     {
