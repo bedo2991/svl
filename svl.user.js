@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.4
+// @version    2.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -261,7 +261,15 @@ function rollbackDefault(dontask){
 
 function getColorSpeed(speed)
 {
-    return (speed * 3) %360; // :150 * 450
+    if(W.prefs.attributes.isImperial) // adjust scale for Imperial
+    {        
+        // speeds 15 to 75 mph (7 increments) are tuned to HSL 95 to 395 (35) for easy visual speed differentiation at common speeds
+        return ((speed / 1.609344 * 5) + 20) %360
+    }
+    else
+    {
+        return (speed * 3) %360; // :150 * 450
+    }
 }
 
 function editPreferences()
@@ -382,8 +390,15 @@ function editPreferences()
     
     $speedLimits.append($('<b>Reference colours</b>'));
     $speedLimits.append('<br/>');
-    for(var k=W.prefs.attributes.isImplerial?10:15; k>1; k--){
-        $speedLimits.append($('<span style="color:hsl('+getColorSpeed(k*10)+',100%,50%)">'+k*10+' </span>'));
+    for(var k=W.prefs.attributes.isImperial?9:15; k>1; k--){
+        if (W.prefs.attributes.isImperial)
+        {
+            $speedLimits.append($('<span style="color:hsl('+getColorSpeed((k*10-5)*1.609344)+',100%,50%)">'+(k*10-5)+' </span>'));
+        }
+        else
+        {
+            $speedLimits.append($('<span style="color:hsl('+getColorSpeed(k*10)+',100%,50%)">'+k*10+' </span>'));
+        }
     }
     $speedLimits.append('<hr>');
     $elementDiv.append($speedLimits);
