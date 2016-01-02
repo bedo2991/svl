@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.5
+// @version    2.6
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -43,6 +43,7 @@ function wbwWazeBits() {
 function wbwGlobals() {
     arrowDeclutter = 25;
     clutterMax = 700;
+    fontSizeMax = 32;
 
     farZoom = wazeMap.zoom <5?true:false;
     svlVersion = GM_info.script.version;
@@ -108,7 +109,8 @@ function rollbackPreferences()
 
 function closePrefPanel()
 {
-    $('#PrefDiv').remove();
+    $('#zoomStyleDiv').hide(400, function(){ $('#zoomStyleDiv').remove();});
+    $('#PrefDiv').hide(400, function(){ $('#PrefDiv').remove();});
 }
 
 function bestBackground(color)
@@ -165,6 +167,8 @@ function updateStylesFromPreferences(preferences)
     arrowDeclutter = preferences.arrowDeclutter;
     labelOutlineWidth = preferences.labelOutlineWidth;
     
+    labelFontSize = farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize;
+    labelOutlineWidth = preferences.labelOutlineWidth+"px";
     //showSLtext = preferences.showSLtext;
     //showSLcolor = preferences.showSLcolor;
     
@@ -239,6 +243,9 @@ function updatePref()
     preferences.showSLcolor = $('#showSLcolor').prop('checked');
     
     preferences.hideMinorRoads = $('#hideMinorRoads').prop('checked');
+    preferences.showDashedUnverifiedSL = $('#showDashedUnverifiedSL').prop('checked');
+    preferences.farZoomLabelSize = $('#farZoomLabelSize').val();
+    preferences.closeZoomLabelSize = $('#closeZoomLabelSize').val();
 
     updateStylesFromPreferences(preferences);
 }
@@ -276,9 +283,19 @@ function editPreferences()
 {
     if($('div#PrefDiv').length >0)
         return;    
-
-    var $style = $('<style>.prefElement{margin-right:3px;}summary{font-weight:bold}</style>');
-    var $mainDiv = $('<div id="PrefDiv" style="padding:10px; border-radius:15px; background:white; opacity:0.9; width:300px; position:absolute; top:61px; left:80px; z-index:200"></div>');
+    var $zoomStyleDiv = $('<div id="zoomStyleDiv" class="zoomDiv"></div>');
+    if(farZoom){
+        $zoomStyleDiv.addClass('farZoom');
+        $zoomStyleDiv.text('You are currently in FAR-zoom mode');
+    }
+    else
+    {
+        $zoomStyleDiv.addClass('closeZoom');
+        $zoomStyleDiv.text('You are in CLOSE-zoom mode');
+    }
+    $('div#map').append($zoomStyleDiv);
+    var $style = $('<style>.farZoom{background-color:orange}.closeZoom{background-color:#6495ED}.zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}.prefElement{margin-right:0.2em;}summary{font-weight:bold}</style>');
+    var $mainDiv = $('<div id="PrefDiv" style="padding:0.6em; border-radius:15px; background:white; opacity:0.93; width:23em; position:absolute; top:11em; left:30em; z-index:200"></div>');
     $mainDiv.append($('<div><button id="saveNewPref">Save</button> <button id="rollbackPreferences">Rollback</button> <button id="rollbackDefault">Reset</button><button style="float:right" id="close">X</button></div>'));   
 
     var $elementDiv = $('<div id="PrefDiv" style="padding:5px; width:280px; max-height:450px; overflow:auto"></div>');
@@ -347,12 +364,18 @@ function editPreferences()
 
     //Labels
     $labels.append('<summary>Rendering Parameters</summary>');
-    $labels.append($('<b>Near Zoom (the highest, the less)</b><br>'));
+    $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
+    $labels.append($('<br><i>Density (the highest, the less)</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="clutterCostantNearZoom" value="'+preferences.clutterCostantNearZoom+'" type="range" min="10" max="'+clutterMax+'"></input>'));
+        $labels.append($('<br><i>Font Size</i><br>'));
+    $labels.append($('<input class="prefElement" title="Quantity" id="closeZoomLabelSize" value="'+preferences.closeZoomLabelSize+'" type="range" min="8" max="'+fontSizeMax+'"></input>'));
     $labels.append('<hr>');
 
-    $labels.append($('<b>Far Zoom (the highest, the less)</b><br>'));
+    $labels.append($("<b style='color:orange'>Far Zoom</b><br>"));
+    $labels.append($('<br><i>Density (the highest, the less)</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="clutterCostantFarZoom" value="'+preferences.clutterCostantFarZoom+'" type="range" min="10" max="'+clutterMax+'"></input>'));
+    $labels.append($('<br><i>Font Size</i><br>'));
+    $labels.append($('<input class="prefElement" title="Quantity" id="farZoomLabelSize" value="'+preferences.farZoomLabelSize+'" type="range" min="8" max="'+fontSizeMax+'"></input>'));
     $labels.append('<hr>');
     
     $labels.append($('<b>Label outline width</b><br>'));
@@ -386,6 +409,9 @@ function editPreferences()
     
     $speedLimits.append($('<b>Show using colours</b>'));
     $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLcolor" type="checkbox" '+(preferences.showSLcolor?'checked':'')+' ></input>'));
+    $speedLimits.append('<hr>');
+    $speedLimits.append($('<b>Show unverified limits with a dashed line</b>'));
+    $speedLimits.append($('<input class="prefElement" title="True or False" id="showDashedUnverifiedSL" type="checkbox" '+(preferences.showDashedUnverifiedSL?'checked':'')+' ></input>'));
     $speedLimits.append('<hr>');
     
     $speedLimits.append($('<b>Reference colours</b>'));
@@ -421,6 +447,7 @@ function saveDefaultPreferences()
 {
     preferences = {};
     preferences.hideMinorRoads = false;
+    preferences.showDashedUnverifiedSL = true;
     preferences.showSLcolor = true;
     preferences.showSLtext = true;
     preferences.version = svlVersion;
@@ -595,13 +622,19 @@ function checkZoomLayer()
     {
         //Close zoom
         clutterConstant = preferences.clutterCostantNearZoom;
-        labelFontSize = "13px";
+        labelFontSize = preferences.closeZoomLabelSize+"px";
         if(farZoom)
         {//Switched from far to close zoom
             farZoom=false;
             thresholdDistance=getThreshold();
             W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
             W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
+            if($('#zoomStyleDiv').length==1)
+            {
+                $('#zoomStyleDiv').removeClass('farZoom');
+                $('#zoomStyleDiv').addClass('closeZoom');
+                $('#zoomStyleDiv').text('You are currently in CLOSE-zoom mode');
+            }
             doDraw();
         }
     }
@@ -611,11 +644,17 @@ function checkZoomLayer()
         var zoomChanged =  !farZoom ? true : false;
         farZoom=true;
         clutterConstant = preferences.clutterCostantFarZoom;
-        labelFontSize = "11px";
+        labelFontSize = preferences.farZoomLabelSize+"px";
         thresholdDistance=getThreshold();
         if(zoomChanged){
             W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
             W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
+            if($('#zoomStyleDiv').length==1)
+            {
+                $('#zoomStyleDiv').removeClass('closeZoom');
+                $('#zoomStyleDiv').addClass('farZoom');
+                $('#zoomStyleDiv').text('You are currently in FAR-zoom mode');
+            }
             nodesVector.destroyFeatures();
             doDraw();
         }
@@ -686,7 +725,13 @@ function initSVL() {
     
     clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
     thresholdDistance = getThreshold();
-    labelFontSize = farZoom?"11px":"13px";
+    if(preferences.farZoomLabelSize == null || preferences.closeZoomLabelSize==null || preferences.labelOutlineWidth ==null){
+        preferences.labelOutlineWidth = 3;
+        preferences.farZoomLabelSize = 11;
+        preferences.closeZoomLabelSize = 11;
+    }
+    labelFontSize = (farZoom?preferences.farZoomLabelSize:preferences.closeZoomLabelSize) + "px";
+    labelOutlineWidth = preferences.labelOutlineWidth+"px";
 
 
     $('.olControlAttribution').click(editPreferences);
@@ -697,12 +742,12 @@ function initSVL() {
                     fontWeight: "800",
                     fontColor: "${color}",
                     labelOutlineColor: "${outlinecolor}",
-                    fontSize: labelFontSize,
+                    fontSize: "${fsize}",
                     labelXOffset: 0,
                     labelYOffset:0,//(attributes.id%2==0?1:-2.6)*7,
                    // fontColor: streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00",
                     //labelOutlineColor:  streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff",
-                    labelOutlineWidth:preferences.labelOutlineWidth,
+                    labelOutlineWidth:"${outlinewidth}",
                     label : "${label}",
                     //label: directionArrow + " " + streetPart+ " " + directionArrow+ " "+speedPart,
                     angle: "${angle}",
@@ -713,7 +758,6 @@ function initSVL() {
        /* cursor: "pointer",
         labelXOffset: 0,
         fontColor: "black",
-
         fontSize: "24px",
         fontFamily: "Arial",
         labelSelect: true,*/
@@ -873,7 +917,7 @@ function manageNodes(e)
     if(e.object.visibility)
     {
         consoleDebug("Registering events");
-        W.model.segments.events.register("objectsadded",streetVector, addSegments); //TODO: This makes the creation of the segment not possible
+        W.model.segments.events.register("objectsadded",streetVector, addSegments);
         W.model.segments.events.register("objectschanged", streetVector, editSegments);
         W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
 
@@ -885,7 +929,7 @@ function manageNodes(e)
     else
     {
         consoleDebug("Unregistering events");
-        W.model.segments.events.unregister("objectsadded",streetVector, addSegments); //TODO: This makes the creation of the segment not possible
+        W.model.segments.events.unregister("objectsadded",streetVector, addSegments);
         W.model.segments.events.unregister("objectschanged", streetVector, editSegments);
         W.model.segments.events.unregister("objectsremoved",streetVector, removeSegments);
 
@@ -957,11 +1001,12 @@ function drawSegment(model)
             consoleDebug("SpeedLimit");
             
             speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
+            var speedStrokeStyle= (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified||attributes.revMaxSpeedUnverified) ? "dash":"solid");
             speedStyle =
-                {
+            {
                 strokeColor: "hsl("+speed+", 100%, 50%)",
                 strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
-                strokeDashstyle: "solid",//(attributes.fwdMaxSpeedUnverified|attributes.revMaxSpeedUnverified ? "dash":"solid"),
+                strokeDashstyle: speedStrokeStyle,
                 pointerEvents: "visiblePainted",
             }
             
@@ -973,7 +1018,7 @@ function drawSegment(model)
                 {
                     strokeColor: "hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
-                    strokeDashstyle: "solid",
+                    strokeDashstyle: speedStrokeStyle,
                     pointerEvents: "visiblePainted",
                 }
                 speed = getColorSpeed(attributes.revMaxSpeed);
@@ -981,7 +1026,7 @@ function drawSegment(model)
                 {
                     strokeColor: "hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
-                    strokeDashstyle: "solid",
+                    strokeDashstyle: speedStrokeStyle,
                     pointerEvents: "visiblePainted",
                 }
                 //It has 2 different speeds:
@@ -1313,6 +1358,8 @@ function drawSegment(model)
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
+                labelFeature.attributes.outlinewidth=labelOutlineWidth;
+                labelFeature.attributes.fsize = labelFontSize;
                 myFeatures.push(labelFeature);
             }
         }
@@ -1402,7 +1449,7 @@ function addSegments(e)
             var features = drawSegment(e[i]);
             for(var j=0; j<features.length; j++){
                 consoleDebug(j, features[j]);
-                if( features[j] != undefined) //TODO scoprire cosa lo rende undefined
+                if( features[j] != undefined) //TODO find out what makes it undefined
                     myFeatures.push(features[j]);
             }
         }
