@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.6
+// @version    2.6.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -291,7 +291,7 @@ function editPreferences()
     else
     {
         $zoomStyleDiv.addClass('closeZoom');
-        $zoomStyleDiv.text('You are in CLOSE-zoom mode');
+        $zoomStyleDiv.text('You are currently in CLOSE-zoom mode');
     }
     $('div#map').append($zoomStyleDiv);
     var $style = $('<style>.farZoom{background-color:orange}.closeZoom{background-color:#6495ED}.zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}.prefElement{margin-right:0.2em;}summary{font-weight:bold}</style>');
@@ -1520,20 +1520,12 @@ function addNodes(e)
 }
 
 function bootstrapSVL() {
-    var bGreasemonkeyServiceDefined = false;
-
-    try {
-        bGreasemonkeyServiceDefined = (typeof Components.interfaces.gmIGreasemonkeyService === "object");
-    } catch (err) { /* Ignore */ }
-
-    if (typeof unsafeWindow === "undefined" || !bGreasemonkeyServiceDefined) {
-        unsafeWindow = (function() {
-            var dummyElem = document.createElement('p');
-            dummyElem.setAttribute('onclick', 'return window;');
-            return dummyElem.onclick();
-        })();
-    }
-
+  // Check all requisites for the script
+  if (typeof Waze === undefined ||
+      typeof document.querySelector('#WazeMap') === undefined) {
+    setTimeout(bootstrapSVL, 400);
+    return;
+  }
     /* begin running the code! */
     svlAttempts=0;
     initSVL();
