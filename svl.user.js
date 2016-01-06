@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.6.3
+// @version    2.6.4C
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -767,7 +767,7 @@ function initSVL() {
                                                {
                                                    styleMap: labelStyleMap,
                                                    uniqueName: 'vectorStreet',
-                                                   shortcutKey:'C+A+l',
+                                                   shortcutKey:'A+l',
                                                    displayInLayerSwitcher:true,
                                                    accelerator: "toggle" + layername.replace(/\s+/g,''),
                                                    visibility: true,
