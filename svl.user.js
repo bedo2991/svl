@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.6.1
+// @version    2.6.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -23,17 +23,17 @@
     else
         consoleDebug = function(){}    
 
-function wbwWazeBits() {    
-    //Utilities variable to avoid writing long names
-    Waze = unsafeWindow.W;
-    if(typeof(Waze) !== "undefined")
+function wbwWazeBits() {
+    ////Utilities variable to avoid writing long names
+    //Waze = unsafeWindow.W;
+    if(typeof(W) !== "undefined")
     {
-        wazeMap = unsafeWindow.W.map;
-        if(typeof(wazeMap) !== "undefined")
+        //wazeMap = unsafeWindow.W.map;
+        if(typeof(W.map) !== "undefined")
         {
-            wazeModel = Waze.model;
-            selectionManager = Waze.selectionManager;
-            if(typeof(wazeModel) !== "undefined" && typeof(selectionManager) !== "undefined")
+            //wazeModel = Waze.model;
+            //selectionManager = W.selectionManager;
+            if(typeof(W.model) !== "undefined" /*&& typeof(selectionManager) !== "undefined"*/)
                 return;
         }
     }
@@ -45,7 +45,7 @@ function wbwGlobals() {
     clutterMax = 700;
     fontSizeMax = 32;
 
-    farZoom = wazeMap.zoom <5?true:false;
+    farZoom = W.map.zoom <5?true:false;
     svlVersion = GM_info.script.version;
     preferences=null;
     svlIgnoredStreets = [8,10,16,17,19,20];
@@ -601,7 +601,7 @@ function loadPreferences()
 
 function checkZoomLayer()
 {
-    var zoom = wazeMap.getZoom();
+    var zoom = W.map.getZoom();
     consoleDebug("Zoom: "+ zoom);
     if(preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled)
     {
@@ -762,11 +762,14 @@ function initSVL() {
         fontFamily: "Arial",
         labelSelect: true,*/
     });
-    streetVector = new OpenLayers.Layer.Vector("Street (Vector)", 
+    var layername= "Street (Vector)";
+    streetVector = new OpenLayers.Layer.Vector(layername, 
                                                {
                                                    styleMap: labelStyleMap,
                                                    uniqueName: 'vectorStreet',
-                                                   shortcutKey:'A+l',
+                                                   shortcutKey:'C+A+l',
+                                                   displayInLayerSwitcher:true,
+                                                   accelerator: "toggle" + layername.replace(/\s+/g,''),
                                                    visibility: true,
                                                    isBaseLayer: false,
                                                    isVector: true,
@@ -860,17 +863,17 @@ function initSVL() {
     clutterCostantFarZoom = preferences.clutterCostantFarZoom ? preferences.clutterCostantFarZoom: 410.0; //float value, the highest the less label will be generated. Zoom <5
     arrowDeclutter = preferences.arrowDeclutter? preferences.arrowDeclutter:  25;
 
-    var segmentLayer = wazeMap.getLayersByName("Segments");
+    var segmentLayer = W.map.getLayersByName("Segments");
 
-    wazeMap.addLayer(streetVector);
-    wazeMap.addLayer(nodesVector);
-    wazeMap.raiseLayer(streetVector, -2);
-    wazeMap.raiseLayer(nodesVector, -1);
+    W.map.addLayer(streetVector);
+    W.map.addLayer(nodesVector);
+    W.map.raiseLayer(streetVector, -2);
+    W.map.raiseLayer(nodesVector, -1);
 
     streetVector.events.register("visibilitychanged",streetVector, manageNodes);
     manageNodes({object:streetVector});
     try{
-        roadLayer = wazeMap.getLayersBy("uniqueName","roads")[0];
+        roadLayer = W.map.getLayersBy("uniqueName","roads")[0];
     }
     catch(e)
     {
@@ -878,7 +881,7 @@ function initSVL() {
         roadLayer=null;
     }
     if(roadLayer!=null){
-        if(wazeMap.getZoom() <= 1)
+        if(W.map.getZoom() <= 1)
         {
             roadLayer.setVisibility(true);
         }
@@ -892,7 +895,7 @@ function initSVL() {
         }
     }
     vectorAutomDisabled=false;
-    wazeMap.events.register("zoomend", null, checkZoomLayer);
+    W.map.events.register("zoomend", null, checkZoomLayer);
     
     if(preferences.startDisabled)
     {
@@ -906,7 +909,7 @@ function getThreshold()
 {
     if(clutterConstant == clutterMax)
         return 0;
-    return clutterConstant / wazeMap.getZoom();
+    return clutterConstant / W.map.getZoom();
 }
 function manageNodes(e)
 {
@@ -1289,7 +1292,7 @@ function drawSegment(model)
         {
             consoleDebug("Label inserted");
             labelFeature = new OpenLayers.Feature.Vector(lineString.getCentroid(true),{myId:attributes.id});/*Important pass true parameter otherwise it will return start point as centroid*/
-            var streetPart = (!address.street.isEmpty?address.street.name:"");
+            var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:"");
             
             if(! streetStyle[attributes.roadType])
                {
@@ -1521,7 +1524,7 @@ function addNodes(e)
 
 function bootstrapSVL() {
   // Check all requisites for the script
-  if (typeof Waze === undefined ||
+  if (typeof W === undefined ||
       typeof document.querySelector('#WazeMap') === undefined) {
     setTimeout(bootstrapSVL, 400);
     return;
