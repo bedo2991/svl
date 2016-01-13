@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.6.4C
+// @version    2.6.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -39,6 +39,12 @@ function wbwWazeBits() {
     }
     throw "Model Not ready";
 }
+    
+function refreshWME()
+    {
+        if(parseInt($('div.counter').text()) == 0)
+            $('div.icon-repeat.reload-button').click();
+    }  
 
 function wbwGlobals() {
     arrowDeclutter = 25;
@@ -902,6 +908,7 @@ function initSVL() {
         streetVector.setVisibility(false);
     }
 
+    //setInterval(refreshWME, 20000);//TODO Add it as an option, make the timer customizable
     console.log("Street Vector Layer v. "+svlVersion+" initialized correctly." );
 }
 
