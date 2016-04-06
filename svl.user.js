@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    2.6.5
+// @version    3.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
 // @author     bedo2991
 // @grant      none
+// @require    https://craig.global.ssl.fastly.net/js/mousetrap/mousetrap.min.js
 // @copyright  2015+, bedo2991
 // ==/UserScript==
+
+//debugger;
 (function() {
     
     var DEBUG_ENABLED = false; //set it to false for production mode
@@ -25,14 +28,11 @@
 
 function wbwWazeBits() {
     ////Utilities variable to avoid writing long names
-    //Waze = unsafeWindow.W;
     if(typeof(W) !== "undefined")
     {
         //wazeMap = unsafeWindow.W.map;
         if(typeof(W.map) !== "undefined")
         {
-            //wazeModel = Waze.model;
-            //selectionManager = W.selectionManager;
             if(typeof(W.model) !== "undefined" /*&& typeof(selectionManager) !== "undefined"*/)
                 return;
         }
@@ -50,7 +50,9 @@ function wbwGlobals() {
     arrowDeclutter = 25;
     clutterMax = 700;
     fontSizeMax = 32;
-
+    beta = false;
+    if(W.model.nodes.events == undefined)
+        beta=true;
     farZoom = W.map.zoom <5?true:false;
     svlVersion = GM_info.script.version;
     preferences=null;
@@ -132,7 +134,7 @@ function bestBackground(color)
 
 function updateStylesFromPreferences(preferences)
 {
-    for(var i=0; i<preferences.streets.length; i++)
+    for(var i=0, len = preferences.streets.length; i<len; i++)
     {
         if(preferences.streets[i] != null){
             streetStyle[i].strokeColor = preferences.streets[i].strokeColor;
@@ -207,7 +209,7 @@ function importPreferences()
 function updatePref()
 {
     $('#saveNewPref').attr("style", "background-color:#FFBD24");
-    for(var i=0; i<preferences.streets.length; i++)
+    for(var i=0, len = preferences.streets.length; i<len; i++)
     {
         if(preferences.streets[i] != null){
             preferences.streets[i].strokeColor = $('#streetColor_'+i).val();
@@ -215,6 +217,8 @@ function updatePref()
             preferences.streets[i].strokeDashstyle = $('#strokeDashstyle_'+i+ ' option:selected').val();
         }
     }
+    
+    preferences.fakelock = $('#fakeLock').val();
 
     //Red
     preferences.red.strokeColor = $('#streetColor_red').val();
@@ -311,7 +315,7 @@ function editPreferences()
     var $labels = $('<details></details>');
     var $speedLimits = $('<details></details>');
     $streets.append('<summary>Road Types</summary>');
-    for(var i=0; i<preferences.streets.length; i++)
+    for(var i=0, len = preferences.streets.length; i<len; ++i)
     {
 
         if(preferences.streets[i] != null)
@@ -338,6 +342,9 @@ function editPreferences()
     $elementDiv.append($streets);
 
     $decorations.append('<summary>Decorations</summary>');
+    $decorations.append('<b>Render map as level</b><br>');
+    $decorations.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="'+W.loginManager.user.getAttributes().normalizedLevel+'" type="number" min="1" max="7"></input>'));
+    $decorations.append('<hr>');
     //Toll
     $decorations.append($('<b>Toll</b><br>'));
     $decorations.append($('<input class="prefElement" title="Colour" id="streetColor_toll" value="'+preferences.toll.strokeColor+'" type="color"></input>'));
@@ -452,6 +459,7 @@ function editPreferences()
 function saveDefaultPreferences()
 {
     preferences = {};
+    preferences.fakelock = W.loginManager.user.getAttributes().normalizedLevel;
     preferences.hideMinorRoads = false;
     preferences.showDashedUnverifiedSL = true;
     preferences.showSLcolor = true;
@@ -619,7 +627,7 @@ function checkZoomLayer()
         {
             vectorAutomDisabled=false;
             consoleDebug("Setting vector visibility to true");
-           streetVector.setVisibility(true);
+            streetVector.setVisibility(true);
             doDraw();
             //streetVector.display(true)
         }
@@ -633,8 +641,15 @@ function checkZoomLayer()
         {//Switched from far to close zoom
             farZoom=false;
             thresholdDistance=getThreshold();
-            W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
-            W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
+            if(beta){
+                W.model.nodes._events["objectsremoved"].push({context:nodesVector, callback: removeNodes, svl:true});
+                W.model.nodes._events["objectsadded"].push({context:nodesVector, callback: addNodes, svl:true});
+            }
+            else
+            {
+                W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
+                W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
+            }
             if($('#zoomStyleDiv').length==1)
             {
                 $('#zoomStyleDiv').removeClass('farZoom');
@@ -653,8 +668,15 @@ function checkZoomLayer()
         labelFontSize = preferences.farZoomLabelSize+"px";
         thresholdDistance=getThreshold();
         if(zoomChanged){
-            W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
-            W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
+            if(beta){
+                W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
+                W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
+            }
+            else
+            {
+                W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
+                W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
+            }
             if($('#zoomStyleDiv').length==1)
             {
                 $('#zoomStyleDiv').removeClass('closeZoom');
@@ -678,11 +700,18 @@ function checkZoomLayer()
         }
     }
 }
+    function toggleLayerVisibility(){
+        consoleDebug("Toggling svl layer visibility");
+        if(!farZoom){
+            streetVector.setVisibility(!streetVector.getVisibility());
+        }
+    }
 
 function initSVL() {
     //Initialize variables
     try{
         wbwWazeBits();
+        Mousetrap.bind('alt+l', toggleLayerVisibility);
     }
     catch (e)
     {
@@ -797,7 +826,7 @@ function initSVL() {
     streetStyle = [];
 
     //Street types
-    for(var i=0; i<preferences.streets.length; i++)
+    for(var i=0, len = preferences.streets.length; i<len; i++)
     {
 
         if(preferences.streets[i] != null){
@@ -869,7 +898,7 @@ function initSVL() {
     clutterCostantFarZoom = preferences.clutterCostantFarZoom ? preferences.clutterCostantFarZoom: 410.0; //float value, the highest the less label will be generated. Zoom <5
     arrowDeclutter = preferences.arrowDeclutter? preferences.arrowDeclutter:  25;
 
-    var segmentLayer = W.map.getLayersByName("Segments");
+    //var segmentLayer = W.map.getLayersByName("Segments");
 
     W.map.addLayer(streetVector);
     W.map.addLayer(nodesVector);
@@ -927,31 +956,61 @@ function manageNodes(e)
     if(e.object.visibility)
     {
         consoleDebug("Registering events");
-        W.model.segments.events.register("objectsadded",streetVector, addSegments);
-        W.model.segments.events.register("objectschanged", streetVector, editSegments);
-        W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
+        if(beta)
+        {
+            W.model.segments._events["objectsadded"].push({context: streetVector, callback: addSegments, svl:true});
+            W.model.segments._events["objectschanged"].push({context: streetVector, callback: editSegments, svl:true});
+            W.model.segments._events["objectsremoved"].push({context: streetVector, callback: removeSegments, svl:true});
 
-        W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
-        W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
+            W.model.nodes._events["objectsremoved"].push({context: nodesVector, callback:removeNodes, svl:true});
+            W.model.nodes._events["objectsadded"].push({context: nodesVector, callback:addNodes, svl:true});
+        }
+        else
+        {
+            W.model.segments.events.register("objectsadded",streetVector, addSegments);
+            W.model.segments.events.register("objectschanged", streetVector, editSegments);
+            W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
 
+            W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
+            W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
+        }
         doDraw();
     }
     else
     {
         consoleDebug("Unregistering events");
-        W.model.segments.events.unregister("objectsadded",streetVector, addSegments);
-        W.model.segments.events.unregister("objectschanged", streetVector, editSegments);
-        W.model.segments.events.unregister("objectsremoved",streetVector, removeSegments);
+        if(beta){
+            W.model.segments._events["objectsadded"].filter(removeSVLEvents);
+            W.model.segments._events["objectsadded"].filter(removeSVLEvents);
+            W.model.segments._events["objectschanged"].filter(removeSVLEvents);
+            W.model.segments._events["objectsremoved"].filter(removeSVLEvents);
 
-        W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
-        W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
+            W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
+            W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
+        }
+        else
+        {
+            W.model.segments.events.unregister("objectsadded",streetVector, addSegments);
+            W.model.segments.events.unregister("objectschanged", streetVector, editSegments);
+            W.model.segments.events.unregister("objectsremoved",streetVector, removeSegments);
 
+            W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
+            W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
+        }
         nodesVector.destroyFeatures();
         streetVector.destroyFeatures();
     }
 }
 
-
+function removeSVLEvents(event)
+    {
+        return event.svl;
+    }
+    
+function getEffectiveLock(model)
+{
+   return 1 + (model.attributes.lockRank == null? model.attributes.rank : model.attributes.lockRank);
+}
 function drawSegment(model)
 {
     var pointList = [];
@@ -967,7 +1026,7 @@ function drawSegment(model)
     var myFeatures = [];
     consoleDebug(address);
     if(null != address.street && !address.street.isEmpty || (preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed)){
-        for(var p=0; p<simplified.length-1; ++p) {
+        for(var p=0, len = simplified.length-1; p<len; ++p) {
             var distance = simplified[p].distanceTo(simplified[p+1]);
             if(distance > maxDistance)
             {
@@ -1044,7 +1103,7 @@ function drawSegment(model)
                 var right = [];
                 var maxdx=streetStyle[attributes.roadType].strokeWidth/4;
                 var maxdy=streetStyle[attributes.roadType].strokeWidth/4;
-                for(var k=0; k< pointList.length-1; k++)
+                for(var k=0, len = pointList.length-1; k<len; k++)
                 {
                     var dx = pointList[k].x-pointList[k+1].x;
                     var dy = pointList[k].y-pointList[k+1].y;
@@ -1143,7 +1202,7 @@ function drawSegment(model)
             myFeatures.push(lineFeature); 
         }
         
-        if(model.isLockedByHigherRank())
+        if(model.isLockedByHigherRank() || (preferences.fakelock) < getEffectiveLock(model))
         {
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  nonEditableStyle);
@@ -1202,7 +1261,7 @@ function drawSegment(model)
             
             if((attributes.fwdDirection | attributes.revDirection) == false){
                 //Unknown direction
-                for(var p=0; p<simplifiedPoints.length-1; p++) {
+                for(var p=0, len = simplifiedPoints.length-1; p<len; p++) {
                     //var shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
                     var arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), {myId:attributes.id}, unknownDirStyle);
                     myFeatures.push(arrowFeature);
@@ -1211,7 +1270,7 @@ function drawSegment(model)
             else{
                 //Draw normal arrows
                 var step = attributes.junctionID != null ? 3:1; //It is a roundabout
-                for(var p=step-1; p<simplifiedPoints.length-1; p+=step) {
+                for(var p=step-1, len = simplifiedPoints.length-1; p<len; p+=step) {
                     //it is one way
                     var dx=0, dy=0;
                     if(attributes.fwdDirection){
@@ -1306,7 +1365,7 @@ function drawSegment(model)
                    streetPart+= "\n!! UNSUPPORTED ROAD TYPE !!";
                }
             var speedPart ="";
-            if(speed){
+            if(speed && preferences.showSLtext){
                 if(attributes.fwdMaxSpeed == attributes.revMaxSpeed)
                 {
                     speedPart = getSuperScript(attributes.fwdMaxSpeed);
@@ -1415,7 +1474,7 @@ function drawAllSegments()
     if(Object.keys(segments).length == 0) return; // exit now if there are no segments to draw, otherwise remainder of function will bomb out
     var keysSorted = Object.keys(segments).sort(function(a,b){return segments[a].attributes.level-segments[b].attributes.level;});
     var myFeatures = [];
-    for(var i=0; i<keysSorted.length; i++)
+    for(var i=0, len = keysSorted.length; i<len; i++)
     {
         myFeatures.push.apply(myFeatures, drawSegment(segments[keysSorted[i]]));
     }
@@ -1428,11 +1487,9 @@ function drawAllNodes()
         var nodeFeatures = [];
     var nodes = W.model.nodes.objects;
     consoleDebug("nodes", nodes);
-    for(var node in nodes)
+    for(var i=0, len = nodes.length; i < len; i++)
     {
-        if (nodes.hasOwnProperty(node)) {
-            nodeFeatures.push(drawNode(nodes[node]));
-        }
+        nodeFeatures.push(drawNode(nodes[i]));
     }//End: For all the nodes
     nodesVector.addFeatures(nodeFeatures);
 }
