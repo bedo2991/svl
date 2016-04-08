@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.1
+// @version    3.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
@@ -13,40 +13,39 @@
 
 //debugger;
 (function() {
+   /* var DEBUG_ENABLED = false; //set it to false for production mode
     
-    var DEBUG_ENABLED = false; //set it to false for production mode
-    
-    if(DEBUG_ENABLED)
+    if(DEBUG_ENABLED){
         consoleDebug= function()
-    {
-        if(DEBUG_ENABLED)
-        for (var i = 0; i < arguments.length; ++i)
-            console.debug(arguments[i]);
-    }
-    else
-        consoleDebug = function(){}    
-
-function wbwWazeBits() {
-    ////Utilities variable to avoid writing long names
-    if(typeof(W) !== "undefined")
-    {
-        //wazeMap = unsafeWindow.W.map;
-        if(typeof(W.map) !== "undefined")
         {
-            if(typeof(W.model) !== "undefined" /*&& typeof(selectionManager) !== "undefined"*/)
-                return;
+            if(DEBUG_ENABLED)
+                for (var i = 0; i < arguments.length; ++i)
+                    console.debug(arguments[i]);
         }
     }
-    throw "Model Not ready";
-}
-    
-function refreshWME()
+    else
     {
-        if(parseInt($('div.counter').text()) == 0)
-            $('div.icon-repeat.reload-button').click();
-    }  
+        consoleDebug = function(){}    
+    }*/
+    
+    var svlIgnoredStreets;
+    var arrowDeclutter;
+    var clutterMax;
+    var fontSizeMax;
+    var beta;
+    var farZoom;
+    var svlVersio;
+    var  preferences;
+    var svlStreetTypes;
+    var nonEditableStyle;
+    var tunnelFlagStyle2;
+    var tunnelFlagStyle1;
+    
+    
+   //End of global variable declaration
 
-function wbwGlobals() {
+    
+    function wbwGlobals() {
     arrowDeclutter = 25;
     clutterMax = 700;
     fontSizeMax = 32;
@@ -56,7 +55,7 @@ function wbwGlobals() {
     farZoom = W.map.zoom <5?true:false;
     svlVersion = GM_info.script.version;
     preferences=null;
-    svlIgnoredStreets = [8,10,16,17,19,20];
+    svlIgnoredStreets = {8:true,10:true,16:true,17:true,19:true,20:true};
     svlStreetTypes = {
         1: 'Street',
         20:'Parking Lot Road',
@@ -100,10 +99,31 @@ function wbwGlobals() {
         pointerEvents: "visiblePainted",
     }
 }
+     
+        
+function wbwWazeBits() {
+    ////Utilities variable to avoid writing long names
+    if(typeof(W) !== "undefined")
+    {
+        //wazeMap = unsafeWindow.W.map;
+        if(typeof(W.map) !== "undefined")
+        {
+            if(typeof(W.model) !== "undefined" /*&& typeof(selectionManager) !== "undefined"*/)
+                return;
+        }
+    }
+    throw "Model Not ready";
+}
+    
+function refreshWME()
+    {
+        if(parseInt($('div.counter').text()) == 0)
+            $('div.icon-repeat.reload-button').click();
+    }  
 
 function hasToBeSkipped(roadid)
 {
-    if(preferences.hideMinorRoads && W.map.getZoom() == 3 && svlIgnoredStreets.indexOf(roadid)>-1)
+    if(preferences.hideMinorRoads && W.map.getZoom() == 3 && svlIgnoredStreets[roadid]===true)
       return true;
     return false;
 }
@@ -117,8 +137,8 @@ function rollbackPreferences()
 
 function closePrefPanel()
 {
-    $('#zoomStyleDiv').hide(400, function(){ $('#zoomStyleDiv').remove();});
-    $('#PrefDiv').hide(400, function(){ $('#PrefDiv').remove();});
+    $(document.getElementById('zoomStyleDiv')).hide(400, function(){ $(document.getElementById('zoomStyleDiv')).remove();});
+    $(document.getElementById('PrefDiv')).hide(400, function(){ $(document.getElementById('PrefDiv')).remove();});
 }
 
 function bestBackground(color)
@@ -291,7 +311,7 @@ function getColorSpeed(speed)
 
 function editPreferences()
 {
-    if($('div#PrefDiv').length >0)
+    if($(document.getElementById('PrefDiv')).length >0)
         return;    
     var $zoomStyleDiv = $('<div id="zoomStyleDiv" class="zoomDiv"></div>');
     if(farZoom){
@@ -303,7 +323,7 @@ function editPreferences()
         $zoomStyleDiv.addClass('closeZoom');
         $zoomStyleDiv.text('You are currently in CLOSE-zoom mode');
     }
-    $('div#map').append($zoomStyleDiv);
+    $(document.getElementById('map')).append($zoomStyleDiv);
     var $style = $('<style>.farZoom{background-color:orange}.closeZoom{background-color:#6495ED}.zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}.prefElement{margin-right:0.2em;}summary{font-weight:bold}</style>');
     var $mainDiv = $('<div id="PrefDiv" style="padding:0.6em; border-radius:15px; background:white; opacity:0.93; width:23em; position:absolute; top:11em; left:30em; z-index:200"></div>');
     $mainDiv.append($('<div><button id="saveNewPref">Save</button> <button id="rollbackPreferences">Rollback</button> <button id="rollbackDefault">Reset</button><button style="float:right" id="close">X</button></div>'));   
@@ -444,8 +464,8 @@ function editPreferences()
 
     $mainDiv.append($elementDiv);
     $mainDiv.append($('<div style="margin-top:2px"><button id="exportPreferences">Export</button> <button id="importPreferences"">Import</button><div>')); 
-    $('body').append($mainDiv);
     $('body').append($style);
+    $('body').append($mainDiv);
     $('.prefElement').change(updatePref);
     $('#close').click(closePrefPanel);
     $('#saveNewPref').click(saveNewPref);
@@ -602,10 +622,10 @@ function savePreferences(preferences)
 function loadPreferences()
 {
     preferences = JSON.parse(localStorage.getItem('svl'));
-    consoleDebug("Loading preferences");
+    //consoleDebug("Loading preferences");
     if(preferences == null)
     {
-        consoleDebug("Creating new preferences from default");
+        //consoleDebug("Creating new preferences from default");
         saveDefaultPreferences();
         return false;
     }
@@ -616,7 +636,7 @@ function loadPreferences()
 function checkZoomLayer()
 {
     var zoom = W.map.getZoom();
-    consoleDebug("Zoom: "+ zoom);
+    //consoleDebug("Zoom: "+ zoom);
     if(preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled)
     {
         roadLayer.setVisibility(false);
@@ -626,7 +646,7 @@ function checkZoomLayer()
         if(streetVector.visibility==false && vectorAutomDisabled)
         {
             vectorAutomDisabled=false;
-            consoleDebug("Setting vector visibility to true");
+            //consoleDebug("Setting vector visibility to true");
             streetVector.setVisibility(true);
             doDraw();
             //streetVector.display(true)
@@ -688,11 +708,11 @@ function checkZoomLayer()
         }
         if(zoom <= 1)
         { //There is nothing to draw, enable road layer
-            consoleDebug("Road layer automatically enabled because of zoom out");
-            consoleDebug("Vector visibility: ", streetVector.visibility);
+            //consoleDebug("Road layer automatically enabled because of zoom out");
+            //consoleDebug("Vector visibility: ", streetVector.visibility);
             if(streetVector.visibility==true)
             {
-                consoleDebug("Setting vector visibility to false");
+                //consoleDebug("Setting vector visibility to false");
                 streetVector.setVisibility(false);
                 vectorAutomDisabled=true;
             }
@@ -701,7 +721,7 @@ function checkZoomLayer()
     }
 }
     function toggleLayerVisibility(){
-        consoleDebug("Toggling svl layer visibility");
+        //consoleDebug("Toggling svl layer visibility");
         if(!farZoom){
             streetVector.setVisibility(!streetVector.getVisibility());
         }
@@ -920,13 +940,10 @@ function initSVL() {
         {
             roadLayer.setVisibility(true);
         }
-        else if(roadLayer.getVisibility())
+        else if(roadLayer.getVisibility() && preferences.disableRoadLayers)
         {
-            if(preferences.disableRoadLayers)
-            {
                 roadLayer.setVisibility(false);
                 console.log("Roads layers were disabled by Street Vector Layer. You can change this behaviour in the preference panel.");
-            }
         }
     }
     vectorAutomDisabled=false;
@@ -950,12 +967,12 @@ function getThreshold()
 function manageNodes(e)
 {
     //Toggle node layer visibility accordingly
-    consoleDebug("Manage nodes", e);
+    //consoleDebug("Manage nodes", e);
     nodesVector.setVisibility(e.object.visibility);
 
     if(e.object.visibility)
     {
-        consoleDebug("Registering events");
+        //consoleDebug("Registering events");
         if(beta)
         {
             W.model.segments._events["objectsadded"].push({context: streetVector, callback: addSegments, svl:true});
@@ -978,7 +995,7 @@ function manageNodes(e)
     }
     else
     {
-        consoleDebug("Unregistering events");
+        //consoleDebug("Unregistering events");
         if(beta){
             W.model.segments._events["objectsadded"].filter(removeSVLEvents);
             W.model.segments._events["objectsadded"].filter(removeSVLEvents);
@@ -1024,7 +1041,7 @@ function drawSegment(model)
     var maxDistanceIndex=-1;
     var address = model.getAddress();
     var myFeatures = [];
-    consoleDebug(address);
+    //consoleDebug(address);
     if(null != address.street && !address.street.isEmpty || (preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed)){
         for(var p=0, len = simplified.length-1; p<len; ++p) {
             var distance = simplified[p].distanceTo(simplified[p+1]);
@@ -1039,8 +1056,7 @@ function drawSegment(model)
     var lineFeature = null;
     if(null == attributes.primaryStreetID)
     {
-        consoleDebug("RED segment", model);
-        consoleDebug(pointList);
+        //consoleDebug("RED segment", model);
         lineFeature = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  redStyle);
         myFeatures.push(lineFeature);
@@ -1048,10 +1064,10 @@ function drawSegment(model)
         var locked = false;
         var speed = null;
         speed = attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed;
-        consoleDebug("Road Type: ", attributes.roadType);
+        //consoleDebug("Road Type: ", attributes.roadType);
         if(attributes.level>0) //it is a bridge
         {
-            consoleDebug("Bridge");
+            //consoleDebug("Bridge");
             var bridgeStyle =
                 {
                 strokeColor: "#000",
@@ -1067,7 +1083,7 @@ function drawSegment(model)
         
         if(speed && !farZoom && preferences.showSLcolor) //it has a speed limit
         {
-            consoleDebug("SpeedLimit");
+            //consoleDebug("SpeedLimit");
             
             speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
             var speedStrokeStyle= (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified||attributes.revMaxSpeedUnverified) ? "dash":"solid");
@@ -1081,7 +1097,7 @@ function drawSegment(model)
             
             if(attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
             {
-                consoleDebug("The segment has 2 different speed limits");
+                //consoleDebug("The segment has 2 different speed limits");
                 speed = getColorSpeed(attributes.fwdMaxSpeed);
                 speedStyleLeft =
                 {
@@ -1105,12 +1121,14 @@ function drawSegment(model)
                 var maxdy=streetStyle[attributes.roadType].strokeWidth/4;
                 for(var k=0, len = pointList.length-1; k<len; k++)
                 {
-                    var dx = pointList[k].x-pointList[k+1].x;
-                    var dy = pointList[k].y-pointList[k+1].y;
-                    left[0] = pointList[k].clone();
-                    right[0] = pointList[k].clone();
-                    left[1] = pointList[k+1].clone();
-                    right[1] = pointList[k+1].clone();
+                    var pk = pointList[k];
+                    var pk1 = pointList[k+1];
+                    var dx = pk.x-pk1.x;
+                    var dy = pk.y-pk1.y;
+                    left[0] = pk.clone();
+                    right[0] = pk.clone();
+                    left[1] = pk1.clone();
+                    right[1] = pk1.clone();
                     var offset = (streetStyle[attributes.roadType].strokeWidth/5.0)*(18/(W.map.getZoom()*W.map.getZoom()))//((W.map.getZoom()+1)/11)+0.6*(1/(11-W.map.getZoom()));// (10-W.map.getZoom()/3)/(10-W.map.getZoom());
                     if(Math.abs(dx)<0.5)
                     {//segment is vertical
@@ -1132,7 +1150,7 @@ function drawSegment(model)
                     {
                         var m= dy/dx;
                         var mb = -1/m;
-                        consoleDebug("m: ", m);
+                        //consoleDebug("m: ", m);
                         if(Math.abs(m)<0.05)
                         {
                             //Segment is horizontal
@@ -1162,7 +1180,7 @@ function drawSegment(model)
                             right[1].move(-offset/temp, -offset*(mb/temp)); 
                         }
                     }
-                    consoleDebug("Adding 2 speeds");
+                    //consoleDebug("Adding 2 speeds");
                     //consoleDebug(left);
                     //consoleDebug(right);
                     lineFeature = new OpenLayers.Feature.Vector(
@@ -1171,8 +1189,6 @@ function drawSegment(model)
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(right), {myId:attributes.id},  speedStyleRight);
                     myFeatures.push(lineFeature); 
-                    right = [];
-                    left = [];
                 }
             }
             else{
@@ -1195,7 +1211,6 @@ function drawSegment(model)
                     strokeOpacity: 0.35,
                     strokeDashstyle: "solid",
                     pointerEvents: "visiblePainted",
-
                 }
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tunnelsStyle);
@@ -1221,7 +1236,7 @@ function drawSegment(model)
         }
         if(null != attributes.junctionID)
         {//It is a roundabout
-            consoleDebug("Segment is a roundabout");
+            //consoleDebug("Segment is a roundabout");
             var lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  roundaboutStyle);
             myFeatures.push(lineFeature);
@@ -1229,7 +1244,7 @@ function drawSegment(model)
 
         if(!locked && (attributes.fwdToll || attributes.revToll))
         {//It is a toll road
-            consoleDebug("Segment is toll");
+            //consoleDebug("Segment is toll");
             var lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tollStyle);
             myFeatures.push(lineFeature);
@@ -1237,7 +1252,7 @@ function drawSegment(model)
         if(attributes.fwdRestrictions){
             if(attributes.fwdRestrictions.length>0 || attributes.revRestrictions.length>0 )
             {//It has restrictions
-                consoleDebug("Segment has restrictions");
+                //consoleDebug("Segment has restrictions");
                 var lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  restrStyle);
                 myFeatures.push(lineFeature);
@@ -1253,7 +1268,7 @@ function drawSegment(model)
 
         if((attributes.fwdDirection == false || attributes.revDirection == false))
         {
-            consoleDebug("The segment is oneway or has unknown direction");
+            //consoleDebug("The segment is oneway or has unknown direction");
             var simplifiedPoints = points;
             if(attributes.junctionID==null && attributes.length / points.length < arrowDeclutter){
                 simplifiedPoints = simplified;
@@ -1350,13 +1365,13 @@ function drawSegment(model)
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   tunnelFlagStyle2);
         myFeatures.push(lineFeature); 
     }
-    consoleDebug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
+    //consoleDebug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
     if(thresholdDistance && maxDistance >= thresholdDistance)
     {
         var labelFeature = null;
         if((attributes.fwdMaxSpeed|attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))
         {
-            consoleDebug("Label inserted");
+            //consoleDebug("Label inserted");
             labelFeature = new OpenLayers.Feature.Vector(lineString.getCentroid(true),{myId:attributes.id});/*Important pass true parameter otherwise it will return start point as centroid*/
             var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:"");
             
@@ -1470,7 +1485,7 @@ function drawAllSegments()
 {
     streetVector.destroyFeatures();
     var segments = W.model.segments.objects;
-    consoleDebug(W.model.segments);
+    //consoleDebug(W.model.segments);
     if(Object.keys(segments).length == 0) return; // exit now if there are no segments to draw, otherwise remainder of function will bomb out
     var keysSorted = Object.keys(segments).sort(function(a,b){return segments[a].attributes.level-segments[b].attributes.level;});
     var myFeatures = [];
@@ -1486,28 +1501,32 @@ function drawAllNodes()
     nodesVector.destroyFeatures();
         var nodeFeatures = [];
     var nodes = W.model.nodes.objects;
-    consoleDebug("nodes", nodes);
-    for(var i=0, len = nodes.length; i < len; i++)
+    //consoleDebug("nodes", nodes);
+    for(var node in nodes)
     {
-        nodeFeatures.push(drawNode(nodes[i]));
+        if (nodes.hasOwnProperty(node)) {
+            nodeFeatures.push(drawNode(nodes[node]));
+        }
     }//End: For all the nodes
     nodesVector.addFeatures(nodeFeatures);
 }
 
 function doDraw()
 {
-    consoleDebug("Drawing everything anew");
+    //consoleDebug("Drawing everything anew");
     drawAllSegments();
     
     if(!farZoom)
+    {
         drawAllNodes();
+    }
 }
-
+    
 function addSegments(e)
 {
-    consoleDebug("Segments added to model");
+    //consoleDebug("Segments added to model");
     e = e.filter(function(value){return value != undefined;})
-    consoleDebug(e);
+    //consoleDebug(e);
     e.sort(function(a,b){return (a.attributes.level-b.attributes.level)});
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
@@ -1515,7 +1534,7 @@ function addSegments(e)
         if(e[i] != null){
             var features = drawSegment(e[i]);
             for(var j=0; j<features.length; j++){
-                consoleDebug(j, features[j]);
+                //consoleDebug(j, features[j]);
                 if( features[j] != undefined) //TODO find out what makes it undefined
                     myFeatures.push(features[j]);
             }
@@ -1526,7 +1545,7 @@ function addSegments(e)
 
 function editSegments(e)
 {
-    consoleDebug("Segments modifed", e);
+    //consoleDebug("Segments modifed", e);
     for(var i=0; i<e.length; i++)
     {
         if(typeof(e[i]._prevID) !== "undefined")
@@ -1544,12 +1563,12 @@ function editSegments(e)
 
 function removeSegmentById(id)
 {
-    consoleDebug("RemoveById", id, typeof(id));
+    //consoleDebug("RemoveById", id, typeof(id));
     streetVector.destroyFeatures(streetVector.getFeaturesByAttribute("myId", id));
 }
 
 function removeSegments(e){
-    consoleDebug("Segments removed from model");
+    //consoleDebug("Segments removed from model");
     for(var i=0; i<e.length; i++)
     {
         removeSegmentById(e[i].attributes.id);
@@ -1563,7 +1582,7 @@ function removeNodeById(id)
 
 function removeNodes(e)
 {
-    consoleDebug("Remove nodes");
+    //consoleDebug("Remove nodes");
     for(var i=0; i<e.length; i++)
     {
         removeNodeById(e[i].attributes.id);
@@ -1575,7 +1594,7 @@ function addNodes(e)
 {
     if(farZoom)
         return;
-    consoleDebug("Add nodes");
+    //consoleDebug("Add nodes");
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
     {
