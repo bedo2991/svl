@@ -1,13 +1,12 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.2
+// @version    3.2.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://www.wazeitalia.it/script/svl.user.js
 // @author     bedo2991
 // @grant      none
-// @require    https://craig.global.ssl.fastly.net/js/mousetrap/mousetrap.min.js
 // @copyright  2015+, bedo2991
 // ==/UserScript==
 
@@ -706,17 +705,17 @@ function checkZoomLayer()
             nodesVector.destroyFeatures();
             doDraw();
         }
-        if(zoom <= 1)
+        if(zoom < 2)
         { //There is nothing to draw, enable road layer
             //consoleDebug("Road layer automatically enabled because of zoom out");
             //consoleDebug("Vector visibility: ", streetVector.visibility);
-            if(streetVector.visibility==true)
+            if(streetVector.getVisibility()===true)
             {
                 //consoleDebug("Setting vector visibility to false");
                 streetVector.setVisibility(false);
                 vectorAutomDisabled=true;
+                roadLayer.setVisibility(true);
             }
-            roadLayer.setVisibility(true);
         }
     }
 }
@@ -731,7 +730,6 @@ function initSVL() {
     //Initialize variables
     try{
         wbwWazeBits();
-        Mousetrap.bind('alt+l', toggleLayerVisibility);
     }
     catch (e)
     {
@@ -757,7 +755,7 @@ function initSVL() {
         //First run, or new broswer
         alert("This is the first time that you run Street Vector Layer in this browser.\n"
               +"Some info about it:\n"
-              +"Use ALT+L to toggle the layer.\n"
+              +"By default, use ALT+L to toggle the layer.\n"
               +"You can change the streets colour, thickness and style by clicking on the attribution bar at the bottom of the editor.\n"
               +"Your preferences will be saved for the next time in your browser.\n"
               +"The other road layers will be automatically hidden. (You can change this behaviour in the preference panel).\n"
@@ -817,11 +815,12 @@ function initSVL() {
         fontFamily: "Arial",
         labelSelect: true,*/
     });
-    var layername= "Street (Vector)";
+    var layername= "Street Vector Layer";    
+    
     streetVector = new OpenLayers.Layer.Vector(layername, 
                                                {
                                                    styleMap: labelStyleMap,
-                                                   uniqueName: 'vectorStreet',
+                                                   uniqueName: 'vectorstreet',
                                                    shortcutKey:'A+l',
                                                    displayInLayerSwitcher:true,
                                                    accelerator: "toggle" + layername.replace(/\s+/g,''),
@@ -832,7 +831,7 @@ function initSVL() {
                                                    attribution: "Street Vector Layer"
                                                });
     streetVector.renderer.drawText = function (e,t,i){var n=!!t.labelOutlineWidth;if(n){var s=OpenLayers.Util.extend({},t);s.fontColor=s.labelOutlineColor,s.fontStrokeColor=s.labelOutlineColor,s.fontStrokeWidth=t.labelOutlineWidth,delete s.labelOutlineWidth,this.drawText(e,s,i)}var r=this.getResolution();var layer=this.map.getLayer(this.container.id);var feature=layer.getFeatureById(e);i=(feature.attributes.centroid?feature.attributes.centroid:i);o=(i.x-this.featureDx)/r+this.left,a=i.y/r-this.top,l=n?this.LABEL_OUTLINE_SUFFIX:this.LABEL_ID_SUFFIX,u=this.nodeFactory(e+l,"text");u.setAttributeNS(null,"x",o),u.setAttributeNS(null,"y",-a);if(t.angle||t.angle==0){var rotate='rotate('+t.angle+','+o+","+-a+')';u.setAttributeNS(null,"transform",rotate);}t.fontColor&&u.setAttributeNS(null,"fill",t.fontColor),t.fontStrokeColor&&u.setAttributeNS(null,"stroke",t.fontStrokeColor),t.fontStrokeWidth&&u.setAttributeNS(null,"stroke-width",t.fontStrokeWidth),t.fontOpacity&&u.setAttributeNS(null,"opacity",t.fontOpacity),t.fontFamily&&u.setAttributeNS(null,"font-family",t.fontFamily),t.fontSize&&u.setAttributeNS(null,"font-size",t.fontSize),t.fontWeight&&u.setAttributeNS(null,"font-weight",t.fontWeight),t.fontStyle&&u.setAttributeNS(null,"font-style",t.fontStyle),t.labelSelect===!0?(u.setAttributeNS(null,"pointer-events","visible"),u._featureId=e):u.setAttributeNS(null,"pointer-events","none");var h=t.labelAlign||OpenLayers.Renderer.defaultSymbolizer.labelAlign;u.setAttributeNS(null,"text-anchor",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[0]]||"middle"),OpenLayers.IS_GECKO===!0&&u.setAttributeNS(null,"dominant-baseline",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[1]]||"central");for(var c=t.label.split("\n"),d=c.length;u.childNodes.length>d;)u.removeChild(u.lastChild);for(var p=0;d>p;p++){var g=this.nodeFactory(e+l+"_tspan_"+p,"tspan");if(t.labelSelect===!0&&(g._featureId=e,g._geometry=i,g._geometryClass=i.CLASS_NAME),OpenLayers.IS_GECKO===!1&&g.setAttributeNS(null,"baseline-shift",OpenLayers.Renderer.SVG.LABEL_VSHIFT[h[1]]||"-35%"),g.setAttribute("x",o),0==p){var f=OpenLayers.Renderer.SVG.LABEL_VFACTOR[h[1]];null==f&&(f=-.5),g.setAttribute("dy",f*(d-1)+"em")}else g.setAttribute("dy","1em");g.textContent=""===c[p]?" ":c[p],g.parentNode||u.appendChild(g)}u.parentNode||this.textRoot.appendChild(u)}
-    nodesVector = new OpenLayers.Layer.Vector("Nodes (Vector)", 
+    nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", 
                                               {
                                                   
                                                   uniqueName: 'vectorNodes',
