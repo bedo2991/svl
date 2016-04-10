@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.2.1
+// @version    3.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
-// @updateURL  http://www.wazeitalia.it/script/svl.user.js
+// @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
 // @author     bedo2991
 // @grant      none
 // @copyright  2015+, bedo2991
@@ -13,7 +13,7 @@
 //debugger;
 (function() {
    /* var DEBUG_ENABLED = false; //set it to false for production mode
-    
+
     if(DEBUG_ENABLED){
         consoleDebug= function()
         {
@@ -24,36 +24,60 @@
     }
     else
     {
-        consoleDebug = function(){}    
+        consoleDebug = function(){}
     }*/
-    
+    var svlAttempts=0;
+    var clutterConstant;
+    var thresholdDistance;
+    var streetStyle = [];
+    var labelFontSize;
+    var streetVector;
+    var nodesVector;
+    var labelOutlineWidth;
+    var clutterCostantFarZoom;
+    var clutterCostantNearZoom;
     var svlIgnoredStreets;
     var arrowDeclutter;
     var clutterMax;
     var fontSizeMax;
     var beta;
     var farZoom;
-    var svlVersio;
+    var svlVersion;
     var  preferences;
     var svlStreetTypes;
     var nonEditableStyle;
     var tunnelFlagStyle2;
+    var superScript;
+
     var tunnelFlagStyle1;
-    
-    
+    var roundaboutStyle;
+    var tollStyle;
+    var closureStyle;
+    var validatedStyle;
+    var restrStyle;
+    var redStyle;
+    var nodeStyle;
+    var unknownDirStyle;
+    var roadLayer;
+    var vectorAutomDisabled;
+
+    var farZoomThereshold;
+
    //End of global variable declaration
 
-    
     function wbwGlobals() {
+            "use strict";
+    farZoomThereshold=5; //To increase performance change this value to 6.
     arrowDeclutter = 25;
     clutterMax = 700;
     fontSizeMax = 32;
     beta = false;
     if(W.model.nodes.events == undefined)
         beta=true;
-    farZoom = W.map.zoom <5?true:false;
+    farZoom = W.map.zoom < farZoomThereshold ? true : false;
     svlVersion = GM_info.script.version;
     preferences=null;
+    superScript = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
     svlIgnoredStreets = {8:true,10:true,16:true,17:true,19:true,20:true};
     svlStreetTypes = {
         1: 'Street',
@@ -73,7 +97,7 @@
         /*'service': 21,*/
         10: 'Pedestrian Boardwalk'
     };
-    
+
     OpenLayers.Renderer.symbol.mytriangle = [-2, 0, 2, 0, 0, -6, -2, 0];
     nonEditableStyle =
         {
@@ -98,8 +122,7 @@
         pointerEvents: "visiblePainted",
     }
 }
-     
-        
+
 function wbwWazeBits() {
     ////Utilities variable to avoid writing long names
     if(typeof(W) !== "undefined")
@@ -113,12 +136,12 @@ function wbwWazeBits() {
     }
     throw "Model Not ready";
 }
-    
+
 function refreshWME()
     {
         if(parseInt($('div.counter').text()) == 0)
             $('div.icon-repeat.reload-button').click();
-    }  
+    }
 
 function hasToBeSkipped(roadid)
 {
@@ -193,12 +216,12 @@ function updateStylesFromPreferences(preferences)
     //ArrowDeclutter
     arrowDeclutter = preferences.arrowDeclutter;
     labelOutlineWidth = preferences.labelOutlineWidth;
-    
+
     labelFontSize = farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize;
     labelOutlineWidth = preferences.labelOutlineWidth+"px";
     //showSLtext = preferences.showSLtext;
     //showSLcolor = preferences.showSLcolor;
-    
+
     doDraw();
 }
 
@@ -236,7 +259,7 @@ function updatePref()
             preferences.streets[i].strokeDashstyle = $('#strokeDashstyle_'+i+ ' option:selected').val();
         }
     }
-    
+
     preferences.fakelock = $('#fakeLock').val();
 
     //Red
@@ -267,10 +290,10 @@ function updatePref()
     preferences.labelOutlineWidth = $('#labelOutlineWidth').val();
     preferences.disableRoadLayers = $('#disableRoadLayers').prop('checked');
     preferences.startDisabled = $('#startdisabled').prop('checked');
-    
+
     preferences.showSLtext = $('#showSLtext').prop('checked');
     preferences.showSLcolor = $('#showSLcolor').prop('checked');
-    
+
     preferences.hideMinorRoads = $('#hideMinorRoads').prop('checked');
     preferences.showDashedUnverifiedSL = $('#showDashedUnverifiedSL').prop('checked');
     preferences.farZoomLabelSize = $('#farZoomLabelSize').val();
@@ -298,7 +321,7 @@ function rollbackDefault(dontask){
 function getColorSpeed(speed)
 {
     if(W.prefs.attributes.isImperial) // adjust scale for Imperial
-    {        
+    {
         // speeds 15 to 75 mph (7 increments) are tuned to HSL 95 to 395 (35) for easy visual speed differentiation at common speeds
         return ((speed / 1.609344 * 5) + 20) %360
     }
@@ -311,7 +334,7 @@ function getColorSpeed(speed)
 function editPreferences()
 {
     if($(document.getElementById('PrefDiv')).length >0)
-        return;    
+        return;
     var $zoomStyleDiv = $('<div id="zoomStyleDiv" class="zoomDiv"></div>');
     if(farZoom){
         $zoomStyleDiv.addClass('farZoom');
@@ -325,7 +348,7 @@ function editPreferences()
     $(document.getElementById('map')).append($zoomStyleDiv);
     var $style = $('<style>.farZoom{background-color:orange}.closeZoom{background-color:#6495ED}.zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}.prefElement{margin-right:0.2em;}summary{font-weight:bold}</style>');
     var $mainDiv = $('<div id="PrefDiv" style="padding:0.6em; border-radius:15px; background:white; opacity:0.93; width:23em; position:absolute; top:11em; left:30em; z-index:200"></div>');
-    $mainDiv.append($('<div><button id="saveNewPref">Save</button> <button id="rollbackPreferences">Rollback</button> <button id="rollbackDefault">Reset</button><button style="float:right" id="close">X</button></div>'));   
+    $mainDiv.append($('<div><button id="saveNewPref">Save</button> <button id="rollbackPreferences">Rollback</button> <button id="rollbackDefault">Reset</button><button style="float:right" id="close">X</button></div>'));
 
     var $elementDiv = $('<div id="PrefDiv" style="padding:5px; width:280px; max-height:450px; overflow:auto"></div>');
 
@@ -409,11 +432,11 @@ function editPreferences()
     $labels.append($('<br><i>Font Size</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="farZoomLabelSize" value="'+preferences.farZoomLabelSize+'" type="range" min="8" max="'+fontSizeMax+'"></input>'));
     $labels.append('<hr>');
-    
+
     $labels.append($('<b>Label outline width</b><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="labelOutlineWidth" value="'+preferences.labelOutlineWidth+'" type="range" min="0" max="10"></input>'));
     $labels.append('<hr>');
-    
+
     $labels.append($('<b>Hide minor roads at zoom 3</b>'));
     $labels.append($('<input class="prefElement" title="True or False" id="hideMinorRoads" type="checkbox" '+(preferences.hideMinorRoads?'checked':'')+' ></input>'));
     $labels.append('<hr>');
@@ -422,30 +445,30 @@ function editPreferences()
     $labels.append($('<b>Arrows (the highest, the less)</b><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="arrowDeclutter" value="'+preferences.arrowDeclutter+'" type="range" min="1" max="200"></input>'));
     $labels.append('<hr>');
-    
+
     $labels.append($('<b>Hide other road layers </b>'));
     $labels.append($('<input class="prefElement" title="True or False" id="disableRoadLayers" type="checkbox" '+(preferences.disableRoadLayers?'checked':'')+' ></input>'));
     $labels.append('<hr>');
-    
+
     $labels.append($('<b>Layer initially disabled</b>'));
     $labels.append($('<input class="prefElement" title="True or False" id="startdisabled" type="checkbox" '+(preferences.startDisabled?'checked':'')+' ></input>'));
     $labels.append('<hr>');
-    
+
     $elementDiv.append($labels);
-    
+
     //Speed limits
     $speedLimits.append('<summary>Speed Limits</summary>');
     $speedLimits.append($('<b>Show text on streetname</b>'));
     $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLtext" type="checkbox" '+(preferences.showSLtext?'checked':'')+' ></input>'));
     $speedLimits.append('<hr>');
-    
+
     $speedLimits.append($('<b>Show using colours</b>'));
     $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLcolor" type="checkbox" '+(preferences.showSLcolor?'checked':'')+' ></input>'));
     $speedLimits.append('<hr>');
     $speedLimits.append($('<b>Show unverified limits with a dashed line</b>'));
     $speedLimits.append($('<input class="prefElement" title="True or False" id="showDashedUnverifiedSL" type="checkbox" '+(preferences.showDashedUnverifiedSL?'checked':'')+' ></input>'));
     $speedLimits.append('<hr>');
-    
+
     $speedLimits.append($('<b>Reference colours</b>'));
     $speedLimits.append('<br/>');
     for(var k=W.prefs.attributes.isImperial?9:15; k>1; k--){
@@ -462,7 +485,7 @@ function editPreferences()
     $elementDiv.append($speedLimits);
 
     $mainDiv.append($elementDiv);
-    $mainDiv.append($('<div style="margin-top:2px"><button id="exportPreferences">Export</button> <button id="importPreferences"">Import</button><div>')); 
+    $mainDiv.append($('<div style="margin-top:2px"><button id="exportPreferences">Export</button> <button id="importPreferences"">Import</button><div>'));
     $('body').append($style);
     $('body').append($mainDiv);
     $('.prefElement').change(updatePref);
@@ -556,7 +579,7 @@ function saveDefaultPreferences()
         strokeColor: "#FFFFFF",
         strokeWidth: 4,
         strokeDashstyle: "dash"
-    };    
+    };
     //Private: 17
     preferences.streets[17] ={
         strokeColor: "#00FFB3",
@@ -651,7 +674,7 @@ function checkZoomLayer()
             //streetVector.display(true)
         }
     }
-    if(zoom >= 5)
+    if(zoom >= farZoomThereshold)
     {
         //Close zoom
         clutterConstant = preferences.clutterCostantNearZoom;
@@ -728,6 +751,7 @@ function checkZoomLayer()
 
 function initSVL() {
     //Initialize variables
+
     try{
         wbwWazeBits();
     }
@@ -747,9 +771,9 @@ function initSVL() {
             return;
         }
     }
-    
+
     wbwGlobals();
-    
+
     if(loadPreferences() == false)
     {
         //First run, or new broswer
@@ -775,7 +799,7 @@ function initSVL() {
             saveDefaultPreferences();
         }
     }
-    
+
     clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
     thresholdDistance = getThreshold();
     if(preferences.farZoomLabelSize == null || preferences.closeZoomLabelSize==null || preferences.labelOutlineWidth ==null){
@@ -806,18 +830,10 @@ function initSVL() {
                     angle: "${angle}",
                     //angle: degrees,
                     labelAlign: "cm"//set to center middle
-        
-
-       /* cursor: "pointer",
-        labelXOffset: 0,
-        fontColor: "black",
-        fontSize: "24px",
-        fontFamily: "Arial",
-        labelSelect: true,*/
     });
-    var layername= "Street Vector Layer";    
-    
-    streetVector = new OpenLayers.Layer.Vector(layername, 
+    var layername= "Street Vector Layer";
+
+    streetVector = new OpenLayers.Layer.Vector(layername,
                                                {
                                                    styleMap: labelStyleMap,
                                                    uniqueName: 'vectorstreet',
@@ -831,9 +847,8 @@ function initSVL() {
                                                    attribution: "Street Vector Layer"
                                                });
     streetVector.renderer.drawText = function (e,t,i){var n=!!t.labelOutlineWidth;if(n){var s=OpenLayers.Util.extend({},t);s.fontColor=s.labelOutlineColor,s.fontStrokeColor=s.labelOutlineColor,s.fontStrokeWidth=t.labelOutlineWidth,delete s.labelOutlineWidth,this.drawText(e,s,i)}var r=this.getResolution();var layer=this.map.getLayer(this.container.id);var feature=layer.getFeatureById(e);i=(feature.attributes.centroid?feature.attributes.centroid:i);o=(i.x-this.featureDx)/r+this.left,a=i.y/r-this.top,l=n?this.LABEL_OUTLINE_SUFFIX:this.LABEL_ID_SUFFIX,u=this.nodeFactory(e+l,"text");u.setAttributeNS(null,"x",o),u.setAttributeNS(null,"y",-a);if(t.angle||t.angle==0){var rotate='rotate('+t.angle+','+o+","+-a+')';u.setAttributeNS(null,"transform",rotate);}t.fontColor&&u.setAttributeNS(null,"fill",t.fontColor),t.fontStrokeColor&&u.setAttributeNS(null,"stroke",t.fontStrokeColor),t.fontStrokeWidth&&u.setAttributeNS(null,"stroke-width",t.fontStrokeWidth),t.fontOpacity&&u.setAttributeNS(null,"opacity",t.fontOpacity),t.fontFamily&&u.setAttributeNS(null,"font-family",t.fontFamily),t.fontSize&&u.setAttributeNS(null,"font-size",t.fontSize),t.fontWeight&&u.setAttributeNS(null,"font-weight",t.fontWeight),t.fontStyle&&u.setAttributeNS(null,"font-style",t.fontStyle),t.labelSelect===!0?(u.setAttributeNS(null,"pointer-events","visible"),u._featureId=e):u.setAttributeNS(null,"pointer-events","none");var h=t.labelAlign||OpenLayers.Renderer.defaultSymbolizer.labelAlign;u.setAttributeNS(null,"text-anchor",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[0]]||"middle"),OpenLayers.IS_GECKO===!0&&u.setAttributeNS(null,"dominant-baseline",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[1]]||"central");for(var c=t.label.split("\n"),d=c.length;u.childNodes.length>d;)u.removeChild(u.lastChild);for(var p=0;d>p;p++){var g=this.nodeFactory(e+l+"_tspan_"+p,"tspan");if(t.labelSelect===!0&&(g._featureId=e,g._geometry=i,g._geometryClass=i.CLASS_NAME),OpenLayers.IS_GECKO===!1&&g.setAttributeNS(null,"baseline-shift",OpenLayers.Renderer.SVG.LABEL_VSHIFT[h[1]]||"-35%"),g.setAttribute("x",o),0==p){var f=OpenLayers.Renderer.SVG.LABEL_VFACTOR[h[1]];null==f&&(f=-.5),g.setAttribute("dy",f*(d-1)+"em")}else g.setAttribute("dy","1em");g.textContent=""===c[p]?" ":c[p],g.parentNode||u.appendChild(g)}u.parentNode||this.textRoot.appendChild(u)}
-    nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", 
+    nodesVector = new OpenLayers.Layer.Vector("Nodes Vector",
                                               {
-                                                  
                                                   uniqueName: 'vectorNodes',
                                                   shortcutKey:'A+n',
                                                   visibility: true,
@@ -841,8 +856,6 @@ function initSVL() {
                                                   isBaseLayer: false,
                                                   sphericalMercator: true
                                               });
-
-    streetStyle = [];
 
     //Street types
     for(var i=0, len = preferences.streets.length; i<len; i++)
@@ -947,7 +960,7 @@ function initSVL() {
     }
     vectorAutomDisabled=false;
     W.map.events.register("zoomend", null, checkZoomLayer);
-    
+
     if(preferences.startDisabled)
     {
         streetVector.setVisibility(false);
@@ -1019,17 +1032,19 @@ function manageNodes(e)
 }
 
 function removeSVLEvents(event)
-    {
-        return event.svl;
-    }
-    
+{
+    return event.svl;
+}
+
 function getEffectiveLock(model)
 {
    return 1 + (model.attributes.lockRank == null? model.attributes.rank : model.attributes.lockRank);
 }
 function drawSegment(model)
 {
+        "use strict";
     var pointList = [];
+    var lineString;
     var attributes = model.attributes;
     if(hasToBeSkipped(attributes.roadType))
         return [];
@@ -1077,28 +1092,28 @@ function drawSegment(model)
                 }
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  bridgeStyle);
-            myFeatures.push(lineFeature); 
+            myFeatures.push(lineFeature);
         }
-        
+
         if(speed && !farZoom && preferences.showSLcolor) //it has a speed limit
         {
             //consoleDebug("SpeedLimit");
-            
+
             speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
             var speedStrokeStyle= (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified||attributes.revMaxSpeedUnverified) ? "dash":"solid");
-            speedStyle =
+            var speedStyle =
             {
                 strokeColor: "hsl("+speed+", 100%, 50%)",
                 strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
                 strokeDashstyle: speedStrokeStyle,
                 pointerEvents: "visiblePainted",
             }
-            
+
             if(attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
             {
                 //consoleDebug("The segment has 2 different speed limits");
                 speed = getColorSpeed(attributes.fwdMaxSpeed);
-                speedStyleLeft =
+                var speedStyleLeft =
                 {
                     strokeColor: "hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
@@ -1106,7 +1121,7 @@ function drawSegment(model)
                     pointerEvents: "visiblePainted",
                 }
                 speed = getColorSpeed(attributes.revMaxSpeed);
-                speedStyleRight =
+                var speedStyleRight =
                 {
                     strokeColor: "hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
@@ -1173,10 +1188,10 @@ function drawSegment(model)
                                 offset*=-1;
                             }
                             var temp = Math.sqrt(1+(mb*mb));
-                            left[0].move(offset/temp, offset*(mb/temp)); 
-                            left[1].move(offset/temp, offset*(mb/temp)); 
-                            right[0].move(-offset/temp, -offset*(mb/temp)); 
-                            right[1].move(-offset/temp, -offset*(mb/temp)); 
+                            left[0].move(offset/temp, offset*(mb/temp));
+                            left[1].move(offset/temp, offset*(mb/temp));
+                            right[0].move(-offset/temp, -offset*(mb/temp));
+                            right[1].move(-offset/temp, -offset*(mb/temp));
                         }
                     }
                     //consoleDebug("Adding 2 speeds");
@@ -1184,16 +1199,16 @@ function drawSegment(model)
                     //consoleDebug(right);
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(left), {myId:attributes.id},  speedStyleLeft);
-                    myFeatures.push(lineFeature); 
+                    myFeatures.push(lineFeature);
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(right), {myId:attributes.id},  speedStyleRight);
-                    myFeatures.push(lineFeature); 
+                    myFeatures.push(lineFeature);
                 }
             }
             else{
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  speedStyle);
-                myFeatures.push(lineFeature); 
+                myFeatures.push(lineFeature);
             }
         }
 
@@ -1213,9 +1228,9 @@ function drawSegment(model)
                 }
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tunnelsStyle);
-            myFeatures.push(lineFeature); 
+            myFeatures.push(lineFeature);
         }
-        
+
         if(model.isLockedByHigherRank() || (preferences.fakelock) < getEffectiveLock(model))
         {
             lineFeature = new OpenLayers.Feature.Vector(
@@ -1272,7 +1287,7 @@ function drawSegment(model)
             if(attributes.junctionID==null && attributes.length / points.length < arrowDeclutter){
                 simplifiedPoints = simplified;
             }
-            
+
             if((attributes.fwdDirection | attributes.revDirection) == false){
                 //Unknown direction
                 for(var p=0, len = simplifiedPoints.length-1; p<len; p++) {
@@ -1302,7 +1317,7 @@ function drawSegment(model)
                     var minDistance = 15.0*(11-W.map.getZoom());
                     if(segmentLenght<minDistance*2){
                         var segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]);
-                        arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {myId:attributes.id},  
+                        arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {myId:attributes.id},
                                                                      {
                             graphicName: "mytriangle",
                             rotation:degrees,
@@ -1331,7 +1346,7 @@ function drawSegment(model)
                         var py = simplifiedPoints[p].y + stepy;
                         for (var ix = 0; ix < numPoints; ix++)
                         {
-                            arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {myId:attributes.id},  
+                            arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {myId:attributes.id},
                                                                          {
                                 graphicName: "mytriangle",
                                 rotation:degrees,
@@ -1349,20 +1364,20 @@ function drawSegment(model)
                             px += stepx;
                             py += stepy;
                         }
-                    }                  
+                    }
                 }
             }
         }
     }
-    
+
     if(attributes.flags & 1)
     {//The tunnel flag is enabled
         lineFeature = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   tunnelFlagStyle1);
-        myFeatures.push(lineFeature); 
+        myFeatures.push(lineFeature);
                 lineFeature = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   tunnelFlagStyle2);
-        myFeatures.push(lineFeature); 
+        myFeatures.push(lineFeature);
     }
     //consoleDebug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
     if(thresholdDistance && maxDistance >= thresholdDistance)
@@ -1370,10 +1385,10 @@ function drawSegment(model)
         var labelFeature = null;
         if((attributes.fwdMaxSpeed|attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))
         {
-            //consoleDebug("Label inserted");
+            //consoleDebug("Label can be inserted");
             labelFeature = new OpenLayers.Feature.Vector(lineString.getCentroid(true),{myId:attributes.id});/*Important pass true parameter otherwise it will return start point as centroid*/
             var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:"");
-            
+
             if(! streetStyle[attributes.roadType])
                {
                    streetPart+= "\n!! UNSUPPORTED ROAD TYPE !!";
@@ -1407,11 +1422,12 @@ function drawSegment(model)
                     speedPart+='?';
                 }
             }
-            
+
             var dx=0, dy=0;
             var p=maxDistanceIndex;
             if(maxDistance > streetPart.length * 2.1 * (8-W.map.getZoom()) + Math.random() * 60)
             {
+                    //consoleDebug("Label inserted");
                     if(attributes.fwdDirection){
                         dx = simplified[p+1].x-simplified[p].x;
                         dy = simplified[p+1].y-simplified[p].y;
@@ -1423,21 +1439,20 @@ function drawSegment(model)
                     }
                     var angle = Math.atan2(dx,dy);
                     var degrees = 90 + angle*180/Math.PI;
-                    var directionArrow = "";
+                    var directionArrow = " ▶ ";
                     if(degrees>90 && degrees < 270)
                     {
                         degrees-=180;
-                        if(model.isOneWay()){
-                            directionArrow = "▶";
-                        }
+                            //directionArrow = " ▶ ";
                     }
                     else
                     {
-                        if(model.isOneWay()){
-                            directionArrow = "◀";
-                        }
+                            directionArrow = " ◀ ";
                     }
-                labelFeature.attributes.label=directionArrow + " " + streetPart+ " " + directionArrow+ " "+speedPart;
+                    if(!model.isOneWay()){
+                        directionArrow="";
+                    }
+                labelFeature.attributes.label=directionArrow + streetPart + " "+ speedPart +directionArrow;
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
@@ -1457,18 +1472,13 @@ function getSuperScript(number)
         { //Convert the speed limit to mph
             number = Math.round(number / 1.609344);
         }
+        var res="";
         number = number.toString();
-        number = number.replace(/0/g, "⁰");
-        number = number.replace(/1/g, "¹");
-        number = number.replace(/2/g, "²");
-        number = number.replace(/3/g, "³");
-        number = number.replace(/4/g, "⁴");
-        number = number.replace(/5/g, "⁵");
-        number = number.replace(/6/g, "⁶");
-        number = number.replace(/7/g, "⁷");
-        number = number.replace(/8/g, "⁸");
-        number = number.replace(/9/g, "⁹");
-        return number;
+        for(var i=0; i<number.length; ++i)
+        {
+          res += superScript[number.charAt(i)];
+        }
+        return res;
     }
     return "";
 }
@@ -1514,13 +1524,13 @@ function doDraw()
 {
     //consoleDebug("Drawing everything anew");
     drawAllSegments();
-    
+
     if(!farZoom)
     {
         drawAllNodes();
     }
 }
-    
+
 function addSegments(e)
 {
     //consoleDebug("Segments added to model");
@@ -1599,7 +1609,7 @@ function addNodes(e)
     {
         myFeatures.push(drawNode(e[i]));
     }
-    
+
     nodesVector.addFeatures(myFeatures);
     return true;
 }
@@ -1612,7 +1622,6 @@ function bootstrapSVL() {
     return;
   }
     /* begin running the code! */
-    svlAttempts=0;
     initSVL();
 }
 
