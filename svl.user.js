@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.3
+// @version    3.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -293,6 +293,8 @@ function updatePref()
 
     preferences.showSLtext = $('#showSLtext').prop('checked');
     preferences.showSLcolor = $('#showSLcolor').prop('checked');
+    preferences.showSLSinglecolor = $('#showSLSinglecolor').prop('checked');
+    preferences.SLColor = $('#SLColor').val();
 
     preferences.hideMinorRoads = $('#hideMinorRoads').prop('checked');
     preferences.showDashedUnverifiedSL = $('#showDashedUnverifiedSL').prop('checked');
@@ -320,6 +322,9 @@ function rollbackDefault(dontask){
 
 function getColorSpeed(speed)
 {
+    if(preferences.showSLSinglecolor)
+        return preferences.SLColor;
+    
     if(W.prefs.attributes.isImperial) // adjust scale for Imperial
     {
         // speeds 15 to 75 mph (7 increments) are tuned to HSL 95 to 395 (35) for easy visual speed differentiation at common speeds
@@ -363,7 +368,7 @@ function editPreferences()
         if(preferences.streets[i] != null)
         {
             $streets.append($('<b>'+svlStreetTypes[i]+'</b><br>'));
-            $streets.append($('<input class="prefElement"  title="Colour" id="streetColor_'+i+'" value="'+preferences.streets[i].strokeColor+'" type="color"></input>&nbsp&nbsp'));
+            $streets.append($('<input class="prefElement"  title="Color" id="streetColor_'+i+'" value="'+preferences.streets[i].strokeColor+'" type="color"></input>&nbsp&nbsp'));
             $streets.append($('<input class="prefElement" title="Width" id="streetWidth_'+i+'" value="'+preferences.streets[i].strokeWidth+'" type="number" min="0" max="15"></input>&nbsp&nbsp'));
             var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_'+i+'"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
             $select.val(preferences.streets[i].strokeDashstyle);
@@ -374,7 +379,7 @@ function editPreferences()
 
     //Red segments
     $streets.append($('<b>Unnamed Segments</b><br>'));
-    $streets.append($('<input class="prefElement"  title="Colour" id="streetColor_red" value="'+preferences.red.strokeColor+'" type="color"></input>'));
+    $streets.append($('<input class="prefElement"  title="Color" id="streetColor_red" value="'+preferences.red.strokeColor+'" type="color"></input>'));
     $streets.append($('<input class="prefElement" title="Width" id="streetWidth_red" value="'+preferences.red.strokeWidth+'" type="number" min="0" max="15"></input>'));
     var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_red"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
     $select.val(preferences.red.strokeDashstyle);
@@ -389,7 +394,7 @@ function editPreferences()
     $decorations.append('<hr>');
     //Toll
     $decorations.append($('<b>Toll</b><br>'));
-    $decorations.append($('<input class="prefElement" title="Colour" id="streetColor_toll" value="'+preferences.toll.strokeColor+'" type="color"></input>'));
+    $decorations.append($('<input class="prefElement" title="Color" id="streetColor_toll" value="'+preferences.toll.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_toll" value="'+preferences.toll.strokeWidth+'" type="number" min="0" max="15"></input>'));
     var $select = $('<select class="prefElement"  title="Stroke style" id="strokeDashstyle_toll"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
     $select.val(preferences.toll.strokeDashstyle);
@@ -398,7 +403,7 @@ function editPreferences()
 
     //Restrictions
     $decorations.append($('<b>Restrictions</b><br>'));
-    $decorations.append($('<input class="prefElement" title="Colour" id="streetColor_restriction" value="'+preferences.restriction.strokeColor+'" type="color"></input>'));
+    $decorations.append($('<input class="prefElement" title="Color" id="streetColor_restriction" value="'+preferences.restriction.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_restriction" value="'+preferences.restriction.strokeWidth+'" type="number" min="0" max="15"></input>'));
     var $select = $('<select class="prefElement"  title="Stroke style" id="strokeDashstyle_restriction"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
     $select.val(preferences.restriction.strokeDashstyle);
@@ -407,7 +412,7 @@ function editPreferences()
 
     //Closures
     $decorations.append($('<b>Closures</b><br>'));
-    $decorations.append($('<input class="prefElement" title="Colour" id="streetColor_closure" value="'+preferences.closure.strokeColor+'" type="color"></input>'));
+    $decorations.append($('<input class="prefElement" title="Color" id="streetColor_closure" value="'+preferences.closure.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_closure" value="'+preferences.closure.strokeWidth+'" type="number" min="0" max="15"></input>'));
     var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_closure"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
     $select.val(preferences.closure.strokeDashstyle);
@@ -438,7 +443,7 @@ function editPreferences()
     $labels.append('<hr>');
 
     $labels.append($('<b>Hide minor roads at zoom 3</b>'));
-    $labels.append($('<input class="prefElement" title="True or False" id="hideMinorRoads" type="checkbox" '+(preferences.hideMinorRoads?'checked':'')+' ></input>'));
+    $labels.append($('<input class="prefElement" title="True or False" id="hideMinorRoads" type="checkbox" '+(preferences.hideMinorRoads?'checked':'')+'></input>'));
     $labels.append('<hr>');
 
     //Arrow declutter
@@ -447,11 +452,11 @@ function editPreferences()
     $labels.append('<hr>');
 
     $labels.append($('<b>Hide other road layers </b>'));
-    $labels.append($('<input class="prefElement" title="True or False" id="disableRoadLayers" type="checkbox" '+(preferences.disableRoadLayers?'checked':'')+' ></input>'));
+    $labels.append($('<input class="prefElement" title="True or False" id="disableRoadLayers" type="checkbox" '+(preferences.disableRoadLayers?'checked':'')+'></input>'));
     $labels.append('<hr>');
 
     $labels.append($('<b>Layer initially disabled</b>'));
-    $labels.append($('<input class="prefElement" title="True or False" id="startdisabled" type="checkbox" '+(preferences.startDisabled?'checked':'')+' ></input>'));
+    $labels.append($('<input class="prefElement" title="True or False" id="startdisabled" type="checkbox" '+(preferences.startDisabled?'checked':'')+'></input>'));
     $labels.append('<hr>');
 
     $elementDiv.append($labels);
@@ -459,17 +464,21 @@ function editPreferences()
     //Speed limits
     $speedLimits.append('<summary>Speed Limits</summary>');
     $speedLimits.append($('<b>Show text on streetname</b>'));
-    $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLtext" type="checkbox" '+(preferences.showSLtext?'checked':'')+' ></input>'));
+    $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLtext" type="checkbox" '+(preferences.showSLtext?'checked':'')+'></input>'));
     $speedLimits.append('<hr>');
 
-    $speedLimits.append($('<b>Show using colours</b>'));
+    $speedLimits.append($('<b>Show using color scale</b>'));
     $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLcolor" type="checkbox" '+(preferences.showSLcolor?'checked':'')+' ></input>'));
     $speedLimits.append('<hr>');
+    $speedLimits.append($('<b>Show using single color</b>'));
+    $speedLimits.append($('<input class="prefElement" title="Pick a color" id="SLColor" type="color" value="'+preferences.SLColor+'"></input>'));
+    $speedLimits.append($('<input class="prefElement" title="True or False" id="showSLSinglecolor" type="checkbox" '+(preferences.showSLSinglecolor?'checked':'')+'></input>'));
+    $speedLimits.append('<hr>');
     $speedLimits.append($('<b>Show unverified limits with a dashed line</b>'));
-    $speedLimits.append($('<input class="prefElement" title="True or False" id="showDashedUnverifiedSL" type="checkbox" '+(preferences.showDashedUnverifiedSL?'checked':'')+' ></input>'));
+    $speedLimits.append($('<input class="prefElement" title="True or False" id="showDashedUnverifiedSL" type="checkbox" '+(preferences.showDashedUnverifiedSL?'checked':'')+'></input>'));
     $speedLimits.append('<hr>');
 
-    $speedLimits.append($('<b>Reference colours</b>'));
+    $speedLimits.append($('<b>Reference colors</b>'));
     $speedLimits.append('<br/>');
     for(var k=W.prefs.attributes.isImperial?9:15; k>1; k--){
         if (W.prefs.attributes.isImperial)
@@ -501,7 +510,12 @@ function editPreferences()
 function saveDefaultPreferences()
 {
     preferences = {};
-    preferences.fakelock = W.loginManager.user.getAttributes().normalizedLevel;
+    preferences.showSLSinglecolor = false;
+    preferences.SLColor = "#ffdf00";
+    if(W.loginManager.user)
+        preferences.fakelock = W.loginManager.user.getAttributes().normalizedLevel;
+    else
+        preferences.fakelock=6;
     preferences.hideMinorRoads = false;
     preferences.showDashedUnverifiedSL = true;
     preferences.showSLcolor = true;
@@ -780,14 +794,15 @@ function initSVL() {
         alert("This is the first time that you run Street Vector Layer in this browser.\n"
               +"Some info about it:\n"
               +"By default, use ALT+L to toggle the layer.\n"
-              +"You can change the streets colour, thickness and style by clicking on the attribution bar at the bottom of the editor.\n"
+              +"You can change the streets color, thickness and style by clicking on the attribution bar at the bottom of the editor.\n"
               +"Your preferences will be saved for the next time in your browser.\n"
               +"The other road layers will be automatically hidden. (You can change this behaviour in the preference panel).\n"
               +"Have fun and tell us if you liked the script!");
     }
     else{
-        if(preferences.showSLcolor == null || preferences.showSLtext == null || preferences.clutterCostantNearZoom == null || preferences.labelOutlineWidth==null || preferences.disableRoadLayers==null || preferences.startDisabled == null)
+        if(preferences.SLColor== null || preferences.showSLcolor == null || preferences.showSLtext == null || preferences.clutterCostantNearZoom == null || preferences.labelOutlineWidth==null || preferences.disableRoadLayers==null || preferences.startDisabled == null)
         {
+            preferences.SLColor = preferences.SLColor? preferences.SLColor : "#ffdf00";
             preferences.showSLcolor = preferences.showSLcolor?preferences.showSLcolor: true;
             preferences.showSLtext = preferences.showSLtext? preferences.showSLtext:true;
             preferences.startDisabled=preferences.startDisabled?preferences.startDisabled:false;
@@ -1098,24 +1113,15 @@ function drawSegment(model)
         if(speed && !farZoom && preferences.showSLcolor) //it has a speed limit
         {
             //consoleDebug("SpeedLimit");
-
-            speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
             var speedStrokeStyle= (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified||attributes.revMaxSpeedUnverified) ? "dash":"solid");
-            var speedStyle =
-            {
-                strokeColor: "hsl("+speed+", 100%, 50%)",
-                strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
-                strokeDashstyle: speedStrokeStyle,
-                pointerEvents: "visiblePainted",
-            }
 
-            if(attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
+            if(!preferences.showSLSinglecolor && attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
             {
                 //consoleDebug("The segment has 2 different speed limits");
                 speed = getColorSpeed(attributes.fwdMaxSpeed);
                 var speedStyleLeft =
                 {
-                    strokeColor: "hsl("+speed+", 100%, 50%)",
+                    strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
                     strokeDashstyle: speedStrokeStyle,
                     pointerEvents: "visiblePainted",
@@ -1123,7 +1129,7 @@ function drawSegment(model)
                 speed = getColorSpeed(attributes.revMaxSpeed);
                 var speedStyleRight =
                 {
-                    strokeColor: "hsl("+speed+", 100%, 50%)",
+                    strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
                     strokeDashstyle: speedStrokeStyle,
                     pointerEvents: "visiblePainted",
@@ -1206,6 +1212,14 @@ function drawSegment(model)
                 }
             }
             else{
+                speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
+                        var speedStyle =
+                            {
+                                strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
+                                strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
+                                strokeDashstyle: speedStrokeStyle,
+                                pointerEvents: "visiblePainted",
+                            }
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  speedStyle);
                 myFeatures.push(lineFeature);
