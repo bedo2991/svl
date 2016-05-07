@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.4
+// @version    3.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -58,6 +58,7 @@
     var redStyle;
     var nodeStyle;
     var unknownDirStyle;
+    var geometryNodeStyle;
     var roadLayer;
     var vectorAutomDisabled;
 
@@ -301,6 +302,7 @@ function updatePref()
     preferences.farZoomLabelSize = $('#farZoomLabelSize').val();
     preferences.closeZoomLabelSize = $('#closeZoomLabelSize').val();
 
+    preferences.renderGeomNodes = $('#renderGeomNodes').prop('checked');
     updateStylesFromPreferences(preferences);
 }
 
@@ -389,9 +391,6 @@ function editPreferences()
     $elementDiv.append($streets);
 
     $decorations.append('<summary>Decorations</summary>');
-    $decorations.append('<b>Render map as level</b><br>');
-    $decorations.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="'+W.loginManager.user.getAttributes().normalizedLevel+'" type="number" min="1" max="7"></input>'));
-    $decorations.append('<hr>');
     //Toll
     $decorations.append($('<b>Toll</b><br>'));
     $decorations.append($('<input class="prefElement" title="Color" id="streetColor_toll" value="'+preferences.toll.strokeColor+'" type="color"></input>'));
@@ -424,10 +423,20 @@ function editPreferences()
 
     //Labels
     $labels.append('<summary>Rendering Parameters</summary>');
+    
+    $labels.append('<b>Render map as level</b><br>');
+    $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="'+W.loginManager.user.getAttributes().normalizedLevel+'" type="number" min="1" max="7"></input>'));
+    $labels.append('<hr>');
+    
     $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
+    
+    $labels.append($('<br><i>Render geometry nodes </i>'));
+    $labels.append($('<input class="prefElement" title="True or False" id="renderGeomNodes" type="checkbox" '+(preferences.renderGeomNodes?'checked':'')+'></input>'));
+    
     $labels.append($('<br><i>Density (the highest, the less)</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="clutterCostantNearZoom" value="'+preferences.clutterCostantNearZoom+'" type="range" min="10" max="'+clutterMax+'"></input>'));
-        $labels.append($('<br><i>Font Size</i><br>'));
+
+    $labels.append($('<br><i>Font Size</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="closeZoomLabelSize" value="'+preferences.closeZoomLabelSize+'" type="range" min="8" max="'+fontSizeMax+'"></input>'));
     $labels.append('<hr>');
 
@@ -927,7 +936,7 @@ function initSVL() {
     nodeStyle = {
         stroke:false,
         fillColor: "#0015FF",
-        fillOpacity: 0.6,
+        fillOpacity: 0.7,
         pointRadius: 4.0,
         pointerEvents: "none"
     };
@@ -938,6 +947,14 @@ function initSVL() {
         fillColor:"#FFFF40",
         fillOpacity:0.7,
         pointRadius: 7,
+        pointerEvents: "none"
+    };
+    
+    geometryNodeStyle = {
+        stroke:false,
+        fillColor: "#000",
+        fillOpacity: 0.5,
+        pointRadius: 3.3,
         pointerEvents: "none"
     };
 
@@ -1382,6 +1399,18 @@ function drawSegment(model)
                 }
             }
         }
+        
+        //Show geometry points
+        if(preferences.renderGeomNodes && attributes.junctionID==null)
+        {//If it's not a roundabout
+            for(var p=1, len = points.length-2; p<len; p++) {
+                //var shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
+                var arrowFeature = new OpenLayers.Feature.Vector(points[p], {myId:attributes.id}, geometryNodeStyle);
+                myFeatures.push(arrowFeature);
+            }
+        }
+        //END: show geometry points
+        
     }
 
     if(attributes.flags & 1)
