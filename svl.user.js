@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.6.1
+// @version    3.6.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1031,11 +1031,21 @@ function initSVL() {
 
     //setInterval(refreshWME, 20000);//TODO Add it as an option, make the timer customizable
     console.log("Adding keyboard shortcut");
+    try{
     WMEKSRegisterKeyboardShortcut('SVL', 'Street Vector Layer', 'ToogleVectorLayer', 'Toggle Vector Layer', function(){streetVector.setVisibility(!streetVector.visibility)}, 'A+l'); //shortcut1
     WMEKSLoadKeyboardShortcuts('SVL');
+    }
+    catch(e)
+    {
+        console.error("Error while adding the keyboard shortcut:");
+        console.error(e);
+    }
+
+    //Save the keyboard shortcut before closing
     window.addEventListener("beforeunload", function() {
 		WMEKSSaveKeyboardShortcuts('SVL');
 	}, false);
+
     console.log("Street Vector Layer v. "+svlVersion+" initialized correctly." );
 }
 
