@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.5
+// @version    3.6
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -268,6 +268,11 @@ function updatePref()
     preferences.red.strokeWidth = $('#streetWidth_red').val();
     preferences.red.strokeDashstyle = $('#strokeDashstyle_red option:selected').val();
 
+    //Dirty
+    preferences.dirty.strokeColor = $('#streetColor_dirty').val();
+    preferences.dirty.opacity = $('#opacity_dirty').val();
+    preferences.dirty.strokeDashstyle = $('#strokeDashstyle_dirty option:selected').val();
+
     //Toll
     preferences.toll.strokeColor = $('#streetColor_toll').val();
     preferences.toll.strokeWidth = $('#streetWidth_toll').val();
@@ -338,6 +343,11 @@ function getColorSpeed(speed)
     }
 }
 
+function createDashStyleDropdown(id)
+{
+    return $('<select class="prefElement" title="Stroke style" id="'+id+'"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+}
+
 function editPreferences()
 {
     if($(document.getElementById('PrefDiv')).length >0)
@@ -371,19 +381,28 @@ function editPreferences()
         {
             $streets.append($('<b>'+svlStreetTypes[i]+'</b><br>'));
             $streets.append($('<input class="prefElement"  title="Color" id="streetColor_'+i+'" value="'+preferences.streets[i].strokeColor+'" type="color"></input>&nbsp&nbsp'));
-            $streets.append($('<input class="prefElement" title="Width" id="streetWidth_'+i+'" value="'+preferences.streets[i].strokeWidth+'" type="number" min="0" max="15"></input>&nbsp&nbsp'));
-            var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_'+i+'"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+            $streets.append($('<input class="prefElement" title="Width" id="streetWidth_'+i+'" value="'+preferences.streets[i].strokeWidth+'" type="number" min="3" max="15"></input>&nbsp&nbsp'));
+            var $select = createDashStyleDropdown('strokeDashstyle_'+i);
             $select.val(preferences.streets[i].strokeDashstyle);
             $streets.append($select);
             $streets.append('<hr>');
         }
     }
 
+    //Dirty
+    $streets.append($('<b>Dirt Roads Flag</b><br>'));
+    $streets.append($('<input class="prefElement"  title="Color" id="streetColor_dirty" value="'+preferences.dirty.strokeColor+'" type="color"></input>'));
+    $streets.append($('<input class="prefElement" title="Width" id="opacity_dirty" value="'+preferences.dirty.opacity+'" type="range" min="0" max="100" step="10"></input>'));
+    var $select = createDashStyleDropdown("strokeDashstyle_dirty");
+    $select.val(preferences.dirty.strokeDashstyle);
+    $streets.append($select);
+    $streets.append('<hr>');
+
     //Red segments
     $streets.append($('<b>Unnamed Segments</b><br>'));
     $streets.append($('<input class="prefElement"  title="Color" id="streetColor_red" value="'+preferences.red.strokeColor+'" type="color"></input>'));
     $streets.append($('<input class="prefElement" title="Width" id="streetWidth_red" value="'+preferences.red.strokeWidth+'" type="number" min="0" max="15"></input>'));
-    var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_red"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+    var $select = createDashStyleDropdown("strokeDashstyle_red");
     $select.val(preferences.red.strokeDashstyle);
     $streets.append($select);
     $streets.append('<hr>');
@@ -395,7 +414,7 @@ function editPreferences()
     $decorations.append($('<b>Toll</b><br>'));
     $decorations.append($('<input class="prefElement" title="Color" id="streetColor_toll" value="'+preferences.toll.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_toll" value="'+preferences.toll.strokeWidth+'" type="number" min="0" max="15"></input>'));
-    var $select = $('<select class="prefElement"  title="Stroke style" id="strokeDashstyle_toll"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+    var $select = createDashStyleDropdown("strokeDashstyle_toll");
     $select.val(preferences.toll.strokeDashstyle);
     $decorations.append($select);
     $decorations.append('<hr>');
@@ -404,7 +423,7 @@ function editPreferences()
     $decorations.append($('<b>Restrictions</b><br>'));
     $decorations.append($('<input class="prefElement" title="Color" id="streetColor_restriction" value="'+preferences.restriction.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_restriction" value="'+preferences.restriction.strokeWidth+'" type="number" min="0" max="15"></input>'));
-    var $select = $('<select class="prefElement"  title="Stroke style" id="strokeDashstyle_restriction"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+    var $select = createDashStyleDropdown("strokeDashstyle_restriction");
     $select.val(preferences.restriction.strokeDashstyle);
     $decorations.append($select);
     $decorations.append('<hr>');
@@ -413,7 +432,7 @@ function editPreferences()
     $decorations.append($('<b>Closures</b><br>'));
     $decorations.append($('<input class="prefElement" title="Color" id="streetColor_closure" value="'+preferences.closure.strokeColor+'" type="color"></input>'));
     $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_closure" value="'+preferences.closure.strokeWidth+'" type="number" min="0" max="15"></input>'));
-    var $select = $('<select class="prefElement" title="Stroke style" id="strokeDashstyle_closure"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+    var $select = createDashStyleDropdown("strokeDashstyle_closure");
     $select.val(preferences.closure.strokeDashstyle);
     $decorations.append($select);
     $decorations.append('<hr>');
@@ -423,16 +442,16 @@ function editPreferences()
 
     //Labels
     $labels.append('<summary>Rendering Parameters</summary>');
-    
+
     $labels.append('<b>Render map as level</b><br>');
     $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="'+W.loginManager.user.getAttributes().normalizedLevel+'" type="number" min="1" max="7"></input>'));
     $labels.append('<hr>');
-    
+
     $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
-    
+
     $labels.append($('<br><i>Render geometry nodes </i>'));
     $labels.append($('<input class="prefElement" title="True or False" id="renderGeomNodes" type="checkbox" '+(preferences.renderGeomNodes?'checked':'')+'></input>'));
-    
+
     $labels.append($('<br><i>Density (the highest, the less)</i><br>'));
     $labels.append($('<input class="prefElement" title="Quantity" id="clutterCostantNearZoom" value="'+preferences.clutterCostantNearZoom+'" type="range" min="10" max="'+clutterMax+'"></input>'));
 
@@ -654,6 +673,11 @@ function saveDefaultPreferences()
         strokeWidth: 2,
         strokeDashstyle: "dash"
     };
+    preferences.dirty ={
+        strokeColor: "#82614A",
+        opacity: 60,
+        strokeDashstyle: "longdash"
+    };
     preferences.arrowDeclutter=10;
     savePreferences(preferences);
 }
@@ -809,8 +833,13 @@ function initSVL() {
               +"Have fun and tell us if you liked the script!");
     }
     else{
-        if(preferences.SLColor== null || preferences.showSLcolor == null || preferences.showSLtext == null || preferences.clutterCostantNearZoom == null || preferences.labelOutlineWidth==null || preferences.disableRoadLayers==null || preferences.startDisabled == null)
+        if(preferences.dirty==null||preferences.SLColor== null || preferences.showSLcolor == null || preferences.showSLtext == null || preferences.clutterCostantNearZoom == null || preferences.labelOutlineWidth==null || preferences.disableRoadLayers==null || preferences.startDisabled == null)
         {
+            preferences.dirty = preferences.dirty ? preferences.dirty : {
+                strokeColor: "#82614A",
+                opacity: 60,
+                strokeDashstyle: "longdash"
+            };
             preferences.SLColor = preferences.SLColor? preferences.SLColor : "#ffdf00";
             preferences.showSLcolor = preferences.showSLcolor?preferences.showSLcolor: true;
             preferences.showSLtext = preferences.showSLtext? preferences.showSLtext:true;
@@ -933,6 +962,7 @@ function initSVL() {
         strokeDashstyle: preferences.red.strokeDashstyle,
         pointerEvents: "none"
     };
+
     nodeStyle = {
         stroke:false,
         fillColor: "#0015FF",
@@ -949,7 +979,7 @@ function initSVL() {
         pointRadius: 7,
         pointerEvents: "none"
     };
-    
+
     geometryNodeStyle = {
         stroke:false,
         fillColor: "#000",
@@ -1271,6 +1301,20 @@ function drawSegment(model)
         }
     }
     //Check segment properties
+if(attributes.flags & 16)
+    {//The dirty flag is enabled
+        var dirtyStyle =
+            {
+                strokeColor: preferences.dirty.strokeColor,
+                strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)-2,
+                strokeOpacity: preferences.dirty.opacity/100.0,
+                strokeDashstyle: preferences.dirty.strokeDashstyle,
+                pointerEvents: "visiblePainted",
+            }
+        lineFeature = new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   dirtyStyle);
+        myFeatures.push(lineFeature);
+    }
 
     if(!farZoom){
         if(attributes.hasClosures)
@@ -1399,7 +1443,7 @@ function drawSegment(model)
                 }
             }
         }
-        
+
         //Show geometry points
         if(preferences.renderGeomNodes && attributes.junctionID==null)
         {//If it's not a roundabout
@@ -1410,7 +1454,6 @@ function drawSegment(model)
             }
         }
         //END: show geometry points
-        
     }
 
     if(attributes.flags & 1)
