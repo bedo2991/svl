@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.7
+// @version    3.8
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -898,7 +898,8 @@ function initSVL() {
                                                    isBaseLayer: false,
                                                    isVector: true,
                                                    sphericalMercator: true,
-                                                   attribution: "Street Vector Layer"
+                                                   attribution: "Street Vector Layer",
+                                                   rendererOptions: {zOrdering: true},
                                                });
     streetVector.renderer.drawText = function (e,t,i){var n=!!t.labelOutlineWidth;if(n){var s=OpenLayers.Util.extend({},t);s.fontColor=s.labelOutlineColor,s.fontStrokeColor=s.labelOutlineColor,s.fontStrokeWidth=t.labelOutlineWidth,delete s.labelOutlineWidth,this.drawText(e,s,i)}var r=this.getResolution();var layer=this.map.getLayer(this.container.id);var feature=layer.getFeatureById(e);i=(feature.attributes.centroid?feature.attributes.centroid:i);o=(i.x-this.featureDx)/r+this.left,a=i.y/r-this.top,l=n?this.LABEL_OUTLINE_SUFFIX:this.LABEL_ID_SUFFIX,u=this.nodeFactory(e+l,"text");u.setAttributeNS(null,"x",o),u.setAttributeNS(null,"y",-a);if(t.angle||t.angle==0){var rotate='rotate('+t.angle+','+o+","+-a+')';u.setAttributeNS(null,"transform",rotate);}t.fontColor&&u.setAttributeNS(null,"fill",t.fontColor),t.fontStrokeColor&&u.setAttributeNS(null,"stroke",t.fontStrokeColor),t.fontStrokeWidth&&u.setAttributeNS(null,"stroke-width",t.fontStrokeWidth),t.fontOpacity&&u.setAttributeNS(null,"opacity",t.fontOpacity),t.fontFamily&&u.setAttributeNS(null,"font-family",t.fontFamily),t.fontSize&&u.setAttributeNS(null,"font-size",t.fontSize),t.fontWeight&&u.setAttributeNS(null,"font-weight",t.fontWeight),t.fontStyle&&u.setAttributeNS(null,"font-style",t.fontStyle),t.labelSelect===!0?(u.setAttributeNS(null,"pointer-events","visible"),u._featureId=e):u.setAttributeNS(null,"pointer-events","none");var h=t.labelAlign||OpenLayers.Renderer.defaultSymbolizer.labelAlign;u.setAttributeNS(null,"text-anchor",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[0]]||"middle"),OpenLayers.IS_GECKO===!0&&u.setAttributeNS(null,"dominant-baseline",OpenLayers.Renderer.SVG.LABEL_ALIGN[h[1]]||"central");for(var c=t.label.split("\n"),d=c.length;u.childNodes.length>d;)u.removeChild(u.lastChild);for(var p=0;d>p;p++){var g=this.nodeFactory(e+l+"_tspan_"+p,"tspan");if(t.labelSelect===!0&&(g._featureId=e,g._geometry=i,g._geometryClass=i.CLASS_NAME),OpenLayers.IS_GECKO===!1&&g.setAttributeNS(null,"baseline-shift",OpenLayers.Renderer.SVG.LABEL_VSHIFT[h[1]]||"-35%"),g.setAttribute("x",o),0==p){var f=OpenLayers.Renderer.SVG.LABEL_VFACTOR[h[1]];null==f&&(f=-.5),g.setAttribute("dy",f*(d-1)+"em")}else g.setAttribute("dy","1em");g.textContent=""===c[p]?" ":c[p],g.parentNode||u.appendChild(g)}u.parentNode||this.textRoot.appendChild(u)}
     nodesVector = new OpenLayers.Layer.Vector("Nodes Vector",
@@ -1147,7 +1148,7 @@ function drawLabel(model, simplified, delayed){
         {
             //consoleDebug("Label can be inserted:");
             //console.dir(address);
-            var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:(attributes.roadType<10?"⚑":""));
+            var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:(attributes.roadType<10 && attributes.junctionID==null?"⚑":""));
             //consoleDebug("Streetpart:"+streetPart);
             if(! streetStyle[attributes.roadType])
                {
@@ -1489,18 +1490,7 @@ if(attributes.flags & 16)
                 var step = attributes.junctionID != null ? 3:1; //It is a roundabout
                 for(var p=step-1, len = simplifiedPoints.length-1; p<len; p+=step) {
                     //it is one way
-                    var dx=0, dy=0;
-                    if(attributes.fwdDirection){
-                        dx = simplifiedPoints[p+1].x-simplifiedPoints[p].x;
-                        dy = simplifiedPoints[p+1].y-simplifiedPoints[p].y;
-                    }
-                    else
-                    {
-                        dx = simplifiedPoints[p].x-simplifiedPoints[p+1].x;
-                        dy = simplifiedPoints[p].y-simplifiedPoints[p+1].y;
-                    }
-                    var angle = Math.atan2(dx,dy);
-                    var degrees = angle*180/Math.PI;//360-(...) -90 removed from here
+                    var degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p+1]);
                     var segmentLenght=simplifiedPoints[p].distanceTo(simplifiedPoints[p+1]);
                     var minDistance = 15.0*(11-W.map.getZoom());
                     if(segmentLenght<minDistance*2){
@@ -1556,6 +1546,34 @@ if(attributes.flags & 16)
                 }
             }
         }
+        
+        if(attributes.fwdFlags & 0x1) //check if speed camera
+        {
+            var degrees = getAngle(attributes.fwdDirection, points[0],points[1]);
+            var avgSpeed = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(points[0].x+Math.sin(degrees)*10,points[0].y+Math.cos(degrees)*10), {myId:attributes.id}, {
+                rotation:degrees,
+            externalGraphic: "https://raw.githubusercontent.com/bedo2991/svl/master/average.png",
+            graphicWidth: 36,
+            graphicHeight: 36,
+                graphicZIndex:100,
+            fillOpacity: 1
+        });
+            myFeatures.push(avgSpeed);
+        }
+        
+        if(attributes.revFlags & 0x1 ) //check if speed camera
+        {
+            var degrees = getAngle(attributes.fwdDirection, points[points.length-2],points[points.length-1]);
+            var avgSpeed = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(points[points.length-1].x+Math.sin(degrees)*10,points[points.length-1].y+Math.cos(degrees)*10), {myId:attributes.id}, {
+                rotation:degrees,
+            externalGraphic: "https://raw.githubusercontent.com/bedo2991/svl/master/average.png",
+            graphicWidth: 36,
+            graphicHeight: 36,
+            graphicZIndex:100,
+            fillOpacity: 1
+        });
+            myFeatures.push(avgSpeed);
+        }
 
         //Show geometry points
         if(preferences.renderGeomNodes && attributes.junctionID==null)
@@ -1585,6 +1603,22 @@ if(attributes.flags & 16)
                 myFeatures.push(labelFeature);
     return myFeatures;
 }
+
+function getAngle(isForward,p0,p1)
+    {
+    var dx=0, dy=0;
+                    if(isForward){
+                        dx = p1.x-p0.x;
+                        dy = p1.y-p0.y;
+                    }
+                    else
+                    {
+                        dx = p0.x-p1.x;
+                        dy = p0.y-p1.y;
+                    }
+                    var angle = Math.atan2(dx,dy);
+                    return angle*180/Math.PI;//360-(...) -90 removed from here
+    }
 
 function getSuperScript(number)
 {
