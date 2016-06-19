@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.9
+// @version    3.9.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1695,8 +1695,6 @@ function addSegments(e)
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
     {
-        if(e[i].attributes.id==82749232)
-        console.log(82749232);
         if(e[i] != null){
             var features = drawSegment(e[i]);
             for(var j=0; j<features.length; j++){
