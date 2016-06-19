@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.8
+// @version    3.9
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -73,9 +73,9 @@
     arrowDeclutter = 25;
     clutterMax = 700;
     fontSizeMax = 32;
-    beta = false;
-    if(W.model.nodes.events == undefined)
-        beta=true;
+    //beta = false;
+    //if(W.model.nodes.events == undefined)
+    //  beta=true;
     farZoom = W.map.zoom < farZoomThereshold ? true : false;
     svlVersion = GM_info.script.version;
     preferences=null;
@@ -731,15 +731,15 @@ function checkZoomLayer()
         {//Switched from far to close zoom
             farZoom=false;
             thresholdDistance=getThreshold();
-            if(beta){
+            /*if(beta){*/
                 W.model.nodes._events["objectsremoved"].push({context:nodesVector, callback: removeNodes, svl:true});
                 W.model.nodes._events["objectsadded"].push({context:nodesVector, callback: addNodes, svl:true});
-            }
+            /*}
             else
             {
                 W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
                 W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
-            }
+            }*/
             if($('#zoomStyleDiv').length==1)
             {
                 $('#zoomStyleDiv').removeClass('farZoom');
@@ -758,15 +758,15 @@ function checkZoomLayer()
         labelFontSize = preferences.farZoomLabelSize+"px";
         thresholdDistance=getThreshold();
         if(zoomChanged){
-            if(beta){
-                W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
-                W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
-            }
+            /*if(beta){*/
+                W.model.nodes._events["objectsremoved"]=W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
+                W.model.nodes._events["objectsadded"]=W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
+            /*}
             else
             {
                 W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
                 W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
-            }
+            }*/
             if($('#zoomStyleDiv').length==1)
             {
                 $('#zoomStyleDiv').removeClass('closeZoom');
@@ -1067,38 +1067,38 @@ function manageNodes(e)
     if(e.object.visibility)
     {
         //consoleDebug("Registering events");
-        if(beta)
-        {
+        /*if(beta)
+        {*/
             W.model.segments._events["objectsadded"].push({context: streetVector, callback: addSegments, svl:true});
             W.model.segments._events["objectschanged"].push({context: streetVector, callback: editSegments, svl:true});
             W.model.segments._events["objectsremoved"].push({context: streetVector, callback: removeSegments, svl:true});
 
             W.model.nodes._events["objectsremoved"].push({context: nodesVector, callback:removeNodes, svl:true});
             W.model.nodes._events["objectsadded"].push({context: nodesVector, callback:addNodes, svl:true});
-        }
+        /*}
         else
         {
+            alert("Not beta");
             W.model.segments.events.register("objectsadded",streetVector, addSegments);
             W.model.segments.events.register("objectschanged", streetVector, editSegments);
             W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
 
             W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
             W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
-        }
+        }*/
         doDraw();
     }
     else
     {
         //consoleDebug("Unregistering events");
-        if(beta){
-            W.model.segments._events["objectsadded"].filter(removeSVLEvents);
-            W.model.segments._events["objectsadded"].filter(removeSVLEvents);
-            W.model.segments._events["objectschanged"].filter(removeSVLEvents);
-            W.model.segments._events["objectsremoved"].filter(removeSVLEvents);
+        /*if(beta){*/
+            W.model.segments._events["objectsadded"]=W.model.segments._events["objectsadded"].filter(removeSVLEvents);
+            W.model.segments._events["objectschanged"]=W.model.segments._events["objectschanged"].filter(removeSVLEvents);
+            W.model.segments._events["objectsremoved"]=W.model.segments._events["objectsremoved"].filter(removeSVLEvents);
 
-            W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
-            W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
-        }
+            W.model.nodes._events["objectsremoved"]=W.model.nodes._events["objectsremoved"].filter(removeSVLEvents);
+            W.model.nodes._events["objectsadded"]=W.model.nodes._events["objectsadded"].filter(removeSVLEvents);
+        /*}
         else
         {
             W.model.segments.events.unregister("objectsadded",streetVector, addSegments);
@@ -1107,15 +1107,15 @@ function manageNodes(e)
 
             W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
             W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
-        }
+        }*/
         nodesVector.destroyFeatures();
         streetVector.destroyFeatures();
     }
 }
 
 function removeSVLEvents(event)
-{
-    return event.svl;
+{ //Keep all the events that don't have the svl flag enabled.
+    return !event.svl;
 }
 
 function getEffectiveLock(model)
@@ -1695,6 +1695,8 @@ function addSegments(e)
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
     {
+        if(e[i].attributes.id==82749232)
+        console.log(82749232);
         if(e[i] != null){
             var features = drawSegment(e[i]);
             for(var j=0; j<features.length; j++){
