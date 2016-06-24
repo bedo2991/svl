@@ -1044,8 +1044,8 @@ function initSVL() {
 
     //Save the keyboard shortcut before closing
     window.addEventListener("beforeunload", function() {
-		WMEKSSaveKeyboardShortcuts('SVL');
-	}, false);
+        WMEKSSaveKeyboardShortcuts('SVL');
+    }, false);
 
     console.log("Street Vector Layer v. "+svlVersion+" initialized correctly." );
 }
@@ -1150,6 +1150,16 @@ function drawLabel(model, simplified, delayed){
             //console.dir(address);
             var streetPart = (address.street != null && !address.street.isEmpty?address.street.name:(attributes.roadType<10 && attributes.junctionID==null?"⚑":""));
             //consoleDebug("Streetpart:"+streetPart);
+
+            // add alt street names
+            var altStreetPart = "";
+            for( var i = 0; i < attributes.streetIDs.length; i++)
+            {
+                var altStreet = model.model.streets.objects[attributes.streetIDs[i]];
+                altStreetPart += (altStreet != null ? "(" + altStreet.name + ")":"");
+            }
+            altStreetPart = altStreetPart.replace(")(", ", ");
+
             if(! streetStyle[attributes.roadType])
                {
                    streetPart+= "\n!! UNSUPPORTED ROAD TYPE !!";
@@ -1218,7 +1228,7 @@ function drawLabel(model, simplified, delayed){
                     if(!model.isOneWay()){
                         directionArrow="";
                     }
-                labelFeature.attributes.label=directionArrow + labelText +directionArrow;
+                labelFeature.attributes.label=directionArrow + labelText +directionArrow + "\n" + altStreetPart;
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
