@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.9.1
+// @version    3.9.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
-// @include    /^https:\/\/(www|editor-beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
+// @include    /^https:\/\/(www|editor-beta|beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
 // @require    https://greasyfork.org/scripts/16071-wme-keyboard-shortcuts/code/WME%20Keyboard%20Shortcuts.js
 // @author     bedo2991
@@ -141,7 +141,7 @@ function wbwWazeBits() {
 
 function refreshWME()
     {
-        if(parseInt($('div.counter').text()) == 0)
+        if(W.model.actionManager.unsavedActionsNum() == 0)
             $('div.icon-repeat.reload-button').click();
     }
 
@@ -1204,31 +1204,41 @@ function drawLabel(model, simplified, delayed){
                 var p=maxDistanceIndex;
                 var centroid = new OpenLayers.Geometry.LineString([simplified[p],simplified[p+1]]).getCentroid(true);/*Important pass true parameter otherwise it will return start point as centroid*/
                 labelFeature = new OpenLayers.Feature.Vector(centroid,{myId:attributes.id});
+                    var fwdRestrictions =  getRestrictions(attributes.fwdRestrictions);
+                    var revRestrictions =  getRestrictions(attributes.revRestrictions);
+                    var leftRestriction = revRestrictions;
+                    var rightRestrictions = fwdRestrictions;
                     if(attributes.fwdDirection){
                         dx = simplified[p+1].x-simplified[p].x;
                         dy = simplified[p+1].y-simplified[p].y;
                     }
                     else
                     {
+                        leftRestriction = fwdRestrictions;
+                        rightRestrictions =revRestrictions;
                         dx = simplified[p].x-simplified[p+1].x;
                         dy = simplified[p].y-simplified[p+1].y;
                     }
                     var angle = Math.atan2(dx,dy);
                     var degrees = 90 + angle*180/Math.PI;
                     var directionArrow = " ▶ ";
+
                     if(degrees>90 && degrees < 270)
                     {
                         degrees-=180;
+
                             //directionArrow = " ▶ ";
                     }
                     else
                     {
+                            leftRestriction = revRestrictions;
+                            rightRestrictions = fwdRestrictions;
                             directionArrow = " ◀ ";
                     }
                     if(!model.isOneWay()){
                         directionArrow="";
                     }
-                labelFeature.attributes.label=directionArrow + labelText + directionArrow + "\n" + altStreetPart;
+                labelFeature.attributes.label=leftRestriction + directionArrow + labelText + directionArrow + rightRestrictions + "\n" + altStreetPart;
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
@@ -1241,6 +1251,39 @@ function drawLabel(model, simplified, delayed){
         streetVector.addFeatures([labelFeature]);
     return labelFeature;
 }
+
+function getRestrictions(r)
+    {
+        if(r==null || r.length==0)
+            return "";
+        var res = "";
+     for(var i=0; i<r.length; r++)
+     {
+         if(!r[i].isAllDay())
+         {
+             res+="📆";
+         }
+         if(r[i].isPermanent()){
+             if(r[i].includesVehicleType(11))
+                 return res+"🚫";
+             if(r[i].includesVehicleType(0))
+                 res+= " 🚚";
+             if(r[i].includesVehicleType(2))
+                 res+= " 🚖";
+             if(r[i].includesVehicleType(9))
+                 res+= " 🚗";
+             if(r[i].includesVehicleType(1))
+                 res+= " 🚍";
+             if(r[i].includesVehicleType(1))
+                 res+= " 🚌";
+         }
+     }
+        if(res==""){
+            console.warn("SVL: Unsupported restriction type");
+            console.debug(r);
+        }
+        return res;
+    }
 
 function drawSegment(model)
 {
