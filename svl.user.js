@@ -1228,7 +1228,7 @@ function drawLabel(model, simplified, delayed){
                     if(!model.isOneWay()){
                         directionArrow="";
                     }
-                labelFeature.attributes.label=directionArrow + labelText +directionArrow + "\n" + altStreetPart;
+                labelFeature.attributes.label=directionArrow + labelText + directionArrow + "\n" + altStreetPart;
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
