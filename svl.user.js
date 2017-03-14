@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.9.2
+// @version    3.9.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta|beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -710,6 +710,7 @@ function checkZoomLayer()
     if(preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled)
     {
         roadLayer.setVisibility(false);
+        $('#layer-switcher-item_street_vector_layer').prop('checked', false);
     }
     if(zoom>1)
     {
@@ -718,6 +719,7 @@ function checkZoomLayer()
             vectorAutomDisabled=false;
             //consoleDebug("Setting vector visibility to true");
             streetVector.setVisibility(true);
+            $('#layer-switcher-item_street_vector_layer').prop('checked', true);
             doDraw();
             //streetVector.display(true)
         }
@@ -784,6 +786,7 @@ function checkZoomLayer()
             {
                 //consoleDebug("Setting vector visibility to false");
                 streetVector.setVisibility(false);
+                $('#layer-switcher-item_street_vector_layer').prop('checked', false);
                 vectorAutomDisabled=true;
                 roadLayer.setVisibility(true);
             }
@@ -885,15 +888,15 @@ function initSVL() {
                     //angle: degrees,
                     labelAlign: "cm"//set to center middle
     });
-    var layername= "Street Vector Layer";
+    var layerName= "Street Vector Layer";
 
-    streetVector = new OpenLayers.Layer.Vector(layername,
+    streetVector = new OpenLayers.Layer.Vector(layerName,
                                                {
                                                    styleMap: labelStyleMap,
                                                    uniqueName: 'vectorstreet',
                                                    //shortcutKey:'A+l',
                                                    displayInLayerSwitcher:true,
-                                                   accelerator: "toggle" + layername.replace(/\s+/g,''),
+                                                   accelerator: "toggle" + layerName.replace(/\s+/g,''),
                                                    visibility: true,
                                                    isBaseLayer: false,
                                                    isVector: true,
@@ -1001,6 +1004,33 @@ function initSVL() {
     W.map.raiseLayer(streetVector, -2);
     W.map.raiseLayer(nodesVector, -1);
 
+    // Add layer entry in the new layer drawer
+    var roadGroupSelector = document.getElementById('layer-switcher-group_road');
+    if (roadGroupSelector != null) {
+      var roadGroup = roadGroupSelector.parentNode.parentNode.querySelector('.children');
+      var toggler = document.createElement('li');
+      var togglerContainer = document.createElement('div');
+      togglerContainer.className = 'controls-container toggler';
+      var checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = true;
+      checkbox.id = 'layer-switcher-item_street_vector_layer';
+      checkbox.className = 'toggle';
+      checkbox.addEventListener('click', function(e) {
+        streetVector.setVisibility(e.target.checked);
+      });
+      togglerContainer.appendChild(checkbox);
+      var label = document.createElement('label');
+      label.htmlFor = checkbox.id;
+      var labelText = document.createElement('span');
+      labelText.className = 'label-text';
+      labelText.appendChild(document.createTextNode(layerName));
+      label.appendChild(labelText);
+      togglerContainer.appendChild(label);
+      toggler.appendChild(togglerContainer);
+      roadGroup.appendChild(toggler);
+    }
+
     streetVector.events.register("visibilitychanged",streetVector, manageNodes);
     manageNodes({object:streetVector});
     try{
@@ -1028,13 +1058,15 @@ function initSVL() {
     if(preferences.startDisabled)
     {
         streetVector.setVisibility(false);
+        $('#layer-switcher-item_street_vector_layer').prop('checked', false);
     }
 
     //setInterval(refreshWME, 20000);//TODO Add it as an option, make the timer customizable
     console.log("Adding keyboard shortcut");
     try{
-    WMEKSRegisterKeyboardShortcut('SVL', 'Street Vector Layer', 'ToogleVectorLayer', 'Toggle Vector Layer', function(){streetVector.setVisibility(!streetVector.visibility)}, 'A+l'); //shortcut1
+    WMEKSRegisterKeyboardShortcut('SVL', 'Street Vector Layer', 'ToogleVectorLayer', 'Toggle Vector Layer', function(){streetVector.setVisibility(!streetVector.visibility);$('#layer-switcher-item_street_vector_layer').prop('checked', streetVector.visibility);}, 'A+l'); //shortcut1
     WMEKSLoadKeyboardShortcuts('SVL');
+         console.log("Keyboard shortcut successfully added.");
     }
     catch(e)
     {
@@ -1063,7 +1095,6 @@ function manageNodes(e)
     //Toggle node layer visibility accordingly
     //consoleDebug("Manage nodes", e);
     nodesVector.setVisibility(e.object.visibility);
-
     if(e.object.visibility)
     {
         //consoleDebug("Registering events");
@@ -1814,9 +1845,18 @@ function addNodes(e)
 
 function bootstrapSVL() {
   // Check all requisites for the script
+    var trials = 0;
   if (typeof W === undefined ||
-      typeof document.querySelector('#WazeMap') === undefined) {
-    setTimeout(bootstrapSVL, 400);
+      typeof document.querySelector('#WazeMap') === undefined || document.getElementById('layer-switcher-group_road') == null) {
+      console.log("SVL not ready to start, retrying in 400ms");
+      trials++;
+      if(trials < 10){
+          setTimeout(bootstrapSVL, 400);
+      }
+      else
+      {
+          alert("Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!");
+      }
     return;
   }
     /* begin running the code! */
