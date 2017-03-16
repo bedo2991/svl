@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.9.3
+// @version    3.9.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta|beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1004,33 +1004,6 @@ function initSVL() {
     W.map.raiseLayer(streetVector, -2);
     W.map.raiseLayer(nodesVector, -1);
 
-    // Add layer entry in the new layer drawer
-    var roadGroupSelector = document.getElementById('layer-switcher-group_road');
-    if (roadGroupSelector != null) {
-      var roadGroup = roadGroupSelector.parentNode.parentNode.querySelector('.children');
-      var toggler = document.createElement('li');
-      var togglerContainer = document.createElement('div');
-      togglerContainer.className = 'controls-container toggler';
-      var checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = true;
-      checkbox.id = 'layer-switcher-item_street_vector_layer';
-      checkbox.className = 'toggle';
-      checkbox.addEventListener('click', function(e) {
-        streetVector.setVisibility(e.target.checked);
-      });
-      togglerContainer.appendChild(checkbox);
-      var label = document.createElement('label');
-      label.htmlFor = checkbox.id;
-      var labelText = document.createElement('span');
-      labelText.className = 'label-text';
-      labelText.appendChild(document.createTextNode(layerName));
-      label.appendChild(labelText);
-      togglerContainer.appendChild(label);
-      toggler.appendChild(togglerContainer);
-      roadGroup.appendChild(toggler);
-    }
-
     streetVector.events.register("visibilitychanged",streetVector, manageNodes);
     manageNodes({object:streetVector});
     try{
@@ -1079,8 +1052,40 @@ function initSVL() {
 		WMEKSSaveKeyboardShortcuts('SVL');
 	}, false);
 
+    createLayerCheckbox();
+    W.app.on('change:mode', createLayerCheckbox);
+
     console.log("Street Vector Layer v. "+svlVersion+" initialized correctly." );
 }
+
+    function createLayerCheckbox(){
+        // Add layer entry in the new layer drawer
+    var roadGroupSelector = document.getElementById('layer-switcher-group_road');
+    if (roadGroupSelector != null) {
+      var roadGroup = roadGroupSelector.parentNode.parentNode.querySelector('.children');
+      var toggler = document.createElement('li');
+      var togglerContainer = document.createElement('div');
+      togglerContainer.className = 'controls-container toggler';
+      var checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = true;
+      checkbox.id = 'layer-switcher-item_street_vector_layer';
+      checkbox.className = 'toggle';
+      checkbox.addEventListener('click', function(e) {
+        streetVector.setVisibility(e.target.checked);
+      });
+      togglerContainer.appendChild(checkbox);
+      var label = document.createElement('label');
+      label.htmlFor = checkbox.id;
+      var labelText = document.createElement('span');
+      labelText.className = 'label-text';
+      labelText.appendChild(document.createTextNode("Street Vector Layer"));
+      label.appendChild(labelText);
+      togglerContainer.appendChild(label);
+      toggler.appendChild(togglerContainer);
+      roadGroup.appendChild(toggler);
+    }
+    }
 
 
 
