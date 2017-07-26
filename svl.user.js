@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    3.9.4
+// @version    4.0
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|editor-beta|beta).waze.com(\/(?!user)\w*-?\w*)?\/editor\/\w*\/?\??[\w|=|&|.]*/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
-// @require    https://greasyfork.org/scripts/16071-wme-keyboard-shortcuts/code/WME%20Keyboard%20Shortcuts.js
+// @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
+// @require    https://greasyfork.org/scripts/16071-wme-keyboard-shortcuts/code/WME%20Keyboard%20Shortcuts.js?version=208075
 // @author     bedo2991
 // @grant      none
 // @copyright  2015+, bedo2991
@@ -28,6 +29,7 @@
         consoleDebug = function(){}
     }*/
     var svlAttempts=0;
+    var autoLoadInterval=null;
     var clutterConstant;
     var thresholdDistance;
     var streetStyle = [];
@@ -51,6 +53,7 @@
     var superScript;
 
     var tunnelFlagStyle1;
+    var headlightsFlagStyle;
     var roundaboutStyle;
     var tollStyle;
     var closureStyle;
@@ -106,7 +109,7 @@
             strokeColor: "#000",
             strokeWidth: 2,
             strokeDashstyle: "solid",
-            pointerEvents: "visiblePainted",
+            pointerEvents: "none",
 
         }
     tunnelFlagStyle2 =
@@ -114,14 +117,14 @@
         strokeColor: "#C90",
         strokeWidth: 1,
         strokeDashstyle: "longdash",
-        pointerEvents: "visiblePainted",
+        pointerEvents: "none",
     }
     tunnelFlagStyle1 =
         {
         strokeColor: "#fff",
         strokeWidth: 2,
         strokeDashstyle: "longdash",
-        pointerEvents: "visiblePainted",
+        pointerEvents: "none",
     }
 }
 
@@ -141,8 +144,10 @@ function wbwWazeBits() {
 
 function refreshWME()
     {
-        if(W.model.actionManager.unsavedActionsNum() == 0)
-            $('div.icon-repeat.reload-button').click();
+        if(W.model.actionManager.unsavedActionsNum() == 0 && W.selectionManager.selectedItems.length == 0)
+        {
+            W.controller.reload();
+        }
     }
 
 function hasToBeSkipped(roadid)
@@ -208,6 +213,11 @@ function updateStylesFromPreferences(preferences)
     closureStyle.strokeWidth = preferences.closure.strokeWidth;
     closureStyle.strokeDashstyle = preferences.closure.strokeDashstyle;
 
+    //Headlights Required
+    headlightsFlagStyle.strokeColor = preferences.headlights.strokeColor;
+    headlightsFlagStyle.strokeWidth = preferences.headlights.strokeWidth;
+    headlightsFlagStyle.strokeDashstyle = preferences.headlights.strokeDashstyle;
+
     //Rendering
     //Labels
     clutterCostantNearZoom = preferences.clutterCostantNearZoom;
@@ -264,6 +274,11 @@ function updatePref()
 
     preferences.fakelock = $('#fakeLock').val();
 
+
+    //AutoReload
+    preferences.autoReload.interval = $('#autoReload_interval').val()*1000;
+    preferences.autoReload.enabled = $('#autoReload_enabled').prop('checked');
+
     //Red
     preferences.red.strokeColor = $('#streetColor_red').val();
     preferences.red.strokeWidth = $('#streetWidth_red').val();
@@ -280,7 +295,6 @@ function updatePref()
     preferences.toll.strokeDashstyle = $('#strokeDashstyle_toll option:selected').val();
 
     //Restrictions
-
     preferences.restriction.strokeColor = $('#streetColor_restriction').val();
     preferences.restriction.strokeWidth = $('#streetWidth_restriction').val();
     preferences.restriction.strokeDashstyle = $('#strokeDashstyle_restriction option:selected').val();
@@ -289,6 +303,11 @@ function updatePref()
     preferences.closure.strokeColor = $('#streetColor_closure').val();
     preferences.closure.strokeWidth = $('#streetWidth_closure').val();
     preferences.closure.strokeDashstyle = $('#strokeDashstyle_closure option:selected').val();
+
+    //HeadlightsRequired
+    preferences.headlights.strokeColor = $('#streetColor_headlights').val();
+    preferences.headlights.strokeWidth = $('#streetWidth_headlights').val();
+    preferences.headlights.strokeDashstyle = $('#strokeDashstyle_headlights option:selected').val();
 
     preferences.clutterCostantNearZoom = $('#clutterCostantNearZoom').val();
     preferences.clutterCostantFarZoom =  $('#clutterCostantFarZoom').val();
@@ -309,7 +328,9 @@ function updatePref()
     preferences.closeZoomLabelSize = $('#closeZoomLabelSize').val();
 
     preferences.renderGeomNodes = $('#renderGeomNodes').prop('checked');
+
     updateStylesFromPreferences(preferences);
+    updateRefreshStatus();
 }
 
 function saveNewPref()
@@ -346,7 +367,7 @@ function getColorSpeed(speed)
 
 function createDashStyleDropdown(id)
 {
-    return $('<select class="prefElement" title="Stroke style" id="'+id+'"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');                          
+    return $('<select class="prefElement" title="Stroke style" id="'+id+'"><option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option></select>');
 }
 
 function editPreferences()
@@ -438,11 +459,30 @@ function editPreferences()
     $decorations.append($select);
     $decorations.append('<hr>');
 
+    //HeadlightsRequired
+    $decorations.append($('<b>Headlights Required</b><br>'));
+    $decorations.append($('<input class="prefElement" title="Color" id="streetColor_headlights" value="'+preferences.headlights.strokeColor+'" type="color"></input>'));
+    $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_headlights" value="'+preferences.headlights.strokeWidth+'" type="number" min="0" max="15"></input>'));
+    var $select = createDashStyleDropdown("strokeDashstyle_headlights");
+    $select.val(preferences.headlights.strokeDashstyle);
+    $decorations.append($select);
+    $decorations.append('<hr>');
+
 
     $elementDiv.append($decorations);
 
     //Labels
     $labels.append('<summary>Rendering Parameters</summary>');
+
+    $labels.append('<b>Automatically refresh the map</b>');
+    $labels.append($('<br><i>Enabled&nbsp;</i>'));
+
+    $labels.append($('<input class="prefElement" title="Enable Auto Reload" id="autoReload_enabled" '+(preferences.autoReload.enabled?'checked':'')+' type="checkbox"></input>'));
+
+    $labels.append($('<br><i>Update Interval (in seconds)</i><br>'));
+    $labels.append($('<input class="prefElement" title="Auto Reload Time Interval in Seconds" id="autoReload_interval" value="'+preferences.autoReload.interval/1000 +'" type="number" min="20" max="3600"></input>'));
+    $labels.append($('<br><i>Note: it will only work if at that time you did not edit any segment and no elements were selected.</i><br>'));
+    $labels.append('<hr>');
 
     $labels.append('<b>Render map as level</b><br>');
     $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="'+W.loginManager.user.getAttributes().normalizedLevel+'" type="number" min="1" max="7"></input>'));
@@ -539,6 +579,11 @@ function editPreferences()
 function saveDefaultPreferences()
 {
     preferences = {};
+
+    preferences.autoReload = {};
+    preferences.autoReload.interval = 60000;
+    preferences.autoReload.enabled = true;
+
     preferences.showSLSinglecolor = false;
     preferences.SLColor = "#ffdf00";
     if(W.loginManager.user)
@@ -668,6 +713,11 @@ function saveDefaultPreferences()
         strokeColor: "#FF00FF",
         strokeWidth: 4,
         strokeDashstyle: "dash"
+    };
+    preferences.headlights ={
+        strokeColor: "#bfff00",
+        strokeWidth: 3,
+        strokeDashstyle: "dot"
     };
     preferences.restriction ={
         strokeColor: "#F2FF00",
@@ -834,9 +884,29 @@ function initSVL() {
               +"You can change the streets color, thickness and style by clicking on the attribution bar at the bottom of the editor.\n"
               +"Your preferences will be saved for the next time in your browser.\n"
               +"The other road layers will be automatically hidden. (You can change this behaviour in the preference panel).\n"
-              +"Have fun and tell us if you liked the script!");
+              +"Have fun and tell us on the Waze forum if you liked the script!");
     }
     else{
+        if(preferences.autoReload == null)
+        {
+            preferences.autoReload = {};
+            preferences.autoReload.interval = 60000;
+            preferences.autoReload.enabled = true;
+            savePreferences(preferences);
+        }
+        if(preferences.headlights == null){
+            preferences.headlights ={
+                strokeColor: "#bfff00",
+                strokeWidth: 3,
+                strokeDashstyle: "dot"
+            };
+
+            savePreferences(preferences);
+            alert("Street Vector Layer (SVL) has been updated to version " + svlVersion+"\n"
+                 +"\nNEW:\n"
+                 +"Headlights required (yellow long dashed by default, it can be changed)\n"
+                 +"\nAuto Refresh: if you didn't edit anything and nothing is selected SVL refreshes the view every 60 seconds (the interval can be changed in the preference panel from 15 seconds to 1h, or completely disabled):\n");
+        }
         if(preferences.dirty==null||preferences.SLColor== null || preferences.showSLcolor == null || preferences.showSLtext == null || preferences.clutterCostantNearZoom == null || preferences.labelOutlineWidth==null || preferences.disableRoadLayers==null || preferences.startDisabled == null)
         {
             preferences.dirty = preferences.dirty ? preferences.dirty : {
@@ -949,6 +1019,14 @@ function initSVL() {
         strokeDashstyle: preferences.closure.strokeDashstyle,
         pointerEvents: "none"
     };
+
+    headlightsFlagStyle = {
+        strokeColor: preferences.headlights.strokeColor,
+        strokeWidth: preferences.headlights.strokeWidth,
+        strokeDashstyle: preferences.headlights.strokeDashstyle,
+        pointerEvents: "none"
+    };
+
     validatedStyle = {
         strokeColor: "#F53BFF",
         strokeWidth: 3,
@@ -1034,8 +1112,7 @@ function initSVL() {
         $('#layer-switcher-item_street_vector_layer').prop('checked', false);
     }
 
-    //setInterval(refreshWME, 20000);//TODO Add it as an option, make the timer customizable
-    console.log("Adding keyboard shortcut");
+    //Adding keyboard shortcut
     try{
     WMEKSRegisterKeyboardShortcut('SVL', 'Street Vector Layer', 'ToogleVectorLayer', 'Toggle Vector Layer', function(){streetVector.setVisibility(!streetVector.visibility);$('#layer-switcher-item_street_vector_layer').prop('checked', streetVector.visibility);}, 'A+l'); //shortcut1
     WMEKSLoadKeyboardShortcuts('SVL');
@@ -1055,10 +1132,12 @@ function initSVL() {
     createLayerCheckbox();
     W.app.on('change:mode', createLayerCheckbox);
 
+    updateRefreshStatus();
+
     console.log("Street Vector Layer v. "+svlVersion+" initialized correctly." );
 }
 
-    function createLayerCheckbox(){
+function createLayerCheckbox(){
         // Add layer entry in the new layer drawer
     var roadGroupSelector = document.getElementById('layer-switcher-group_road');
     if (roadGroupSelector != null) {
@@ -1085,9 +1164,17 @@ function initSVL() {
       toggler.appendChild(togglerContainer);
       roadGroup.appendChild(toggler);
     }
+}
+
+
+function updateRefreshStatus()
+{
+    clearInterval(autoLoadInterval);
+    autoLoadInterval = null;
+    if(preferences.autoReload.enabled){
+        autoLoadInterval = setInterval(refreshWME, preferences.autoReload.interval);
     }
-
-
+}
 
 function getThreshold()
 {
@@ -1230,41 +1317,31 @@ function drawLabel(model, simplified, delayed){
                 var p=maxDistanceIndex;
                 var centroid = new OpenLayers.Geometry.LineString([simplified[p],simplified[p+1]]).getCentroid(true);/*Important pass true parameter otherwise it will return start point as centroid*/
                 labelFeature = new OpenLayers.Feature.Vector(centroid,{myId:attributes.id});
-                    var fwdRestrictions =  getRestrictions(attributes.fwdRestrictions);
-                    var revRestrictions =  getRestrictions(attributes.revRestrictions);
-                    var leftRestriction = revRestrictions;
-                    var rightRestrictions = fwdRestrictions;
                     if(attributes.fwdDirection){
                         dx = simplified[p+1].x-simplified[p].x;
                         dy = simplified[p+1].y-simplified[p].y;
                     }
                     else
                     {
-                        leftRestriction = fwdRestrictions;
-                        rightRestrictions =revRestrictions;
                         dx = simplified[p].x-simplified[p+1].x;
                         dy = simplified[p].y-simplified[p+1].y;
                     }
                     var angle = Math.atan2(dx,dy);
                     var degrees = 90 + angle*180/Math.PI;
                     var directionArrow = " ▶ ";
-
                     if(degrees>90 && degrees < 270)
                     {
                         degrees-=180;
-
                             //directionArrow = " ▶ ";
                     }
                     else
                     {
-                            leftRestriction = revRestrictions;
-                            rightRestrictions = fwdRestrictions;
                             directionArrow = " ◀ ";
                     }
                     if(!model.isOneWay()){
                         directionArrow="";
                     }
-                labelFeature.attributes.label=leftRestriction+directionArrow + labelText +directionArrow+rightRestrictions;
+                labelFeature.attributes.label=directionArrow + labelText +directionArrow;
                 labelFeature.attributes.color=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].strokeColor:"#f00";
                 labelFeature.attributes.outlinecolor=streetStyle[attributes.roadType]?streetStyle[attributes.roadType].outlineColor:"#fff";
                 labelFeature.attributes.angle=degrees;
@@ -1278,6 +1355,7 @@ function drawLabel(model, simplified, delayed){
     return labelFeature;
 }
 
+    /*
 function getRestrictions(r)
     {
         if(r==null || r.length==0)
@@ -1310,6 +1388,7 @@ function getRestrictions(r)
         }
         return res;
     }
+    */
 
 function drawSegment(model)
 {
@@ -1342,7 +1421,7 @@ function drawSegment(model)
                 strokeColor: "#000",
                 strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+(speed&&preferences.showSLcolor&&!farZoom?6:4),
                 //strokeDashstyle: "solid",
-                pointerEvents: "visiblePainted",
+                pointerEvents: "none",
 
                 }
             lineFeature = new OpenLayers.Feature.Vector(
@@ -1364,7 +1443,7 @@ function drawSegment(model)
                     strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
                     strokeDashstyle: speedStrokeStyle,
-                    pointerEvents: "visiblePainted",
+                    pointerEvents: "none",
                 }
                 speed = getColorSpeed(attributes.revMaxSpeed);
                 var speedStyleRight =
@@ -1372,7 +1451,7 @@ function drawSegment(model)
                     strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
                     strokeWidth: streetStyle[attributes.roadType].strokeWidth,
                     strokeDashstyle: speedStrokeStyle,
-                    pointerEvents: "visiblePainted",
+                    pointerEvents: "none",
                 }
                 //It has 2 different speeds:
                 var left = [];
@@ -1458,7 +1537,7 @@ function drawSegment(model)
                                 strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
                                 strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
                                 strokeDashstyle: speedStrokeStyle,
-                                pointerEvents: "visiblePainted",
+                                pointerEvents: "none",
                             }
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  speedStyle);
@@ -1478,7 +1557,7 @@ function drawSegment(model)
                     strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth),
                     strokeOpacity: 0.35,
                     strokeDashstyle: "solid",
-                    pointerEvents: "visiblePainted",
+                    pointerEvents: "none",
                 }
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tunnelsStyle);
@@ -1502,7 +1581,7 @@ if(attributes.flags & 16)
                 strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)-2,
                 strokeOpacity: preferences.dirty.opacity/100.0,
                 strokeDashstyle: preferences.dirty.strokeDashstyle,
-                pointerEvents: "visiblePainted",
+                pointerEvents: "none",
             }
         lineFeature = new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   dirtyStyle);
@@ -1531,20 +1610,26 @@ if(attributes.flags & 16)
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tollStyle);
             myFeatures.push(lineFeature);
         }
-        if(attributes.fwdRestrictions){
-            if(attributes.fwdRestrictions.length>0 || attributes.revRestrictions.length>0 )
-            {//It has restrictions
+        if(attributes.restrictions.length>0){
+            //It has restrictions
                 //consoleDebug("Segment has restrictions");
                 var lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  restrStyle);
                 myFeatures.push(lineFeature);
-            }
         }
 
         if(!locked && attributes.validated === false)
         {//Segments that needs validation
             var lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id}, validatedStyle);
+            myFeatures.push(lineFeature);
+        }
+        
+        //Headlights
+        if(attributes.flags & 32)
+        {
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  headlightsFlagStyle);
             myFeatures.push(lineFeature);
         }
 
@@ -1664,8 +1749,9 @@ if(attributes.flags & 16)
             }
         }
         //END: show geometry points
-    }
+    } // End: Close Zoom
 
+    //Far Zoom:
     if(attributes.flags & 1)
     {//The tunnel flag is enabled
         lineFeature = new OpenLayers.Feature.Vector(
@@ -1675,11 +1761,13 @@ if(attributes.flags & 16)
             new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},   tunnelFlagStyle2);
         myFeatures.push(lineFeature);
     }
-    //consoleDebug("Maxdistance:", maxDistance, "Threshold:", thresholdDistance);
 
-            var labelFeature = drawLabel(model, simplified);
-            if(labelFeature!=null)
-                myFeatures.push(labelFeature);
+
+    //Add Label
+    var labelFeature = drawLabel(model, simplified);
+    if(labelFeature!=null){
+        myFeatures.push(labelFeature);
+    }
     return myFeatures;
 }
 
@@ -1748,7 +1836,9 @@ function drawAllNodes()
     for(var node in nodes)
     {
         if (nodes.hasOwnProperty(node)) {
-            nodeFeatures.push(drawNode(nodes[node]));
+            if(nodes[node].state != "Delete"){
+                nodeFeatures.push(drawNode(nodes[node]));
+            }
         }
     }//End: For all the nodes
     nodesVector.addFeatures(nodeFeatures);
@@ -1841,6 +1931,11 @@ function addNodes(e)
     var myFeatures = [];
     for(var i=0; i<e.length; i++)
     {
+        if(e[i].state=="Insert"){
+            //If a new node was inserted, stop here and draw everything again to avoid keeping the one that was deleted
+            drawAllNodes();
+            return;
+        }
         myFeatures.push(drawNode(e[i]));
     }
 
