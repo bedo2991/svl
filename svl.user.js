@@ -1,17 +1,18 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.1
+// @version    4.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
 // @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
 // @require    https://greasyfork.org/scripts/16071-wme-keyboard-shortcuts/code/WME%20Keyboard%20Shortcuts.js?version=208075
 // @author     bedo2991
-// @grant      none
+// @grant    GM_setClipboard
 // @copyright  2015+, bedo2991
 // ==/UserScript==
 
+//Code minifier: https://closure-compiler.appspot.com/home
 //debugger;
 (function() {
    /*var DEBUG_ENABLED = true; //set it to false for production mode
@@ -239,7 +240,9 @@ function updateStylesFromPreferences(preferences)
 
 function exportPreferences()
 {
-    prompt("Please copy this string (CTRL+C):", JSON.stringify(preferences));
+    //prompt("Please copy this string (CTRL+C):", JSON.stringify(preferences));
+    GM_setClipboard(JSON.stringify(preferences));
+    alert("The configuration has been copied to your clipboard. Please past it in a file (CTRL+V)")
 }
 
 function importPreferences()
