@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.2
+// @version    4.2.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -925,7 +925,8 @@ function initSVL() {
             preferences.disableRoadLayers=preferences.disableRoadLayers?preferences.disableRoadLayers:true;
             preferences.clutterCostantNearZoom =preferences.clutterCostantNearZoom?preferences.clutterCostantNearZoom: 350; //float value, the highest the less label will be generated. Zoom >=5
             preferences.clutterCostantFarZoom = preferences.clutterCostantFarZoom? preferences.clutterCostantFarZoom: 410; //float value, the highest the less label will be generated. Zoom <5
-            prompt("!!! IMPORTANT !!!\nStreet Vector layer got updated to the version "+svlVersion+ " and needs to update your saved preferences in order to keep working.\nHere is a backup of your previous settings.\nCopy it and import it later if you have made any change that you'd like to keep.", JSON.stringify(preferences));
+            prompt("!!! IMPORTANT !!!\nStreet Vector layer got updated to the version "+svlVersion+ " and needs to update your saved preferences in order to keep working.\nA backup of your previous settings has been copied to your clipboard.\nImport it later if you have made any change that you'd like to keep (Open the preference panel, click on import down below and press CTRL+V to paste your current preferences).");
+            GM_setClipboard(JSON.stringify(preferences));
             saveDefaultPreferences();
         }
     }
