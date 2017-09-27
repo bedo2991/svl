@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.2.1
+// @version    4.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -145,7 +145,7 @@ function wbwWazeBits() {
 
 function refreshWME()
     {
-        if(W.model.actionManager.unsavedActionsNum() == 0 && W.selectionManager.selectedItems.length == 0)
+        if(W.model.actionManager.unsavedActionsNum() == 0 && W.selectionManager.selectedItems.length == 0 && $('.place-update-edit.show').size() == 0)
         {
             W.controller.reload();
         }
@@ -265,7 +265,7 @@ function importPreferences()
 
 function updatePref()
 {
-    $('#saveNewPref').attr("style", "background-color:#FFBD24");
+    $('#saveNewPref').removeClass("btn-primary").addClass("btn-warning");
     for(var i=0, len = preferences.streets.length; i<len; i++)
     {
         if(preferences.streets[i] != null){
@@ -389,10 +389,10 @@ function editPreferences()
     }
     $(document.getElementById('map')).append($zoomStyleDiv);
     var $style = $('<style>.farZoom{background-color:orange}.closeZoom{background-color:#6495ED}.zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}.prefElement{margin-right:0.2em;}summary{font-weight:bold}</style>');
-    var $mainDiv = $('<div id="PrefDiv" style="padding:0.6em; border-radius:15px; background:white; opacity:0.93; width:23em; position:absolute; top:11em; left:30em; z-index:200"></div>');
-    $mainDiv.append($('<div><button id="saveNewPref">Save</button> <button id="rollbackPreferences">Rollback</button> <button id="rollbackDefault">Reset</button><button style="float:right" id="close">X</button></div>'));
+    var $mainDiv = $('<div id="PrefDiv" class="panel panel-default show" style="width:24em; position:absolute; top:10em; left:30em; z-index:200; background-color:#ffffff"></div>');
+    $mainDiv.append($('<div class="panel-heading"><button id="saveNewPref" class="btn btn-primary waze-icon-save">Save</button> <button id="rollbackPreferences" class="btn btn-default">Rollback</button> <button id="rollbackDefault" class="btn btn-default">Reset</button><a id="close" class="close-panel" /></div>'));
 
-    var $elementDiv = $('<div id="PrefDiv" style="padding:5px; width:280px; max-height:450px; overflow:auto"></div>');
+    var $elementDiv = $('<div id="PrefElementDiv" style="padding:1px 15px; max-height:450px; overflow:auto"></div>');
 
     var $streets = $('<details open></details>');
     var $decorations = $('<details></details>');
@@ -405,7 +405,7 @@ function editPreferences()
         if(preferences.streets[i] != null)
         {
             $streets.append($('<b>'+svlStreetTypes[i]+'</b><br>'));
-            $streets.append($('<input class="prefElement"  title="Color" id="streetColor_'+i+'" value="'+preferences.streets[i].strokeColor+'" type="color"></input>&nbsp&nbsp'));
+            $streets.append($('<input class="prefElement" title="Color" id="streetColor_'+i+'" value="'+preferences.streets[i].strokeColor+'" type="color"></input>&nbsp&nbsp'));
             $streets.append($('<input class="prefElement" title="Width" id="streetWidth_'+i+'" value="'+preferences.streets[i].strokeWidth+'" type="number" min="3" max="15"></input>&nbsp&nbsp'));
             var $select = createDashStyleDropdown('strokeDashstyle_'+i);
             $select.val(preferences.streets[i].strokeDashstyle);
@@ -477,7 +477,7 @@ function editPreferences()
     //Labels
     $labels.append('<summary>Rendering Parameters</summary>');
 
-    $labels.append('<b>Automatically refresh the map</b>');
+    $labels.append('<b>Automatically refresh the Map</b>');
     $labels.append($('<br><i>Enabled&nbsp;</i>'));
 
     $labels.append($('<input class="prefElement" title="Enable Auto Reload" id="autoReload_enabled" '+(preferences.autoReload.enabled?'checked':'')+' type="checkbox"></input>'));
@@ -566,7 +566,7 @@ function editPreferences()
     $elementDiv.append($speedLimits);
 
     $mainDiv.append($elementDiv);
-    $mainDiv.append($('<div style="margin-top:2px"><button id="exportPreferences">Export</button> <button id="importPreferences"">Import</button><div>'));
+    $mainDiv.append($('<div class="panel-footer" style="margin-top:2px"><button id="exportPreferences" class="btn btn-default">Export</button> <button id="importPreferences" class="btn btn-default">Import</button><div>'));
     $('body').append($style);
     $('body').append($mainDiv);
     $('.prefElement').change(updatePref);
@@ -585,7 +585,7 @@ function saveDefaultPreferences()
 
     preferences.autoReload = {};
     preferences.autoReload.interval = 60000;
-    preferences.autoReload.enabled = true;
+    preferences.autoReload.enabled = false;
 
     preferences.showSLSinglecolor = false;
     preferences.SLColor = "#ffdf00";
@@ -1438,7 +1438,7 @@ function drawSegment(model)
             //consoleDebug("SpeedLimit");
             var speedStrokeStyle= (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified||attributes.revMaxSpeedUnverified) ? "dash":"solid");
 
-            if(!preferences.showSLSinglecolor && attributes.fwdMaxSpeed && attributes.revMaxSpeed && attributes.fwdMaxSpeed != attributes.revMaxSpeed)
+            if(!preferences.showSLSinglecolor && (attributes.fwdMaxSpeed || attributes.revMaxSpeed) && attributes.fwdMaxSpeed != attributes.revMaxSpeed && !model.isOneWay())
             {
                 //consoleDebug("The segment has 2 different speed limits");
                 speed = getColorSpeed(attributes.fwdMaxSpeed);
@@ -1535,17 +1535,32 @@ function drawSegment(model)
                 }
             }
             else{
-                speed = getColorSpeed(attributes.fwdMaxSpeed?attributes.fwdMaxSpeed:attributes.revMaxSpeed);
-                        var speedStyle =
-                            {
-                                strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
-                                strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
-                                strokeDashstyle: speedStrokeStyle,
-                                pointerEvents: "none",
-                            }
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  speedStyle);
-                myFeatures.push(lineFeature);
+                //The segment is two way street with the same speed limit on both sides or one way street
+                var speedValue = attributes.fwdMaxSpeed; //If the segment is two way, take any speed, they are equal.
+                if(model.isOneWay())
+                {
+                    if(attributes.fwdDirection)
+                    {
+                        speedValue = attributes.fwdMaxSpeed;
+                    }
+                    else
+                    {
+                        speedValue = attributes.revMaxSpeed;
+                    }
+                }
+                if(speedValue){
+                    speed = getColorSpeed(speedValue);
+                    var speedStyle =
+                        {
+                            strokeColor: speed.toString().charAt(0)=='#'?speed:"hsl("+speed+", 100%, 50%)",
+                            strokeWidth: parseInt(streetStyle[attributes.roadType].strokeWidth)+4,
+                            strokeDashstyle: speedStrokeStyle,
+                            pointerEvents: "none",
+                        }
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  speedStyle);
+                    myFeatures.push(lineFeature);
+                }
             }
         }
 
