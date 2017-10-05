@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.3.1
+// @version    4.3.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1629,6 +1629,18 @@ if(attributes.flags & 16)
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tollStyle);
             myFeatures.push(lineFeature);
         }
+        else{
+            var restr = attributes.restrictions;
+            for(var i=0; i<restr.length; i++){
+                if(restr[i]._defaultType == "TOLL")
+                { //If it has at least a "toll free" restriction
+                    var lineFeature = new OpenLayers.Feature.Vector(
+                    new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id},  tollStyle);
+                    myFeatures.push(lineFeature);
+                    break;
+                }
+            }
+         }
         if(attributes.restrictions.length>0){
             //It has restrictions
                 //consoleDebug("Segment has restrictions");
@@ -1643,7 +1655,7 @@ if(attributes.flags & 16)
                 new OpenLayers.Geometry.LineString(pointList), {myId:attributes.id}, validatedStyle);
             myFeatures.push(lineFeature);
         }
-        
+
         //Headlights
         if(attributes.flags & 32)
         {
@@ -1729,7 +1741,7 @@ if(attributes.flags & 16)
                 }
             }
         }
-        
+
         if(attributes.fwdFlags & 0x1) //check if speed camera
         {
             var degrees = getAngle(attributes.fwdDirection, points[0],points[1]);
@@ -1743,7 +1755,7 @@ if(attributes.flags & 16)
         });
             myFeatures.push(avgSpeed);
         }
-        
+
         if(attributes.revFlags & 0x1 ) //check if speed camera
         {
             var degrees = getAngle(attributes.fwdDirection, points[points.length-2],points[points.length-1]);
