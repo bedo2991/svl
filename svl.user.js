@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.4
+// @version    4.4.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -744,24 +744,26 @@
                     locked = true;
                 }
             }
+
+            /*jslint bitwise: true */
+            if (attributes.flags & 16) { //The dirty flag is enabled
+                /*jslint bitwise: false */
+                dirtyStyle = {
+                    strokeColor: preferences.dirty.strokeColor,
+                    strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10) - 2,
+                    strokeOpacity: preferences.dirty.opacity / 100.0,
+                    strokeDashstyle: preferences.dirty.strokeDashstyle,
+                    pointerEvents: "none"
+                };
+                lineFeature = new OpenLayers.Feature.Vector(
+                    new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id
+                    }, dirtyStyle);
+                myFeatures.push(lineFeature);
+            }
         }
         //Check segment properties
-        /*jslint bitwise: true */
-        if (attributes.flags & 16) { //The dirty flag is enabled
-            /*jslint bitwise: false */
-            dirtyStyle = {
-                strokeColor: preferences.dirty.strokeColor,
-                strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10) - 2,
-                strokeOpacity: preferences.dirty.opacity / 100.0,
-                strokeDashstyle: preferences.dirty.strokeDashstyle,
-                pointerEvents: "none"
-            };
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id
-                }, dirtyStyle);
-            myFeatures.push(lineFeature);
-        }
+
 
         if (!farZoom) {
             if (attributes.hasClosures) {
@@ -1122,7 +1124,7 @@
     function updateRoutingModePanel() {
         //"use strict";
         var $routingModeDiv;
-        console.error("ROTUING MODE ENABLED? ", preferences.routingModeEnabled);
+        //console.error("ROTUING MODE ENABLED? ", preferences.routingModeEnabled);
         if (preferences.routingModeEnabled) {
             $routingModeDiv = $("<div id=\"routingModeDiv\" class=\"routingDiv\">Routing Mode<br><small>Hover to temporary disable it<small></div>");
             $routingModeDiv.hover(
@@ -1500,7 +1502,7 @@
                 drawAllNodes();
                 return;
             }
-            if(e[i].attributes.geometry !== undefined) {
+            if (e[i].attributes.geometry !== undefined) {
                 myFeatures.push(drawNode(e[i]));
             }
         }
@@ -1800,7 +1802,7 @@
                 "The other road layers will be automatically hidden (you can change this behaviour in the preference panel).\n" +
                 "Have fun and tell us on the Waze forum if you liked the script!");
         } else {
-            console.dir(preferences);
+            //console.dir(preferences);
             if (!preferences.autoReload) {
                 preferences.autoReload = {};
                 preferences.autoReload.interval = 60000;
@@ -1820,7 +1822,7 @@
                     "Headlights required (yellow long dashed by default, it can be changed)\n" +
                     "\nAuto Refresh: if you didn't edit anything and nothing is selected SVL refreshes the view every 60 seconds (the interval can be changed in the preference panel from 15 seconds to 1h, or completely disabled):\n");
             }
-            if (preferences.dirty === undefined || preferences.SLColor ===  undefined || preferences.showSLcolor === undefined || preferences.showSLtext === undefined || preferences.clutterCostantNearZoom === undefined || preferences.labelOutlineWidth === undefined || preferences.disableRoadLayers === undefined || preferences.startDisabled === undefined) {
+            if (preferences.dirty === undefined || preferences.SLColor === undefined || preferences.showSLcolor === undefined || preferences.showSLtext === undefined || preferences.clutterCostantNearZoom === undefined || preferences.labelOutlineWidth === undefined || preferences.disableRoadLayers === undefined || preferences.startDisabled === undefined) {
                 preferences.dirty = preferences.dirty || {
                     strokeColor: "#82614A",
                     opacity: 60,
@@ -1850,7 +1852,7 @@
 
         clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
         thresholdDistance = getThreshold();
-        if (preferences.farZoomLabelSize=== undefined || preferences.closeZoomLabelSize=== undefined || preferences.labelOutlineWidth=== undefined) {
+        if (preferences.farZoomLabelSize === undefined || preferences.closeZoomLabelSize === undefined || preferences.labelOutlineWidth === undefined) {
             preferences.labelOutlineWidth = 3;
             preferences.farZoomLabelSize = 11;
             preferences.closeZoomLabelSize = 11;
