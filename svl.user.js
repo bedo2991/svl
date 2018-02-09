@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.4.1
+// @version    4.4.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -421,11 +421,13 @@
         return res;
     }
 
-    function drawLabel(model, simplified, delayed) {
-        //console.log("drawLabel");
+    function drawLabels(model, simplified, delayed) {
+        //console.log("drawLabels");
         //"use strict";
-        var labelFeature, len, attributes, address, maxDistance, maxDistanceIndex, p, streetPart, speedPart, speed, distance,
-            labelText, dx, dy, centroid, angle, degrees, directionArrow;
+        var labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
+            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance;
+        defaultLabel = null;
+        labels = [];
         labelFeature = null;
         attributes = model.attributes;
         address = model.getAddress();
@@ -433,95 +435,126 @@
         if (attributes.primaryStreetID !== null && address.state === undefined) {
             //console.error("NOT READY");
             setTimeout(function () {
-                drawLabel(model, simplified, true);
+                drawLabels(model, simplified, true);
             }, 500);
         } else /*if ((preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))*/ {
-            maxDistance = 0;
-            maxDistanceIndex = -1;
-            for (p = 0, len = simplified.length - 1; p < len; p += 1) {
-                distance = simplified[p].distanceTo(simplified[p + 1]);
-                if (distance > maxDistance) {
-                    maxDistance = distance;
-                    maxDistanceIndex = p;
-                }
+            //maxDistance = 0;
+            //maxDistanceIndex = -1;
+            streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
+            //consoleDebug("Streetpart:" +streetPart);
+            if (!streetStyle[attributes.roadType]) {
+                streetPart += "\n!! UNSUPPORTED ROAD TYPE !!";
             }
-            if (thresholdDistance && maxDistance >= thresholdDistance) {
-                //consoleDebug("Label can be inserted:");
-                //console.dir(address);
-                streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
-                //consoleDebug("Streetpart:" +streetPart);
-                if (!streetStyle[attributes.roadType]) {
-                    streetPart += "\n!! UNSUPPORTED ROAD TYPE !!";
-                }
-                speedPart = "";
-                speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed;
-                if (speed && preferences.showSLtext) {
-                    if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
+            speedPart = "";
+            speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed;
+            if (speed && preferences.showSLtext) {
+                if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
+                    speedPart = getSuperScript(attributes.fwdMaxSpeed);
+                } else {
+                    if (attributes.fwdMaxSpeed) {
                         speedPart = getSuperScript(attributes.fwdMaxSpeed);
+                        if (attributes.revMaxSpeed) {
+                            speedPart += "'" + getSuperScript(attributes.revMaxSpeed);
+                        }
                     } else {
+                        speedPart = getSuperScript(attributes.revMaxSpeed);
                         if (attributes.fwdMaxSpeed) {
-                            speedPart = getSuperScript(attributes.fwdMaxSpeed);
-                            if (attributes.revMaxSpeed) {
-                                speedPart += "'" + getSuperScript(attributes.revMaxSpeed);
-                            }
-                        } else {
-                            speedPart = getSuperScript(attributes.revMaxSpeed);
-                            if (attributes.fwdMaxSpeed) {
-                                speedPart += "'" + getSuperScript(attributes.fwdMaxSpeed);
-                            }
+                            speedPart += "'" + getSuperScript(attributes.fwdMaxSpeed);
                         }
                     }
-                    /*jslint bitwise: true */
-                    if (attributes.fwdMaxSpeedUnverified | attributes.revMaxSpeedisVerified) {
-                        /*jslint bitwise: false */
-                        speedPart += "?";
-                    }
                 }
-                labelText = streetPart + " " + speedPart;
-                if (labelText === " ") {
-                    return null;
-                }
-                dx = 0;
-                dy = 0;
-                if (maxDistance > streetPart.length * 2.1 * (8 - Wmap.getZoom()) + Math.random() * 30) {
-                    //consoleDebug("Label inserted");
-                    p = maxDistanceIndex;
-                    centroid = new OpenLayers.Geometry.LineString([simplified[p], simplified[p + 1]]).getCentroid(true); /*Important pass true parameter otherwise it will return start point as centroid*/
-                    labelFeature = new OpenLayers.Feature.Vector(centroid, {
-                        myId: attributes.id
-                    });
-                    if (attributes.fwdDirection) {
-                        dx = simplified[p + 1].x - simplified[p].x;
-                        dy = simplified[p + 1].y - simplified[p].y;
-                    } else {
-                        dx = simplified[p].x - simplified[p + 1].x;
-                        dy = simplified[p].y - simplified[p + 1].y;
-                    }
-                    angle = Math.atan2(dx, dy);
-                    degrees = 90 + angle * 180 / Math.PI;
-                    directionArrow = " ▶ ";
-                    if (degrees > 90 && degrees < 270) {
-                        degrees -= 180;
-                        //directionArrow = " ▶ ";
-                    } else {
-                        directionArrow = " ◀ ";
-                    }
-                    if (!model.isOneWay()) {
-                        directionArrow = "";
-                    }
-                    labelFeature.attributes.label = directionArrow + labelText + directionArrow;
-                    labelFeature.attributes.color = streetStyle[attributes.roadType] ? streetStyle[attributes.roadType].strokeColor : "#f00";
-                    labelFeature.attributes.outlinecolor = streetStyle[attributes.roadType] ? streetStyle[attributes.roadType].outlineColor : "#fff";
-                    labelFeature.attributes.angle = degrees;
-                    labelFeature.attributes.outlinewidth = labelOutlineWidth;
-                    labelFeature.attributes.fsize = labelFontSize;
+                /*jslint bitwise: true */
+                if (attributes.fwdMaxSpeedUnverified | attributes.revMaxSpeedisVerified) {
+                    /*jslint bitwise: false */
+                    speedPart += "?";
                 }
             }
+            labelText = streetPart + " " + speedPart;
+            if (labelText === " ") {
+                return [];
+            }
+            streetNameThresholdDistance = labelText.length * 2.3 * (8 - Wmap.getZoom()) + Math.random() * 30;
+            doubleLabelDistance = 4 * streetNameThresholdDistance;
+
+            defaultLabel = new OpenLayers.Feature.Vector(simplified[0], {
+                myId: attributes.id
+            });
+
+            defaultLabel.attributes.color = streetStyle[attributes.roadType] ? streetStyle[attributes.roadType].strokeColor : "#f00";
+            defaultLabel.attributes.outlinecolor = streetStyle[attributes.roadType] ? streetStyle[attributes.roadType].outlineColor : "#fff";
+            defaultLabel.attributes.outlinewidth = labelOutlineWidth;
+            defaultLabel.attributes.fsize = labelFontSize;
+
+
+            for (p = 0, len = simplified.length - 1; p < len; p += 1) {
+                distance = simplified[p].distanceTo(simplified[p + 1]);
+                if (thresholdDistance && distance >= thresholdDistance) {
+                    //consoleDebug("Label can be inserted:");
+                    //console.dir(address);
+                    dx = 0;
+                    dy = 0;
+                    if (distance > streetNameThresholdDistance) {
+                        //consoleDebug("Label inserted");
+                        //p = maxDistanceIndex;
+                        if (farZoom || distance < doubleLabelDistance) {
+                            p0 = simplified[p];
+                            p1 = simplified[p + 1];
+                        } else {
+                            p0 = simplified[p];
+                            p1 = new OpenLayers.Geometry.LineString([p0, simplified[p + 1]]).getCentroid(true);
+                        }
+                        centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true); /*Important pass true parameter otherwise it will return start point as centroid*/
+                        //Clone the label
+                        labelFeature = defaultLabel.clone();
+                        labelFeature.geometry = centroid;
+                        if (attributes.fwdDirection) {
+                            dx = p1.x - p0.x;
+                            dy = p1.y - p0.y;
+                        } else {
+                            dx = p0.x - p1.x;
+                            dy = p0.y - p1.y;
+                        }
+                        angle = Math.atan2(dx, dy);
+                        degrees = 90 + angle * 180 / Math.PI;
+                        directionArrow = " ▶ ";
+                        if (degrees > 90 && degrees < 270) {
+                            degrees -= 180;
+                            //directionArrow = " ▶ ";
+                        } else {
+                            directionArrow = " ◀ ";
+                        }
+                        if (!model.isOneWay()) {
+                            directionArrow = ""; //The degree has to be computed anyway
+                        }
+                        labelFeature.attributes.label = directionArrow + labelText + directionArrow;
+
+                        labelFeature.attributes.angle = degrees;
+                        labels.push(labelFeature);
+                        if (!farZoom && distance >= doubleLabelDistance) { //Create the second label on a long segment
+                            p0 = p1;
+                            p1 = simplified[p + 1];
+                            centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true);
+                            labelFeature = labelFeature.clone();
+                            labelFeature.geometry = centroid;
+                            labels.push(labelFeature);
+                        }
+                    }
+                }
+
+
+                /*
+                    if (distance > maxDistance) {
+                        maxDistance = distance;
+                        maxDistanceIndex = p;
+                    }
+                    */
+            }
+
         }
         if (delayed && labelFeature) {
-            streetVector.addFeatures([labelFeature]);
+            streetVector.addFeatures(labels);
         }
-        return labelFeature;
+        return labels;
     }
 
     function createAverageSpeedCamera(id, rev, isForward, p0, p1) {
@@ -543,7 +576,7 @@
     function drawSegment(model) {
         //"use strict";
         var i, attributes, points, pointList, simplified, myFeatures, lineFeature, roadType, locked, speed,
-            bridgeStyle, speedStyleLeft, speedStyleRight, speedStrokeStyle, speedValue, tunnelsStyle, restr, speedStyle, dirtyStyle, simplifiedPoints, arrowFeature, p, len, dx, dy, labelFeature,
+            bridgeStyle, speedStyleLeft, speedStyleRight, speedStrokeStyle, speedValue, tunnelsStyle, restr, speedStyle, dirtyStyle, simplifiedPoints, arrowFeature, p, len, dx, dy, labels,
             left, right, /*maxdx, maxdy,*/ k, pk, pk1, offset, /*of2,*/ m, mb, temp,
             step, degrees, segmentLenght, minDistance, segmentLineString,
             numPoints, stepx, stepy, px, py, ix; //dx, dy
@@ -953,9 +986,9 @@
 
 
         //Add Label
-        labelFeature = drawLabel(model, simplified);
-        if (labelFeature !== null) {
-            myFeatures.push(labelFeature);
+        labels = drawLabels(model, simplified);
+        if (labels.length > 0) {
+            myFeatures = myFeatures.concat(labels);
         }
         return myFeatures;
     }
