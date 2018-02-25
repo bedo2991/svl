@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.4.3
+// @version    4.4.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -121,7 +121,7 @@
             /*"service": 21,*/
         };
 
-        OpenLayers.Renderer.symbol.mytriangle = [-2, 0, 2, 0, 0, -6, -2, 0];
+        OL.Renderer.symbol.mytriangle = [-2, 0, 2, 0, 0, -6, -2, 0];
         nonEditableStyle = {
             strokeColor: "#000",
             strokeWidth: 2,
@@ -476,7 +476,7 @@
             streetNameThresholdDistance = labelText.length * 2.3 * (8 - Wmap.getZoom()) + Math.random() * 30;
             doubleLabelDistance = 4 * streetNameThresholdDistance;
 
-            defaultLabel = new OpenLayers.Feature.Vector(simplified[0], {
+            defaultLabel = new OL.Feature.Vector(simplified[0], {
                 myId: attributes.id
             });
 
@@ -501,9 +501,9 @@
                             p1 = simplified[p + 1];
                         } else {
                             p0 = simplified[p];
-                            p1 = new OpenLayers.Geometry.LineString([p0, simplified[p + 1]]).getCentroid(true);
+                            p1 = new OL.Geometry.LineString([p0, simplified[p + 1]]).getCentroid(true);
                         }
-                        centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true); /*Important pass true parameter otherwise it will return start point as centroid*/
+                        centroid = new OL.Geometry.LineString([p0, p1]).getCentroid(true); /*Important pass true parameter otherwise it will return start point as centroid*/
                         //Clone the label
                         labelFeature = defaultLabel.clone();
                         labelFeature.geometry = centroid;
@@ -533,7 +533,7 @@
                         if (!farZoom && distance >= doubleLabelDistance) { //Create the second label on a long segment
                             p0 = p1;
                             p1 = simplified[p + 1];
-                            centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true);
+                            centroid = new OL.Geometry.LineString([p0, p1]).getCentroid(true);
                             labelFeature = labelFeature.clone();
                             labelFeature.geometry = centroid;
                             labels.push(labelFeature);
@@ -560,7 +560,7 @@
     function createAverageSpeedCamera(id, rev, isForward, p0, p1) {
         var degrees;
         degrees = getAngle(isForward, rev ? p1 : p0, rev ? p0 : p1);
-        return new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(p0.x + Math.sin(degrees) * 10, p0.y + Math.cos(degrees) * 10), {
+        return new OL.Feature.Vector(new OL.Geometry.Point(p0.x + Math.sin(degrees) * 10, p0.y + Math.cos(degrees) * 10), {
             myId: id
         }, {
             rotation: degrees,
@@ -586,12 +586,12 @@
         }
         points = attributes.geometry.components;
         pointList = attributes.geometry.getVertices(); //is an array
-        simplified = new OpenLayers.Geometry.LineString(pointList).simplify(1.5).components;
+        simplified = new OL.Geometry.LineString(pointList).simplify(1.5).components;
         myFeatures = [];
         lineFeature = null;
         if (null === attributes.primaryStreetID) {
             //consoleDebug("RED segment", model);
-            lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
+            lineFeature = new OL.Feature.Vector(new OL.Geometry.LineString(pointList), {
                 myId: attributes.id
             }, redStyle);
             myFeatures.push(lineFeature);
@@ -612,8 +612,8 @@
                         //strokeDashstyle: "solid",
                         pointerEvents: "none"
                     };
-                    lineFeature = new OpenLayers.Feature.Vector(
-                        new OpenLayers.Geometry.LineString(pointList), {
+                    lineFeature = new OL.Feature.Vector(
+                        new OL.Geometry.LineString(pointList), {
                             myId: attributes.id
                         }, bridgeStyle);
                     myFeatures.push(lineFeature);
@@ -709,13 +709,13 @@
                             //consoleDebug("Adding 2 speeds");
                             //consoleDebug(left);
                             //consoleDebug(right);
-                            lineFeature = new OpenLayers.Feature.Vector(
-                                new OpenLayers.Geometry.LineString(left), {
+                            lineFeature = new OL.Feature.Vector(
+                                new OL.Geometry.LineString(left), {
                                     myId: attributes.id
                                 }, speedStyleLeft);
                             myFeatures.push(lineFeature);
-                            lineFeature = new OpenLayers.Feature.Vector(
-                                new OpenLayers.Geometry.LineString(right), {
+                            lineFeature = new OL.Feature.Vector(
+                                new OL.Geometry.LineString(right), {
                                     myId: attributes.id
                                 }, speedStyleRight);
                             myFeatures.push(lineFeature);
@@ -738,8 +738,8 @@
                                 strokeDashstyle: speedStrokeStyle,
                                 pointerEvents: "none"
                             };
-                            lineFeature = new OpenLayers.Feature.Vector(
-                                new OpenLayers.Geometry.LineString(pointList), {
+                            lineFeature = new OL.Feature.Vector(
+                                new OL.Geometry.LineString(pointList), {
                                     myId: attributes.id
                                 }, speedStyle);
                             myFeatures.push(lineFeature);
@@ -747,8 +747,8 @@
                     }
                 }
 
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, streetStyle[roadType]);
                 myFeatures.push(lineFeature);
@@ -761,16 +761,16 @@
                         strokeDashstyle: "solid",
                         pointerEvents: "none"
                     };
-                    lineFeature = new OpenLayers.Feature.Vector(
-                        new OpenLayers.Geometry.LineString(pointList), {
+                    lineFeature = new OL.Feature.Vector(
+                        new OL.Geometry.LineString(pointList), {
                             myId: attributes.id
                         }, tunnelsStyle);
                     myFeatures.push(lineFeature);
                 }
 
                 if (model.isLockedByHigherRank() || (preferences.fakelock) < getEffectiveLock(model)) {
-                    lineFeature = new OpenLayers.Feature.Vector(
-                        new OpenLayers.Geometry.LineString(pointList), {
+                    lineFeature = new OL.Feature.Vector(
+                        new OL.Geometry.LineString(pointList), {
                             myId: attributes.id
                         }, nonEditableStyle);
                     myFeatures.push(lineFeature);
@@ -788,8 +788,8 @@
                     strokeDashstyle: preferences.dirty.strokeDashstyle,
                     pointerEvents: "none"
                 };
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, dirtyStyle);
                 myFeatures.push(lineFeature);
@@ -800,16 +800,16 @@
 
         if (!farZoom) {
             if (attributes.hasClosures) {
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, closureStyle);
                 myFeatures.push(lineFeature);
             }
             if (null !== attributes.junctionID) { //It is a roundabout
                 //consoleDebug("Segment is a roundabout");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, roundaboutStyle);
                 myFeatures.push(lineFeature);
@@ -817,8 +817,8 @@
 
             if (!locked && (attributes.fwdToll || attributes.revToll)) { //It is a toll road
                 //consoleDebug("Segment is toll");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, tollStyle);
                 myFeatures.push(lineFeature);
@@ -826,7 +826,7 @@
                 restr = attributes.restrictions;
                 for (i = 0; i < restr.length; i += 1) {
                     if (restr[i]._defaultType === "TOLL") { //If it has at least a "toll free" restriction
-                        lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
+                        lineFeature = new OL.Feature.Vector(new OL.Geometry.LineString(pointList), {
                             myId: attributes.id
                         }, tollStyle);
                         myFeatures.push(lineFeature);
@@ -837,16 +837,16 @@
             if (attributes.restrictions.length > 0) {
                 //It has restrictions
                 //consoleDebug("Segment has restrictions");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, restrStyle);
                 myFeatures.push(lineFeature);
             }
 
             if (!locked && attributes.validated === false) { //Segments that needs validation
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, validatedStyle);
                 myFeatures.push(lineFeature);
@@ -856,8 +856,8 @@
             /*jslint bitwise: true */
             if (attributes.flags & 32) {
                 /*jslint bitwise: false */
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(pointList), {
                         myId: attributes.id
                     }, headlightsFlagStyle);
                 myFeatures.push(lineFeature);
@@ -875,8 +875,8 @@
                     /*jslint bitwise: false */
                     //Unknown direction
                     for (p = 0, len = simplifiedPoints.length - 1; p < len; p += 1) {
-                        //var shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
-                        arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
+                        //var shape = OL.Geometry.Polygon.createRegularPolygon(new OL.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
+                        arrowFeature = new OL.Feature.Vector(new OL.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
                             myId: attributes.id
                         }, unknownDirStyle);
                         myFeatures.push(arrowFeature);
@@ -891,8 +891,8 @@
                         segmentLenght = simplifiedPoints[p].distanceTo(simplifiedPoints[p + 1]);
                         minDistance = 15.0 * (11 - Wmap.getZoom());
                         if (segmentLenght < minDistance * 2) {
-                            segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
-                            arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {
+                            segmentLineString = new OL.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
+                            arrowFeature = new OL.Feature.Vector(segmentLineString.getCentroid(true), {
                                 myId: attributes.id
                             }, {
                                 graphicName: "mytriangle",
@@ -918,7 +918,7 @@
                             px = simplifiedPoints[p].x + stepx;
                             py = simplifiedPoints[p].y + stepy;
                             for (ix = 0; ix < numPoints; ix += 1) {
-                                arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {
+                                arrowFeature = new OL.Feature.Vector(new OL.Geometry.Point(px, py), {
                                     myId: attributes.id
                                 }, {
                                     graphicName: "mytriangle",
@@ -957,8 +957,8 @@
             //Show geometry points
             if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
                 for (p = 1, len = points.length - 2; p < len; p += 1) {
-                    //var shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
-                    arrowFeature = new OpenLayers.Feature.Vector(points[p], {
+                    //var shape = OL.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
+                    arrowFeature = new OL.Feature.Vector(points[p], {
                         myId: attributes.id
                     }, geometryNodeStyle);
                     myFeatures.push(arrowFeature);
@@ -972,13 +972,13 @@
         /*jslint bitwise: true */
         if (attributes.flags & 1) { //The tunnel flag is enabled
             /*jslint bitwise: false */
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
+            lineFeature = new OL.Feature.Vector(
+                new OL.Geometry.LineString(pointList), {
                     myId: attributes.id
                 }, tunnelFlagStyle1);
             myFeatures.push(lineFeature);
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
+            lineFeature = new OL.Feature.Vector(
+                new OL.Geometry.LineString(pointList), {
                     myId: attributes.id
                 }, tunnelFlagStyle2);
             myFeatures.push(lineFeature);
@@ -1015,8 +1015,8 @@
 
     function drawNode(model) {
         var point, pointFeature;
-        point = new OpenLayers.Geometry.Point(model.attributes.geometry.x, model.attributes.geometry.y);
-        pointFeature = new OpenLayers.Feature.Vector(point, {
+        point = new OL.Geometry.Point(model.attributes.geometry.x, model.attributes.geometry.y);
+        pointFeature = new OL.Feature.Vector(point, {
             myid: model.attributes.id
         }, nodeStyle);
         return pointFeature;
@@ -1897,7 +1897,7 @@
         $(".olControlAttribution").click(editPreferences);
         $(".olControlScaleLineTop").click(editPreferences);
         $(".olControlScaleLineBottom").click(editPreferences);
-        labelStyleMap = new OpenLayers.StyleMap({
+        labelStyleMap = new OL.StyleMap({
             fontFamily: "Open Sans, Alef, helvetica, sans-serif, monospace",
             fontWeight: "800",
             fontColor: "${color}",
@@ -1916,7 +1916,7 @@
         });
         layerName = "Street Vector Layer";
 
-        streetVector = new OpenLayers.Layer.Vector(layerName, {
+        streetVector = new OL.Layer.Vector(layerName, {
             styleMap: labelStyleMap,
             uniqueName: "vectorStreet",
             draggable: true,
@@ -1937,7 +1937,7 @@
             var n, s, r, layer, feature, rotate, h, c, p, g, f, o, a, l, u, d;
             n = !!t.labelOutlineWidth;
             if (n) {
-                s = OpenLayers.Util.extend({}, t);
+                s = OL.Util.extend({}, t);
                 s.fontColor = s.labelOutlineColor;
                 s.fontStrokeColor = s.labelOutlineColor;
                 s.fontStrokeWidth = t.labelOutlineWidth;
@@ -1988,10 +1988,10 @@
             } else {
                 u.setAttributeNS(null, "pointer-events", "none");
             }
-            h = t.labelAlign || OpenLayers.Renderer.defaultSymbolizer.labelAlign;
-            u.setAttributeNS(null, "text-anchor", OpenLayers.Renderer.SVG.LABEL_ALIGN[h[0]] || "middle");
-            if (OpenLayers.IS_GECKO === true) {
-                u.setAttributeNS(null, "dominant-baseline", OpenLayers.Renderer.SVG.LABEL_ALIGN[h[1]] || "central");
+            h = t.labelAlign || OL.Renderer.defaultSymbolizer.labelAlign;
+            u.setAttributeNS(null, "text-anchor", OL.Renderer.SVG.LABEL_ALIGN[h[0]] || "middle");
+            if (OL.IS_GECKO === true) {
+                u.setAttributeNS(null, "dominant-baseline", OL.Renderer.SVG.LABEL_ALIGN[h[1]] || "central");
             }
             c = t.label.split("\n");
             d = c.length;
@@ -2005,12 +2005,12 @@
                     g._geometry = i;
                     g._geometryClass = i.CLASS_NAME;
                 }
-                if (OpenLayers.IS_GECKO === false) {
-                    g.setAttributeNS(null, "baseline-shift", OpenLayers.Renderer.SVG.LABEL_VSHIFT[h[1]] || "-35%");
+                if (OL.IS_GECKO === false) {
+                    g.setAttributeNS(null, "baseline-shift", OL.Renderer.SVG.LABEL_VSHIFT[h[1]] || "-35%");
                 }
                 g.setAttribute("x", o);
                 if (0 === p) {
-                    f = OpenLayers.Renderer.SVG.LABEL_VFACTOR[h[1]];
+                    f = OL.Renderer.SVG.LABEL_VFACTOR[h[1]];
                     if (f === undefined) {
                         f = -0.5;
                     }
@@ -2027,7 +2027,7 @@
                 this.textRoot.appendChild(u);
             }
         };
-        nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", {
+        nodesVector = new OL.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
             shortcutKey: "A+n",
             draggable: true,
