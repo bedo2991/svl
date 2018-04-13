@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.4.5
+// @version    4.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -338,6 +338,7 @@
 
         preferences.showUnderGPSPoints = false;
         preferences.routingModeEnabled = false;
+        preferences.showANs = false;
 
         savePreferences(preferences);
     }
@@ -433,7 +434,7 @@
         //consoleDebug("drawLabels");
         //"use strict";
         var labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
-            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance;
+            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance, ANsShown, i, altStreet, altStreetPart;
         defaultLabel = null;
         labels = [];
         labelFeature = null;
@@ -453,6 +454,30 @@
             }
             streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
             //consoleDebug("Streetpart:" +streetPart);
+
+            // add alt street names
+           altStreetPart = "";
+           if(preferences.showANs){
+               for(i = 0, ANsShown = 0; i < attributes.streetIDs.length; i++)
+               {
+                 if(ANsShown === 2)
+                 {//Show maximum 2 alternative names
+                   altStreetPart+=" …";
+                   break;
+                 }
+                  altStreet = model.model.streets.objects[attributes.streetIDs[i]];
+                  if(altStreet !== null && altStreet.name !== address.street.name){
+                    ANsShown++;
+                  altStreetPart += (altStreet !== null ? "(" + altStreet.name + ")":"");
+                }
+               }
+               altStreetPart = altStreetPart.replace(")(", ", ");
+               if(altStreetPart != "")
+               {
+                 altStreetPart = "\n" + altStreetPart;
+               }
+           }
+
             if (!streetStyle[attributes.roadType]) {
                 streetPart += "\n!! UNSUPPORTED ROAD TYPE !!";
             }
@@ -537,7 +562,7 @@
                         if (!model.isOneWay()) {
                             directionArrow = ""; //The degree has to be computed anyway
                         }
-                        labelFeature.attributes.label = directionArrow + labelText + directionArrow;
+                        labelFeature.attributes.label = directionArrow + labelText + directionArrow + altStreetPart;
 
                         labelFeature.attributes.angle = degrees;
                         labels.push(labelFeature);
@@ -1286,6 +1311,8 @@
             preferences.routingModeEnabled = $("#routingModeEnabled").prop("checked");
         }
 
+        preferences.showANs = $("#showANs").prop("checked");
+
         updateStylesFromPreferences(preferences);
         updateRefreshStatus();
     }
@@ -1409,9 +1436,15 @@
         //Labels
         $labels.append("<summary>Rendering Parameters</summary>");
 
+        $labels.append($("<b>Show Alternative Names</b>"));
+        $labels.append($("<br>"));
+        $labels.append($("<i>When enabled, maximum 2 ANs that are different from the primary name are show under the street name&nbsp;</i>"));
+        $labels.append($('<input class="prefElement" title="True or False" id="showANs" type="checkbox" ' + (preferences.showANs ? 'checked' : '') + '></input>'));
+        $labels.append("<hr>");
+
         $labels.append($("<b>Enable Routing Mode</b>"));
         $labels.append($("<br>"));
-        $labels.append($("<i>When enabled, roads are rendered by taking into consideration their &quot;routing&quot; attribute. E.g. a &quot;preferred&quot; Minor Highway is shown as a Major Highway.&nbsp</i>"));
+        $labels.append($("<i>When enabled, roads are rendered by taking into consideration their &quot;routing&quot; attribute. E.g. a &quot;preferred&quot; Minor Highway is shown as a Major Highway.&nbsp;</i>"));
         $labels.append($('<input class="prefElement" title="True or False" id="routingModeEnabled" type="checkbox" ' + (preferences.routingModeEnabled ? 'checked' : '') + '></input>'));
         $labels.append("<hr>");
 
