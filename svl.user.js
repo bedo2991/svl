@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.4.4
+// @version    4.4.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -22,14 +22,16 @@
 //debugger;
 (function () {
     "use strict";
-    /*var DEBUG_ENABLED = true; //set it to false for production mode
+    /*
+    var DEBUG_ENABLED = true; //set it to false for production mode
+    var consoleDebug;
 
      if (DEBUG_ENABLED) {
          consoleDebug= function ()
          {
              if (DEBUG_ENABLED)
                  for (var i = 0; i < arguments.length; ++i)
-                     console.debug(arguments[i]);
+                     console.dir(arguments[i]);
          }
      }
      else
@@ -51,7 +53,7 @@
         arrowDeclutter,
         clutterMax,
         fontSizeMax,
-        // beta,
+        beta = true,
         farZoom,
         svlVersion,
         preferences,
@@ -79,7 +81,7 @@
 
     //End of global variable declaration
 
-    function wbwGlobals() {
+    function svlGlobals() {
         //"use strict";
         Wmap = W.map;
         splittedSpeedLimits = false;
@@ -140,9 +142,15 @@
             strokeDashstyle: "longdash",
             pointerEvents: "none"
         };
+
+        //Fix for the current beta, remove when in production!
+        if (!W.selectionManager.hasSelectedFeatures) {
+            beta = false;
+            W.selectionManager.hasSelectedFeatures = W.selectionManager.hasSelectedItems;
+        }
     }
 
-    function wbwWazeBits() {
+    function svlWazeBits() {
         ////Utilities variable to avoid writing long names
         if (W !== undefined) {
             //wazeMap = unsafeWindow.W.map;
@@ -156,7 +164,7 @@
     }
 
     function refreshWME() {
-        if (W.model.actionManager.unsavedActionsNum() === 0 && W.selectionManager.selectedItems.length === 0 && $(".place-update-edit.show").size() === 0) {
+        if (W.model.actionManager.unsavedActionsNum() === 0 && !W.selectionManager.hasSelectedFeatures() && $(".place-update-edit.show").size() === 0) {
             W.controller.reload();
         }
     }
@@ -422,7 +430,7 @@
     }
 
     function drawLabels(model, simplified, delayed) {
-        //console.log("drawLabels");
+        //consoleDebug("drawLabels");
         //"use strict";
         var labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
             labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance;
@@ -431,8 +439,8 @@
         labelFeature = null;
         attributes = model.attributes;
         address = model.getAddress();
-        //console.dir(address);
-        if (attributes.primaryStreetID !== null && address.state === undefined) {
+        //consoleDebug(address, attributes);
+        if (attributes.primaryStreetID !== null && (beta && address.attributes.state === undefined) || (!beta && address.state === undefined)) { //TODO remove !beta check once in production
             //console.error("NOT READY");
             setTimeout(function () {
                 drawLabels(model, simplified, true);
@@ -440,6 +448,9 @@
         } else /*if ((preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))*/ {
             //maxDistance = 0;
             //maxDistanceIndex = -1;
+            if(beta){
+              address = address.attributes; //Fix from beta v2.12-36-g29f47ac
+            }
             streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
             //consoleDebug("Streetpart:" +streetPart);
             if (!streetStyle[attributes.roadType]) {
@@ -574,7 +585,7 @@
     }
 
     function drawSegment(model) {
-        //"use strict";
+        //consoleDebug("DrawSegment");
         var i, attributes, points, pointList, simplified, myFeatures, lineFeature, roadType, locked, speed,
             bridgeStyle, speedStyleLeft, speedStyleRight, speedStrokeStyle, speedValue, tunnelsStyle, restr, speedStyle, dirtyStyle, simplifiedPoints, arrowFeature, p, len, dx, dy, labels,
             left, right, /*maxdx, maxdy,*/ k, pk, pk1, offset, /*of2,*/ m, mb, temp,
@@ -1809,7 +1820,7 @@
         //Initialize variables
         var i, labelStyleMap, layerName, len, layers;
         try {
-            wbwWazeBits();
+            svlWazeBits();
         } catch (e) {
             svlAttempts += 1;
             if (svlAttempts < 10) {
@@ -1823,7 +1834,7 @@
             return;
         }
 
-        wbwGlobals();
+        svlGlobals();
 
         if (loadPreferences() === false) {
             //First run, or new broswer
@@ -2027,6 +2038,7 @@
                 this.textRoot.appendChild(u);
             }
         };
+
         nodesVector = new OL.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
             shortcutKey: "A+n",
