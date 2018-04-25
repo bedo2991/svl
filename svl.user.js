@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.5.1
+// @version    4.5.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -119,7 +119,8 @@
             17: "Private Road",
             18: "Railroad",
             19: "Runway",
-            20: "Parking Lot Road"
+            20: "Parking Lot Road",
+            22: "Alley"
             /*"service": 21,*/
         };
 
@@ -279,6 +280,12 @@
             strokeWidth: 4,
             strokeDashstyle: "solid"
         };
+        //Alley: 22
+        preferences.streets[22] = {
+            strokeColor: "#C6C7FF",
+            strokeWidth: 4,
+            strokeDashstyle: "solid"
+        };
         //Runway: 19
         preferences.streets[19] = {
             strokeColor: "#00FF00",
@@ -374,7 +381,6 @@
     }
 
     function bestBackground(color) {
-        //"use strict";
         var oppositeColor = parseInt(color.substring(1, 3), 16) * 0.299 + parseInt(color.substring(3, 5), 16) * 0.587 + parseInt(color.substring(5, 7), 16) * 0.114;
         if (oppositeColor < 127) {
             return "#FFF";
@@ -1229,7 +1235,7 @@
         var i, len;
         $("#saveNewPref").removeClass("btn-primary").addClass("btn-warning");
         for (i = 0, len = preferences.streets.length; i < len; i += 1) {
-            if (preferences.streets[i] !== null) {
+            if (preferences.streets[i]) {
                 preferences.streets[i].strokeColor = $("#streetColor_" + i).val();
                 preferences.streets[i].strokeWidth = $("#streetWidth_" + i).val();
                 preferences.streets[i].strokeDashstyle = $("#strokeDashstyle_" + i + " option:selected").val();
@@ -1923,7 +1929,16 @@
                 preferences.routingModeEnabled = preferences.routingModeEnabled || false;
                 preferences.showUnderGPSPoints = preferences.showUnderGPSPoints || false;
                 savePreferences(preferences);
-                alert("Street Vector Layer has been updated to the version " + svlVersion + ".\nIt is now possible to place the GPS points above the road layer and to enter the routing mode.\nMore information on the Waze forum and in the preference panel.");
+                alert("Street Vector Layer has been updated to v. " + svlVersion + ".\nIt is now possible to place the GPS points above the road layer and to enter the routing mode.\nMore information on the Waze forum and in the preference panel.");
+            }
+            if(preferences.streets[22] === undefined){
+                preferences.streets[22]={
+                    strokeColor: "#C6C7FF",
+                    strokeWidth: "4",
+                    strokeDashstyle: "solid"
+                };
+                savePreferences(preferences);
+                console.log("Street Vector Layer has been updated to v. " + svlVersion + ".\n");
             }
         }
 
