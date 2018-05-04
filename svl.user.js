@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.5.2
+// @version    4.5.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -472,9 +472,9 @@
                    break;
                  }
                   altStreet = model.model.streets.objects[attributes.streetIDs[i]];
-                  if(altStreet !== null && altStreet.name !== address.street.name){
+                  if(altStreet && altStreet.name !== address.street.name){
                     ANsShown++;
-                  altStreetPart += (altStreet !== null ? "(" + altStreet.name + ")":"");
+                    altStreetPart += (altStreet.name ? "(" + altStreet.name + ")":"");
                 }
                }
                altStreetPart = altStreetPart.replace(")(", ", ");
