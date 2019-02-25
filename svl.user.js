@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.5.3
+// @version    4.5.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -14,7 +14,7 @@
 
 /*jslint browser: true*/
 /*jslint white: true */
-/*global $, console, jQuery, confirm, alert, prompt, W, GM_info, GM_setClipboard, OpenLayers, WMEKSRegisterKeyboardShortcut, WMEKSLoadKeyboardShortcuts, WMEKSSaveKeyboardShortcuts*/
+/*global $, console, jQuery, confirm, alert, prompt, W, GM_info, GM_setClipboard, OpenLayers, WMEKSRegisterKeyboardShortcut, WMEKSLoadKeyboardShortcuts, WMEKSSaveKeyboardShortcuts, OL*/
 /*jslint nomen: true */ //for variable starting with _
 
 
@@ -192,7 +192,7 @@
         preferences.showSLSinglecolor = false;
         preferences.SLColor = "#ffdf00";
         if (W.loginManager.user) {
-            preferences.fakelock = W.loginManager.user.getAttributes().normalizedLevel;
+            preferences.fakelock = W.loginManager.user.normalizedLevel;
         } else {
             preferences.fakelock = 6;
         }
@@ -809,14 +809,17 @@
                         }, tunnelsStyle);
                     myFeatures.push(lineFeature);
                 }
-
-                if (model.isLockedByHigherRank() || (preferences.fakelock) < getEffectiveLock(model)) {
-                    lineFeature = new OL.Feature.Vector(
-                        new OL.Geometry.LineString(pointList), {
-                            myId: attributes.id
-                        }, nonEditableStyle);
-                    myFeatures.push(lineFeature);
-                    locked = true;
+                var u = W.loginManager.user;
+                if(u){
+                    var currentLock = model.getLockRank() + 1;
+                    if (currentLock > preferences.fakelock || currentLock > u.normalizedLevel) {
+                        lineFeature = new OL.Feature.Vector(
+                            new OL.Geometry.LineString(pointList), {
+                                myId: attributes.id
+                            }, nonEditableStyle);
+                        myFeatures.push(lineFeature);
+                        locked = true;
+                    }
                 }
             }
 
