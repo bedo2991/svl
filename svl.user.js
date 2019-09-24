@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.5.4
+// @version    4.6.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -64,6 +64,7 @@
 
         tunnelFlagStyle1,
         headlightsFlagStyle,
+        laneStyle,
         roundaboutStyle,
         tollStyle,
         closureStyle,
@@ -212,109 +213,133 @@
             strokeColor: "#FFFFFF",
             outlineColor: "#000",
             strokeWidth: 5,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Parking: 20
         preferences.streets[20] = {
             strokeColor: "#2282ab",
             strokeWidth: 5,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Ramp: 4
         preferences.streets[4] = {
             strokeColor: "#3FC91C",
             strokeWidth: 6,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Freeway: 3
         preferences.streets[3] = {
             strokeColor: "#387FB8",
             strokeWidth: 9,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Minor: 7
         preferences.streets[7] = {
             strokeColor: "#ECE589",
             strokeWidth: 7,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Major: 6
         preferences.streets[6] = {
             strokeColor: "#C13040",
             strokeWidth: 8,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Stairway: 16
         preferences.streets[16] = {
             strokeColor: "#B700FF",
             strokeWidth: 3,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         //Walking: 5
         preferences.streets[5] = {
             strokeColor: "#00FF00",
             strokeWidth: 3,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         //Dirty: 8
         preferences.streets[8] = {
             strokeColor: "#82614A",
             strokeWidth: 5,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Ferry: 15
         preferences.streets[15] = {
             strokeColor: "#FF8000",
             strokeWidth: 3,
-            strokeDashstyle: "dashdot"
+            strokeDashstyle: "dashdot",
+            pointerEvents: "none"
         };
         //Railroad: 18
         preferences.streets[18] = {
             strokeColor: "#FFFFFF",
             strokeWidth: 4,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         //Private: 17
         preferences.streets[17] = {
             strokeColor: "#00FFB3",
             strokeWidth: 4,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Alley: 22
         preferences.streets[22] = {
             strokeColor: "#C6C7FF",
             strokeWidth: 4,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Runway: 19
         preferences.streets[19] = {
             strokeColor: "#00FF00",
             strokeWidth: 4,
-            strokeDashstyle: "dashdot"
+            strokeDashstyle: "dashdot",
+            pointerEvents: "none"
         };
         //Primary: 2
         preferences.streets[2] = {
             strokeColor: "#CBA12E",
             strokeWidth: 6,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
         //Pedestrian: 10
         preferences.streets[10] = {
             strokeColor: "#0000FF",
             strokeWidth: 6,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         //Red segments (without names)
         preferences.red = {
             strokeColor: "#FF0000",
             strokeWidth: 6,
-            strokeDashstyle: "solid"
+            strokeDashstyle: "solid",
+            pointerEvents: "none"
         };
 
         preferences.roundabout = {
             strokeColor: "#111",
             strokeWidth: 1,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
+        };
+        preferences.lanes = {
+            strokeColor: "#454443",
+            strokeWidth: 3,
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         preferences.toll = {
             strokeColor: "#00E1FF",
@@ -324,22 +349,26 @@
         preferences.closure = {
             strokeColor: "#FF00FF",
             strokeWidth: 4,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         preferences.headlights = {
             strokeColor: "#bfff00",
             strokeWidth: 3,
-            strokeDashstyle: "dot"
+            strokeDashstyle: "dot",
+            pointerEvents: "none"
         };
         preferences.restriction = {
             strokeColor: "#F2FF00",
             strokeWidth: 2,
-            strokeDashstyle: "dash"
+            strokeDashstyle: "dash",
+            pointerEvents: "none"
         };
         preferences.dirty = {
             strokeColor: "#82614A",
             opacity: 60,
-            strokeDashstyle: "longdash"
+            strokeDashstyle: "longdash",
+            pointerEvents: "none"
         };
         preferences.arrowDeclutter = 10;
 
@@ -908,6 +937,32 @@
                 myFeatures.push(lineFeature);
             }
 
+            if(attributes.fwdLaneCount > 0){
+                console.log("LANE fwd");
+                let res = pointList.slice(-2);
+                //if(pointList.length === 2){
+                    res[0] = new OL.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+                //}
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(res), {
+                        myId: attributes.id
+                    }, laneStyle);
+                myFeatures.push(lineFeature);
+            }
+
+            if(attributes.revLaneCount > 0){
+                console.log("LANE rev");
+                let res = pointList.slice(0,2);
+                //if(pointList.length === 2){
+                    res[1] = new OL.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+                //}
+                lineFeature = new OL.Feature.Vector(
+                    new OL.Geometry.LineString(res), {
+                        myId: attributes.id
+                    },laneStyle);
+                myFeatures.push(lineFeature);
+            }
+
             if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
                 //consoleDebug("The segment is oneway or has unknown direction");
                 simplifiedPoints = points;
@@ -1110,6 +1165,11 @@
         redStyle.strokeWidth = preferences.red.strokeWidth;
         redStyle.strokeDashstyle = preferences.red.strokeDashstyle;
 
+        //Lanes
+        laneStyle.strokeColor = preferences.lanes.strokeColor;
+        laneStyle.strokeWidth = preferences.lanes.strokeWidth;
+        laneStyle.strokeDashstyle = preferences.lanes.strokeDashstyle;
+
         //Toll
         tollStyle.strokeColor = preferences.toll.strokeColor;
         tollStyle.strokeWidth = preferences.toll.strokeWidth;
@@ -1262,6 +1322,11 @@
         preferences.dirty.opacity = $("#opacity_dirty").val();
         preferences.dirty.strokeDashstyle = $("#strokeDashstyle_dirty option:selected").val();
 
+        //Lanes
+        preferences.lanes.strokeColor = $("#streetColor_lanes").val();
+        preferences.lanes.strokeWidth = $("#streetWidth_lanes").val();
+        preferences.lanes.strokeDashstyle = $("#strokeDashstyle_lanes option:selected").val();
+
         //Toll
         preferences.toll.strokeColor = $("#streetColor_toll").val();
         preferences.toll.strokeWidth = $("#streetWidth_toll").val();
@@ -1403,6 +1468,15 @@
         $elementDiv.append($streets);
 
         $decorations.append("<summary>Decorations</summary>");
+        //Lanes
+        $decorations.append($("<b>Lanes</b><br>"));
+        $decorations.append($('<input class="prefElement" title="Color" id="streetColor_lanes" value="' + preferences.lanes.strokeColor + '" type="color"></input>'));
+        $decorations.append($('<input class="prefElement" title="Width" id="streetWidth_lanes" value="' + preferences.lanes.strokeWidth + '" type="number" min="0" max="15"></input>'));
+        $select = createDashStyleDropdown("strokeDashstyle_lanes");
+        $select.val(preferences.lanes.strokeDashstyle);
+        $decorations.append($select);
+        $decorations.append("<hr>");
+
         //Toll
         $decorations.append($("<b>Toll</b><br>"));
         $decorations.append($('<input class="prefElement" title="Color" id="streetColor_toll" value="' + preferences.toll.strokeColor + '" type="color"></input>'));
@@ -1472,7 +1546,7 @@
         $labels.append("<hr>");
 
         $labels.append("<b>Render map as level</b><br>");
-        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + W.loginManager.user.getAttributes().normalizedLevel + '" type="number" min="1" max="7"></input>'));
+        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + W.loginManager.user.normalizedLevel + '" type="number" min="1" max="7"></input>'));
         $labels.append("<hr>");
 
         $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
@@ -1830,8 +1904,10 @@
 
     function createLayerCheckbox() {
         // Add layer entry in the new layer drawer
+        return;
+        //TODO: fix
         var roadGroupSelector, roadGroup, toggler, togglerContainer, checkbox, label, labelText;
-        roadGroupSelector = document.getElementById("layer-switcher-group_road");
+        roadGroupSelector = document.getElementById("collapsible-GROUP_ROAD");
         if (roadGroupSelector !== null) {
             roadGroup = roadGroupSelector.parentNode.parentNode.querySelector(".children");
             toggler = document.createElement("li");
@@ -1888,6 +1964,14 @@
                 "The other road layers will be automatically hidden (you can change this behaviour in the preference panel).\n" +
                 "Have fun and tell us on the Waze forum if you liked the script!");
         } else {
+            if(!preferences.lanes){
+                preferences.lanes = {
+                    strokeColor: "#454443",
+                    strokeWidth: 3,
+                    strokeDashstyle: "dash",
+                    pointerEvents: "none"
+                };
+            }
             //console.dir(preferences);
             if (!preferences.autoReload) {
                 preferences.autoReload = {};
@@ -1899,7 +1983,8 @@
                 preferences.headlights = {
                     strokeColor: "#bfff00",
                     strokeWidth: 3,
-                    strokeDashstyle: "dot"
+                    strokeDashstyle: "dot",
+                    pointerEvents: "none"
                 };
 
                 savePreferences(preferences);
@@ -1912,7 +1997,8 @@
                 preferences.dirty = preferences.dirty || {
                     strokeColor: "#82614A",
                     opacity: 60,
-                    strokeDashstyle: "longdash"
+                    strokeDashstyle: "longdash",
+                    pointerEvents: "none"
                 };
                 preferences.SLColor = preferences.SLColor || "#ffdf00";
                 preferences.showSLcolor = preferences.showSLcolor || true;
@@ -1938,7 +2024,8 @@
                 preferences.streets[22]={
                     strokeColor: "#C6C7FF",
                     strokeWidth: "4",
-                    strokeDashstyle: "solid"
+                    strokeDashstyle: "solid",
+                    pointerEvents: "none"
                 };
                 savePreferences(preferences);
                 console.log("Street Vector Layer has been updated to v. " + svlVersion + ".\n");
@@ -2117,6 +2204,13 @@
             strokeColor: preferences.roundabout.strokeColor,
             strokeWidth: preferences.roundabout.strokeWidth,
             strokeDashstyle: preferences.roundabout.strokeDashstyle,
+            strokeOpacity: 0.9,
+            pointerEvents: "none"
+        };
+        laneStyle = {
+            strokeColor: preferences.lanes.strokeColor,
+            strokeWidth: preferences.lanes.strokeWidth,
+            strokeDashstyle: preferences.lanes.strokeDashstyle,
             strokeOpacity: 0.9,
             pointerEvents: "none"
         };
