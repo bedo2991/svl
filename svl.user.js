@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.6.1
+// @version    4.6.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -938,7 +938,7 @@
             }
 
             if(attributes.fwdLaneCount > 0){
-                console.log("LANE fwd");
+                //console.log("LANE fwd");
                 let res = pointList.slice(-2);
                 //if(pointList.length === 2){
                     res[0] = new OL.Geometry.LineString([res[0], res[1]]).getCentroid(true);
@@ -951,7 +951,7 @@
             }
 
             if(attributes.revLaneCount > 0){
-                console.log("LANE rev");
+                //console.log("LANE rev");
                 let res = pointList.slice(0,2);
                 //if(pointList.length === 2){
                     res[1] = new OL.Geometry.LineString([res[0], res[1]]).getCentroid(true);
