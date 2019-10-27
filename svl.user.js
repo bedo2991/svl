@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7
+// @version    4.7.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1903,39 +1903,6 @@
         }
     }
 
-    function createLayerCheckbox() {
-        WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
-        // Add layer entry in the new layer drawer
-        return;
-        //TODO: fix
-        var roadGroupSelector, roadGroup, toggler, togglerContainer, checkbox, label, labelText;
-        roadGroupSelector = document.getElementById("collapsible-GROUP_ROAD");
-        if (roadGroupSelector !== null) {
-            roadGroup = roadGroupSelector.parentNode.parentNode.querySelector(".children");
-            toggler = document.createElement("li");
-            togglerContainer = document.createElement("div");
-            togglerContainer.className = "controls-container toggler";
-            checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = true;
-            checkbox.id = "layer-switcher-item_street_vector_layer";
-            checkbox.className = "toggle";
-            checkbox.addEventListener("click", function (e) {
-                streetVector.setVisibility(e.target.checked);
-            });
-            togglerContainer.appendChild(checkbox);
-            label = document.createElement("label");
-            label.htmlFor = checkbox.id;
-            labelText = document.createElement("span");
-            labelText.className = "label-text";
-            labelText.appendChild(document.createTextNode("Street Vector Layer"));
-            label.appendChild(labelText);
-            togglerContainer.appendChild(label);
-            toggler.appendChild(togglerContainer);
-            roadGroup.appendChild(toggler);
-        }
-    }
-
     function initSVL() {
         //Initialize variables
         var i, labelStyleMap, layerName, len, layers;
@@ -2337,9 +2304,12 @@
             console.error(e);
         }
 
-        //TODO: do it here directly
-        createLayerCheckbox();
-        //W.app.on("change:mode", createLayerCheckbox);
+        //Add the layer checkbox
+        try{
+            WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
+        }catch(e){
+            console.error("SVL: could not add layer checkbox");
+        }
 
         if (preferences.showUnderGPSPoints) { //By default, WME places the GPS points under the layer, no need to move it.
             updateLayerPosition();
