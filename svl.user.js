@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.6.2
+// @version    4.7
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
 // @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
-// @require    https://greasyfork.org/scripts/16071-wme-keyboard-shortcuts/code/WME%20Keyboard%20Shortcuts.js?version=208075
+// @require    https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
 // @author     bedo2991
 // @grant    GM_setClipboard
 // @copyright  2015+, bedo2991
@@ -14,7 +14,7 @@
 
 /*jslint browser: true*/
 /*jslint white: true */
-/*global $, console, jQuery, confirm, alert, prompt, W, GM_info, GM_setClipboard, OpenLayers, WMEKSRegisterKeyboardShortcut, WMEKSLoadKeyboardShortcuts, WMEKSSaveKeyboardShortcuts, OL*/
+/*global $, console, jQuery, confirm, alert, prompt, W, GM_info, GM_setClipboard, OpenLayers, OL, WazeWrap*/
 /*jslint nomen: true */ //for variable starting with _
 
 
@@ -193,7 +193,7 @@
         preferences.showSLSinglecolor = false;
         preferences.SLColor = "#ffdf00";
         if (W.loginManager.user) {
-            preferences.fakelock = W.loginManager.user.normalizedLevel;
+            preferences.fakelock = WazeWrap.User.Rank();
         } else {
             preferences.fakelock = 6;
         }
@@ -838,10 +838,10 @@
                         }, tunnelsStyle);
                     myFeatures.push(lineFeature);
                 }
-                var u = W.loginManager.user;
+                var u = WazeWrap.User;
                 if(u){
                     var currentLock = model.getLockRank() + 1;
-                    if (currentLock > preferences.fakelock || currentLock > u.normalizedLevel) {
+                    if (currentLock > preferences.fakelock || currentLock > u.Rank()) {
                         lineFeature = new OL.Feature.Vector(
                             new OL.Geometry.LineString(pointList), {
                                 myId: attributes.id
@@ -1546,7 +1546,7 @@
         $labels.append("<hr>");
 
         $labels.append("<b>Render map as level</b><br>");
-        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + W.loginManager.user.normalizedLevel + '" type="number" min="1" max="7"></input>'));
+        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + WazeWrap.User.Rank() + '" type="number" min="1" max="7"></input>'));
         $labels.append("<hr>");
 
         $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
@@ -1632,6 +1632,7 @@
         $("#importPreferences").click(importPreferences);
         $("#rollbackPreferences").click(rollbackPreferences);
         $("#rollbackDefault").click(rollbackDefault);
+        //new WazeWrap.Interface.Tab('SVL', $mainDiv, null);
     }
 
     function removeNodeById(id) {
@@ -1903,6 +1904,7 @@
     }
 
     function createLayerCheckbox() {
+        WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
         // Add layer entry in the new layer drawer
         return;
         //TODO: fix
@@ -2179,7 +2181,7 @@
 
         nodesVector = new OL.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
-            shortcutKey: "A+n",
+            //shortcutKey: "A+n",
             draggable: true,
             visibility: true,
             displayInLayerSwitcher: false,
@@ -2315,29 +2317,29 @@
         }
 
         //Adding keyboard shortcut
-        try {
-            /*jslint newcap: true */
+        try{
+        new WazeWrap.Interface.Shortcut('SVLToggleLayer', 'Toggle SVL', 'svl', 'Street Vector Layer', "A+l", function () {
+                streetVector.setVisibility(!streetVector.visibility);
+                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
+            }, null).add();
+            console.log("Keyboard shortcut successfully added.");
+        }
+        /*try {
             WMEKSRegisterKeyboardShortcut("SVL", "Street Vector Layer", "ToogleVectorLayer", "Toggle Vector Layer", function () {
                 streetVector.setVisibility(!streetVector.visibility);
                 $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
             }, "A+l"); //shortcut1
             WMEKSLoadKeyboardShortcuts("SVL");
-            /*jslint newcap: false */
             console.log("Keyboard shortcut successfully added.");
-        } catch (e) {
+        }*/
+        catch (e) {
             console.error("Error while adding the keyboard shortcut:");
             console.error(e);
         }
 
-        //Save the keyboard shortcut before closing
-        window.addEventListener("beforeunload", function () {
-            /*jslint newcap: true */
-            WMEKSSaveKeyboardShortcuts("SVL");
-            /*jslint newcap: false */
-        }, false);
-
+        //TODO: do it here directly
         createLayerCheckbox();
-        W.app.on("change:mode", createLayerCheckbox);
+        //W.app.on("change:mode", createLayerCheckbox);
 
         if (preferences.showUnderGPSPoints) { //By default, WME places the GPS points under the layer, no need to move it.
             updateLayerPosition();
@@ -2387,8 +2389,8 @@ function getRestrictions(r)
     function bootstrapSVL() {
         // Check all requisites for the script
         var trials = 0;
-        if (W === undefined ||
-            document.querySelector("#WazeMap") === undefined || document.getElementById("layer-switcher-group_road") === null) {
+        if (W === undefined || !WazeWrap.Ready ||
+            document.querySelector("#WazeMap") === undefined || WazeWrap.Interface === undefined) {
             console.log("SVL not ready to start, retrying in 400ms");
             trials += 1;
             if (trials < 10) {
