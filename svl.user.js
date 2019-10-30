@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7.1
+// @version    4.7.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -38,8 +38,7 @@
      {
          consoleDebug = function () {}
      }*/
-    var svlAttempts = 0,
-        autoLoadInterval = null,
+    var autoLoadInterval = null,
         clutterConstant,
         thresholdDistance,
         streetStyle = [],
@@ -61,7 +60,6 @@
         nonEditableStyle,
         tunnelFlagStyle2,
         superScript,
-
         tunnelFlagStyle1,
         headlightsFlagStyle,
         laneStyle,
@@ -192,7 +190,7 @@
 
         preferences.showSLSinglecolor = false;
         preferences.SLColor = "#ffdf00";
-        if (W.loginManager.user) {
+        if (WazeWrap && WazeWrap.User) {
             preferences.fakelock = WazeWrap.User.Rank();
         } else {
             preferences.fakelock = 6;
@@ -838,7 +836,10 @@
                         }, tunnelsStyle);
                     myFeatures.push(lineFeature);
                 }
-                var u = WazeWrap.User;
+                var u;
+                try{
+                    u = WazeWrap.User;
+                }catch(e){}
                 if(u){
                     var currentLock = model.getLockRank() + 1;
                     if (currentLock > preferences.fakelock || currentLock > u.Rank()) {
@@ -1288,7 +1289,7 @@
         //"use strict";
         clearInterval(autoLoadInterval);
         autoLoadInterval = null;
-        if (preferences.autoReload.enabled) {
+        if (preferences.autoReload && preferences.autoReload.enabled) {
             autoLoadInterval = setInterval(refreshWME, preferences.autoReload.interval);
         }
     }
@@ -1299,6 +1300,7 @@
         $("#saveNewPref").removeClass("btn-primary").addClass("btn-warning");
         for (i = 0, len = preferences.streets.length; i < len; i += 1) {
             if (preferences.streets[i]) {
+                preferences.streets[i] = {};
                 preferences.streets[i].strokeColor = $("#streetColor_" + i).val();
                 preferences.streets[i].strokeWidth = $("#streetWidth_" + i).val();
                 preferences.streets[i].strokeDashstyle = $("#strokeDashstyle_" + i + " option:selected").val();
@@ -1309,40 +1311,48 @@
 
 
         //AutoReload
+        preferences.autoReload = {};
         preferences.autoReload.interval = $("#autoReload_interval").val() * 1000;
         preferences.autoReload.enabled = $("#autoReload_enabled").prop("checked");
 
         //Red
+        preferences.red = {};
         preferences.red.strokeColor = $("#streetColor_red").val();
         preferences.red.strokeWidth = $("#streetWidth_red").val();
         preferences.red.strokeDashstyle = $("#strokeDashstyle_red option:selected").val();
 
         //Dirty
+        preferences.dirty = {};
         preferences.dirty.strokeColor = $("#streetColor_dirty").val();
         preferences.dirty.opacity = $("#opacity_dirty").val();
         preferences.dirty.strokeDashstyle = $("#strokeDashstyle_dirty option:selected").val();
 
         //Lanes
+        preferences.lanes = {};
         preferences.lanes.strokeColor = $("#streetColor_lanes").val();
         preferences.lanes.strokeWidth = $("#streetWidth_lanes").val();
         preferences.lanes.strokeDashstyle = $("#strokeDashstyle_lanes option:selected").val();
 
         //Toll
+        preferences.toll = {};
         preferences.toll.strokeColor = $("#streetColor_toll").val();
         preferences.toll.strokeWidth = $("#streetWidth_toll").val();
         preferences.toll.strokeDashstyle = $("#strokeDashstyle_toll option:selected").val();
 
         //Restrictions
+        preferences.restriction = {};
         preferences.restriction.strokeColor = $("#streetColor_restriction").val();
         preferences.restriction.strokeWidth = $("#streetWidth_restriction").val();
         preferences.restriction.strokeDashstyle = $("#strokeDashstyle_restriction option:selected").val();
 
         //Closures
+        preferences.closure = {};
         preferences.closure.strokeColor = $("#streetColor_closure").val();
         preferences.closure.strokeWidth = $("#streetWidth_closure").val();
         preferences.closure.strokeDashstyle = $("#strokeDashstyle_closure option:selected").val();
 
         //HeadlightsRequired
+        preferences.headlights = {};
         preferences.headlights.strokeColor = $("#streetColor_headlights").val();
         preferences.headlights.strokeWidth = $("#streetWidth_headlights").val();
         preferences.headlights.strokeDashstyle = $("#strokeDashstyle_headlights option:selected").val();
@@ -1546,7 +1556,7 @@
         $labels.append("<hr>");
 
         $labels.append("<b>Render map as level</b><br>");
-        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + WazeWrap.User.Rank() + '" type="number" min="1" max="7"></input>'));
+        $labels.append($('<input class="prefElement" title="fakeLock" id="fakeLock" value="' + (WazeWrap && WazeWrap.User ? WazeWrap.User.Rank():2) + '" type="number" min="1" max="7"></input>'));
         $labels.append("<hr>");
 
         $labels.append($("<b style='color:#6495ED'>Close Zoom</b><br>"));
@@ -1903,17 +1913,64 @@
         }
     }
 
-    function initSVL() {
+    function initWazeWrap(trial = 1) {
+        if(trial > 30){
+            console.error("SVL: could not initialize WazeWrap");
+            return;
+        }
+
+        if(!WazeWrap.Ready || WazeWrap.Interface === undefined){
+            console.log("SVL: WazeWrap not ready, retrying in 800ms");
+            setTimeout(()=>{initWazeWrap(++trial);}, 800);
+            return;
+        }
+        initWazeWrapElements();
+    }
+
+    function initWazeWrapElements(){
+        console.log("SVL: initializing WazeWrap");
+        //Adding keyboard shortcut
+        try{
+        new WazeWrap.Interface.Shortcut('SVLToggleLayer', 'Toggle SVL', 'svl', 'Street Vector Layer', "A+l", function () {
+                streetVector.setVisibility(!streetVector.visibility);
+                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
+            }, null).add();
+            console.log("Keyboard shortcut successfully added.");
+        }
+        /*try {
+            WMEKSRegisterKeyboardShortcut("SVL", "Street Vector Layer", "ToogleVectorLayer", "Toggle Vector Layer", function () {
+                streetVector.setVisibility(!streetVector.visibility);
+                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
+            }, "A+l"); //shortcut1
+            WMEKSLoadKeyboardShortcuts("SVL");
+            console.log("Keyboard shortcut successfully added.");
+        }*/
+        catch (e) {
+            console.error("Error while adding the keyboard shortcut:");
+            console.error(e);
+        }
+
+        //Add the layer checkbox
+        try{
+            WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
+        }catch(e){
+            console.error("SVL: could not add layer checkbox");
+        }
+
+        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer",svlVersion,"Performance: the road layer shows up faster.");
+    }
+
+    function initSVL(svlAttempts = 0) {
         //Initialize variables
         var i, labelStyleMap, layerName, len, layers;
         try {
             svlWazeBits();
         } catch (e) {
             svlAttempts += 1;
-            if (svlAttempts < 10) {
+            if (svlAttempts < 20) {
                 console.warn(e);
                 console.warn("Could not initialize SVL correctly. Maybe the Waze model was not ready. Retrying in 500ms...");
-                setTimeout(initSVL, 500);
+                setTimeout(()=>{initSVL(++svlAttempts);}, 500);
                 return;
             } /*else {*/
             console.error(e);
@@ -2012,9 +2069,13 @@
         labelOutlineWidth = preferences.labelOutlineWidth + "px";
 
 
-        $(".olControlAttribution").click(editPreferences);
-        $(".olControlScaleLineTop").click(editPreferences);
-        $(".olControlScaleLineBottom").click(editPreferences);
+        try{
+            $(".olControlAttribution").click(editPreferences);
+            $(".olControlScaleLineTop").click(editPreferences);
+            $(".olControlScaleLineBottom").click(editPreferences);
+        }catch(e){
+            console.warn("SVL: could not set click event");
+        }
         labelStyleMap = new OL.StyleMap({
             fontFamily: "Open Sans, Alef, helvetica, sans-serif, monospace",
             fontWeight: "800",
@@ -2256,8 +2317,15 @@
 
         Wmap.addLayer(streetVector);
         Wmap.addLayer(nodesVector);
-        Wmap.raiseLayer(streetVector, -2);
-        Wmap.raiseLayer(nodesVector, -1);
+        /*if(!Wmap.raiseLayer){
+            Wmap.raiseLayer = function(){
+                console.warn("SVL Info: W.map.raiseLayer has been removed!");
+            }
+        }*/
+        //streetVector.setZIndex(streetVector.getZIndex() - 2);
+        //nodesVector.setZIndex(streetVector.getZIndex() + 1);
+        //Wmap.raiseLayer(streetVector, -2);
+        //Wmap.raiseLayer(nodesVector, -1);
 
         streetVector.events.register("visibilitychanged", streetVector, manageNodes);
         manageNodes({
@@ -2276,39 +2344,18 @@
             }
         }
         vectorAutomDisabled = false;
-        Wmap.events.register("zoomend", null, checkZoomLayer);
+
+        //TODO: fix when beta gets to production
+        try{
+            Wmap.events.register("zoomend", null, checkZoomLayer);
+        }
+        catch(e){
+            Wmap.getMapEventsListener().register("zoomend", null, checkZoomLayer);
+        }
 
         if (preferences.startDisabled) {
             streetVector.setVisibility(false);
             $("#layer-switcher-item_street_vector_layer").prop("checked", false);
-        }
-
-        //Adding keyboard shortcut
-        try{
-        new WazeWrap.Interface.Shortcut('SVLToggleLayer', 'Toggle SVL', 'svl', 'Street Vector Layer', "A+l", function () {
-                streetVector.setVisibility(!streetVector.visibility);
-                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
-            }, null).add();
-            console.log("Keyboard shortcut successfully added.");
-        }
-        /*try {
-            WMEKSRegisterKeyboardShortcut("SVL", "Street Vector Layer", "ToogleVectorLayer", "Toggle Vector Layer", function () {
-                streetVector.setVisibility(!streetVector.visibility);
-                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
-            }, "A+l"); //shortcut1
-            WMEKSLoadKeyboardShortcuts("SVL");
-            console.log("Keyboard shortcut successfully added.");
-        }*/
-        catch (e) {
-            console.error("Error while adding the keyboard shortcut:");
-            console.error(e);
-        }
-
-        //Add the layer checkbox
-        try{
-            WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
-        }catch(e){
-            console.error("SVL: could not add layer checkbox");
         }
 
         if (preferences.showUnderGPSPoints) { //By default, WME places the GPS points under the layer, no need to move it.
@@ -2317,6 +2364,8 @@
 
         updateRoutingModePanel();
         updateRefreshStatus();
+
+        initWazeWrap();
 
         console.log("Street Vector Layer v. " + svlVersion + " initialized correctly.");
     }
@@ -2356,15 +2405,13 @@ function getRestrictions(r)
     }
     */
 
-    function bootstrapSVL() {
+    function bootstrapSVL(trials = 0) {
         // Check all requisites for the script
-        var trials = 0;
-        if (W === undefined || !WazeWrap.Ready ||
-            document.querySelector("#WazeMap") === undefined || WazeWrap.Interface === undefined) {
-            console.log("SVL not ready to start, retrying in 400ms");
+        if (W === undefined || W.map === undefined) {
+            console.log("SVL not ready to start, retrying in 600ms");
             trials += 1;
-            if (trials < 10) {
-                setTimeout(bootstrapSVL, 400);
+            if (trials < 20) {
+                setTimeout(()=>{bootstrapSVL(++trials);}, 600);
             } else {
                 alert("Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!");
             }
