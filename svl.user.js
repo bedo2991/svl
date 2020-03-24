@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7.2
+// @version    4.7.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -81,16 +81,12 @@
     //End of global variable declaration
 
     function svlGlobals() {
-        //"use strict";
         Wmap = W.map;
         splittedSpeedLimits = false;
         farZoomThereshold = 5; //To increase performance change this value to 6.
         arrowDeclutter = 25;
         clutterMax = 700;
         fontSizeMax = 32;
-        //beta = false;
-        //if (W.model.nodes.events == undefined)
-        //  beta=true;
         farZoom = Wmap.zoom < farZoomThereshold ? true : false;
         svlVersion = GM_info.script.version;
         preferences = null;
@@ -142,12 +138,6 @@
             strokeDashstyle: "longdash",
             pointerEvents: "none"
         };
-
-        //Fix for the current beta, remove when in production!
-        if (!W.selectionManager.hasSelectedFeatures) {
-            beta = false;
-            W.selectionManager.hasSelectedFeatures = W.selectionManager.hasSelectedItems;
-        }
     }
 
     function svlWazeBits() {
@@ -164,7 +154,7 @@
     }
 
     function refreshWME() {
-        if (W.model.actionManager.unsavedActionsNum() === 0 && !W.selectionManager.hasSelectedFeatures() && $(".place-update-edit.show").size() === 0) {
+        if (W.model.actionManager.unsavedActionsNum() === 0 && !WazeWrap.hasSelectedFeatures() && $(".place-update-edit.show").size() === 0) {
             W.controller.reload();
         }
     }
@@ -432,7 +422,6 @@
     }
 
     function getAngle(isForward, p0, p1) {
-        //"use strict";
         var dx, dy, angle;
         dx = 0;
         dy = 0;
@@ -448,7 +437,6 @@
     }
 
     function getSuperScript(number) {
-        //"use strict";
         var res, i;
         res = "";
         if (number) {
@@ -465,7 +453,6 @@
 
     function drawLabels(model, simplified, delayed) {
         //consoleDebug("drawLabels");
-        //"use strict";
         var labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
             labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance, ANsShown, i, altStreet, altStreetPart;
         defaultLabel = null;
@@ -474,7 +461,7 @@
         attributes = model.attributes;
         address = model.getAddress();
         //consoleDebug(address, attributes);
-        if (attributes.primaryStreetID !== null && (beta && address.attributes.state === undefined) || (!beta && address.state === undefined)) { //TODO remove !beta check once in production
+        if (attributes.primaryStreetID !== null && address.attributes.state === undefined) {
             //console.error("NOT READY");
             setTimeout(function () {
                 drawLabels(model, simplified, true);
@@ -482,9 +469,7 @@
         } else /*if ((preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))*/ {
             //maxDistance = 0;
             //maxDistanceIndex = -1;
-            if(beta){
-              address = address.attributes; //Fix from beta v2.12-36-g29f47ac
-            }
+            address = address.attributes;
             streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
             //consoleDebug("Streetpart:" +streetPart);
 
@@ -1096,7 +1081,6 @@
 
     function drawAllSegments() {
         //console.log("DrawAllSegments");
-        //"use strict";
         var segments = W.model.segments.objects,
             keysSorted, myFeatures = [],
             i, len;
@@ -1124,7 +1108,6 @@
     }
 
     function drawAllNodes() {
-        //"use strict";
         var node, nodeFeatures, nodes;
         nodesVector.destroyFeatures();
         nodeFeatures = [];
@@ -1240,7 +1223,6 @@
     }
 
     function updateLayerPosition() {
-        //"use strict";
         var gps_layer_index;
         gps_layer_index = parseInt(Wmap.getLayerByUniqueName("gps_points").getZIndex(), 10);
 
@@ -1254,14 +1236,12 @@
     }
 
     function closeRoutingPanel() {
-        //"use strict";
         animateAndClose("routingModeDiv");
         preferences.routingModeEnabled = false;
         doDraw();
     }
 
     function updateRoutingModePanel() {
-        //"use strict";
         var $routingModeDiv;
         //console.error("ROTUING MODE ENABLED? ", preferences.routingModeEnabled);
         if (preferences.routingModeEnabled) {
@@ -1286,7 +1266,6 @@
     }
 
     function updateRefreshStatus() {
-        //"use strict";
         clearInterval(autoLoadInterval);
         autoLoadInterval = null;
         if (preferences.autoReload && preferences.autoReload.enabled) {
@@ -1295,7 +1274,6 @@
     }
 
     function updatePref() {
-        //"use strict";
         var i, len;
         $("#saveNewPref").removeClass("btn-primary").addClass("btn-warning");
         for (i = 0, len = preferences.streets.length; i < len; i += 1) {
@@ -1420,7 +1398,6 @@
     }
 
     function editPreferences() {
-        //"use strict";
         var $zoomStyleDiv, $style, $mainDiv, $elementDiv, $streets, $decorations, $labels, $speedLimits, $select, i, k, len;
         if ($(document.getElementById("PrefDiv")).length > 0) {
             return;
@@ -1658,8 +1635,7 @@
         return true;
     }
 
-    function addNodes(e) {
-        //"use strict";
+    function addNodes(e) {    
         var myFeatures, i;
         if (farZoom) {
             return;
@@ -1711,7 +1687,6 @@
             if (farZoom) { //Switched from far to close zoom
                 farZoom = false;
                 thresholdDistance = getThreshold();
-                /*if (beta) {*/
                 W.model.nodes._events.objectsremoved.push({
                     context: nodesVector,
                     callback: removeNodes,
@@ -1722,12 +1697,6 @@
                     callback: addNodes,
                     svl: true
                 });
-                /*}
-                else
-                {
-                    W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
-                    W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
-                }*/
                 if ($("#zoomStyleDiv").length === 1) {
                     $("#zoomStyleDiv").removeClass("farZoom");
                     $("#zoomStyleDiv").addClass("closeZoom");
@@ -1746,15 +1715,8 @@
             labelFontSize = preferences.farZoomLabelSize + "px";
             thresholdDistance = getThreshold();
             if (zoomChanged) {
-                /*if (beta) {*/
                 W.model.nodes._events.objectsremoved = W.model.nodes._events.objectsremoved.filter(removeSVLEvents);
                 W.model.nodes._events.objectsadded = W.model.nodes._events.objectsadded.filter(removeSVLEvents);
-                /*}
-                else
-                {
-                    W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
-                    W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
-                }*/
                 if ($("#zoomStyleDiv").length === 1) {
                     $("#zoomStyleDiv").removeClass("closeZoom");
                     $("#zoomStyleDiv").addClass("farZoom");
@@ -1785,7 +1747,6 @@
     }*/
 
     function addSegments(e) {
-        //"use strict";
         var i, j, features, myFeatures;
         //console.log("Segments added to model");
         //console.log("Size: " + e.length);
@@ -1849,8 +1810,6 @@
         nodesVector.setVisibility(e.object.visibility);
         if (e.object.visibility) {
             //consoleDebug("Registering events");
-            /*if (beta)
-            {*/
             W.model.segments._events.objectsadded.push({
                 context: streetVector,
                 callback: addSegments,
@@ -1877,37 +1836,15 @@
                 callback: addNodes,
                 svl: true
             });
-            /*}
-            else
-            {
-                alert("Not beta");
-                W.model.segments.events.register("objectsadded",streetVector, addSegments);
-                W.model.segments.events.register("objectschanged", streetVector, editSegments);
-                W.model.segments.events.register("objectsremoved",streetVector, removeSegments);
-
-                W.model.nodes.events.register("objectsremoved", nodesVector, removeNodes);
-                W.model.nodes.events.register("objectsadded", nodesVector, addNodes);
-            }*/
             doDraw();
         } else {
             //consoleDebug("Unregistering events");
-            /*if (beta) {*/
             W.model.segments._events.objectsadded = W.model.segments._events.objectsadded.filter(removeSVLEvents);
             W.model.segments._events.objectschanged = W.model.segments._events.objectschanged.filter(removeSVLEvents);
             W.model.segments._events.objectsremoved = W.model.segments._events.objectsremoved.filter(removeSVLEvents);
 
             W.model.nodes._events.objectsremoved = W.model.nodes._events.objectsremoved.filter(removeSVLEvents);
             W.model.nodes._events.objectsadded = W.model.nodes._events.objectsadded.filter(removeSVLEvents);
-            /*}
-            else
-            {
-                W.model.segments.events.unregister("objectsadded",streetVector, addSegments);
-                W.model.segments.events.unregister("objectschanged", streetVector, editSegments);
-                W.model.segments.events.unregister("objectsremoved",streetVector, removeSegments);
-
-                W.model.nodes.events.unregister("objectsremoved", nodesVector, removeNodes);
-                W.model.nodes.events.unregister("objectsadded", nodesVector, addNodes);
-            }*/
             nodesVector.destroyFeatures();
             streetVector.destroyFeatures();
         }
@@ -1937,14 +1874,6 @@
             }, null).add();
             console.log("Keyboard shortcut successfully added.");
         }
-        /*try {
-            WMEKSRegisterKeyboardShortcut("SVL", "Street Vector Layer", "ToogleVectorLayer", "Toggle Vector Layer", function () {
-                streetVector.setVisibility(!streetVector.visibility);
-                $("#layer-switcher-item_street_vector_layer").prop("checked", streetVector.visibility);
-            }, "A+l"); //shortcut1
-            WMEKSLoadKeyboardShortcuts("SVL");
-            console.log("Keyboard shortcut successfully added.");
-        }*/
         catch (e) {
             console.error("Error while adding the keyboard shortcut:");
             console.error(e);
@@ -1953,11 +1882,12 @@
         //Add the layer checkbox
         try{
             WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked)=>{streetVector.setVisibility(checked);}, streetVector);
+            streetVector.setVisibility(sessionStorage.street_vector_layer); // This row should not be needed, once WazeWrap gets fixed.
         }catch(e){
             console.error("SVL: could not add layer checkbox");
         }
 
-        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer",svlVersion,"Performance: the road layer shows up faster.");
+        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer",svlVersion,"Minor fix due to the new WME release. Known issue: the layer switcher may not work. Please use the keyboard shortcut to enable/disable the layer (default: ALT+L).");
     }
 
     function initSVL(svlAttempts = 0) {
