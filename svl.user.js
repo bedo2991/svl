@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7.5
+// @version    4.7.6
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -1940,7 +1940,7 @@
         }catch(e){
             console.error("SVL: could not add layer checkbox");
         }
-        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer",svlVersion,"Minor update for future WME compatibility.");
+        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", svlVersion, "Improved street labels font.");
     }
 
     function initSVL(svlAttempts = 0) {
@@ -2060,7 +2060,7 @@
             console.warn("SVL: could not set click event");
         }
         labelStyleMap = new OpenLayers.StyleMap({
-            fontFamily: "Open Sans, Alef, helvetica, sans-serif, monospace",
+            fontFamily: "Rubik, Open Sans, Alef, helvetica, sans-serif, monospace",
             fontWeight: "800",
             fontColor: "${color}",
             labelOutlineColor: "${outlinecolor}",
