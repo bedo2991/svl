@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7.6
+// @version    4.7.7
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -22,22 +22,13 @@
 //debugger;
 (function () {
     "use strict";
-    /*
-    let DEBUG_ENABLED = true; //set it to false for production mode
-    let consoleDebug;
-
-     if (DEBUG_ENABLED) {
-         consoleDebug= function ()
+    const consoleDebug = localStorage.getItem("svlDebugOn")==="true" ? (...args) =>
          {
-             if (DEBUG_ENABLED)
-                 for (let i = 0; i < arguments.length; ++i)
-                     console.dir(arguments[i]);
-         }
-     }
-     else
-     {
-         consoleDebug = function () {}
-     }*/
+             for (let i = 0; i < args.length; i++){
+                 console.dir(args[i]);
+             }
+         } : ()=>{};
+
     let autoLoadInterval = null,
         clutterConstant,
         thresholdDistance,
@@ -72,14 +63,14 @@
         roadLayer,
         vectorAutomDisabled,
         farZoomThreshold,
-        Wmap,
-        splittedSpeedLimits;
+        Wmap;
+        //splittedSpeedLimits;
 
     //End of global variable declaration
 
     function svlGlobals() {
         Wmap = W.map;
-        splittedSpeedLimits = false;
+        //splittedSpeedLimits = false;
         farZoomThreshold = 5; //To increase performance change this value to 6.
         arrowDeclutter = 25;
         clutterMax = 700;
@@ -362,6 +353,42 @@
         savePreferences(preferences);
     }
 
+    const defaultSegmentWidhtMeters = {
+            1: 5.0,// "Street",
+            2: 5.5,//"Primary Street",
+            3: 22.5,//"Freeway",
+            4: 6.0,//"Ramp",
+            5: 2.0,//"Walking Trail",
+            6: 10.0,//"Major Highway",
+            7: 9.0,//"Minor Highway",
+            8: 4.0,//"Dirt Road",
+            10: 2.0,//"Pedestrian Boardwalk",
+            15: 8.0,//"Ferry",
+            16: 2.0,//"Stairway",
+            17: 5.0,//"Private Road",
+            18: 10.0,//"Railroad",
+            19: 5.0,//"Runway",
+            20: 5.0,//"Parking Lot Road",
+            22: 3.0//"Alley"
+            /*"service": 21,*/
+        };
+
+    function getWidth({segmentWidth, roadType, twoWay}){
+        //If in close zoom and user enabled the realsize mode
+        if(!farZoom && preferences.realsize){
+            //If the segment has a widht set, use it
+            if(segmentWidth){
+                return (twoWay ? segmentWidth : (segmentWidth / 2.0)) / W.map.getOLMap().getResolution();
+            }else{
+                return (twoWay ? defaultSegmentWidhtMeters[roadType] : (defaultSegmentWidhtMeters[roadType] / 2.0)) / W.map.getOLMap().getResolution();
+            }
+        }else{
+            //Use the value stored in the preferences //TODO: parseInt should not be needed
+         return parseInt(streetStyle[roadType].strokeWidth,10);
+        }
+    }
+
+
     function loadPreferences() {
         preferences = JSON.parse(localStorage.getItem("svl"));
         //consoleDebug("Loading preferences");
@@ -634,6 +661,10 @@
             myFeatures.push(lineFeature);
         } else {
             roadType = attributes.roadType;
+            let width = getWidth({segmentWidth:attributes.width,
+                                  roadType:attributes.roadType,
+                                  twoWay: attributes.fwdDirection && attributes.revDirection});
+            consoleDebug(width);
             if (preferences.routingModeEnabled && attributes.routingRoadType !== null) {
                 roadType = attributes.routingRoadType;
             }
@@ -645,7 +676,7 @@
                     //consoleDebug("Bridge");
                     bridgeStyle = {
                         strokeColor: "#000",
-                        strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10) + (speed && preferences.showSLcolor && !farZoom ? 6 : 4),
+                        strokeWidth: width + (speed && preferences.showSLcolor && !farZoom ? 6 : 4),
                         //strokeDashstyle: "solid",
                         pointerEvents: "none"
                     };
@@ -662,18 +693,18 @@
 
                     if (!preferences.showSLSinglecolor && (attributes.fwdMaxSpeed || attributes.revMaxSpeed) && attributes.fwdMaxSpeed !== attributes.revMaxSpeed && !model.isOneWay()) {
                         //consoleDebug("The segment has 2 different speed limits");
-                        splittedSpeedLimits = true;
+                        //splittedSpeedLimits = true;
                         speed = getColorSpeed(attributes.fwdMaxSpeed);
                         speedStyleLeft = {
                             strokeColor: speed.toString().charAt(0) === "#" ? speed : "hsl(" + speed + ", 100%, 50%)",
-                            strokeWidth: streetStyle[roadType].strokeWidth,
+                            strokeWidth: width,
                             strokeDashstyle: speedStrokeStyle,
                             pointerEvents: "none"
                         };
                         speed = getColorSpeed(attributes.revMaxSpeed);
                         speedStyleRight = {
                             strokeColor: speed.toString().charAt(0) === "#" ? speed : "hsl(" + speed + ", 100%, 50%)",
-                            strokeWidth: streetStyle[roadType].strokeWidth,
+                            strokeWidth: width,
                             strokeDashstyle: speedStrokeStyle,
                             pointerEvents: "none"
                         };
@@ -689,7 +720,7 @@
                             right[0] = pk.clone();
                             left[1] = pk1.clone();
                             right[1] = pk1.clone();
-                            offset = (streetStyle[roadType].strokeWidth / 5.0) * (30.0 / (Wmap.getZoom() * Wmap.getZoom())); //((Wmap.getZoom()+1)/11)+0.6*(1/(11-Wmap.getZoom()));// (10-Wmap.getZoom()/3)/(10-Wmap.getZoom());
+                            offset = (width / 5.0) * (30.0 / (Wmap.getZoom() * Wmap.getZoom())); //((Wmap.getZoom()+1)/11)+0.6*(1/(11-Wmap.getZoom()));// (10-Wmap.getZoom()/3)/(10-Wmap.getZoom());
                             //of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
                             //console.error(of2);
                             //console.log(offset);
@@ -769,7 +800,7 @@
                             speed = getColorSpeed(speedValue);
                             speedStyle = {
                                 strokeColor: speed.toString().charAt(0) === "#" ? speed : "hsl(" + speed + ", 100%, 50%)",
-                                strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10) + 4,
+                                strokeWidth: width + 4,
                                 strokeDashstyle: speedStrokeStyle,
                                 pointerEvents: "none"
                             };
@@ -785,13 +816,15 @@
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id
-                    }, streetStyle[roadType]);
+                    }, Object.assign({}, streetStyle[roadType]));
+                //console.dir(lineFeature);
+                lineFeature.style.strokeWidth = width;
                 myFeatures.push(lineFeature);
 
                 if (attributes.level < 0) {
                     tunnelsStyle = {
                         strokeColor: "#000",
-                        strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10),
+                        strokeWidth: width,
                         strokeOpacity: 0.35,
                         strokeDashstyle: "solid",
                         pointerEvents: "none"
@@ -824,7 +857,7 @@
                 /*jslint bitwise: false */
                 dirtyStyle = {
                     strokeColor: preferences.dirty.strokeColor,
-                    strokeWidth: parseInt(streetStyle[roadType].strokeWidth, 10) - 2,
+                    strokeWidth: width - 2,
                     strokeOpacity: preferences.dirty.opacity / 100.0,
                     strokeDashstyle: preferences.dirty.strokeDashstyle,
                     pointerEvents: "none"
@@ -1107,7 +1140,7 @@
 
     function doDraw() {
         //consoleDebug("Drawing everything anew");
-        splittedSpeedLimits = false;
+        //splittedSpeedLimits = false;
         drawAllSegments();
 
         if (!farZoom) {
@@ -1356,6 +1389,14 @@
         }
 
         preferences.showANs = $("#showANs").prop("checked");
+        preferences.realsize = $("#realsize").prop("checked");
+
+        if(preferences.realsize){
+        //Disable all width inputs.
+            $('input.segmentsWidth').prop( "disabled", true );
+        }else{
+            $('input.segmentsWidth').prop( "disabled", false );
+        }
 
         updateStylesFromPreferences(preferences);
         updateRefreshStatus();
@@ -1408,7 +1449,7 @@
             if (preferences.streets[i]) {
                 $streets.append($("<b>" + svlStreetTypes[i] + "</b><br>"));
                 $streets.append($("<input class=\"prefElement\" title=\"Color\" id=\"streetColor_" + i + "\" value=\"" + preferences.streets[i].strokeColor + "\" type=\"color\"></input>&nbsp&nbsp"));
-                $streets.append($("<input class=\"prefElement\" title=\"Width\" id=\"streetWidth_" + i + "\" value=\"" + preferences.streets[i].strokeWidth + "\" type=\"number\" min=\"3\" max=\"15\"></input>&nbsp&nbsp"));
+                $streets.append($("<input class=\"prefElement segmentsWidth\" title=\"Width\" id=\"streetWidth_" + i + "\" value=\"" + preferences.streets[i].strokeWidth + "\" type=\"number\" min=\"3\" max=\"15\"></input>&nbsp&nbsp"));
                 $select = createDashStyleDropdown("strokeDashstyle_" + i);
                 $select.val(preferences.streets[i].strokeDashstyle);
                 $streets.append($select);
@@ -1487,6 +1528,12 @@
 
         //Labels
         $labels.append("<summary>Rendering Parameters</summary>");
+
+        $labels.append($("<b>Use real-life width instead of standard</b>"));
+        $labels.append($("<br>"));
+        $labels.append($("<i>When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences&nbsp;</i>"));
+        $labels.append($('<input class="prefElement" title="True or False" id="realsize" type="checkbox" ' + (preferences.realsize ? 'checked' : '') + '></input>'));
+        $labels.append("<hr>");
 
         $labels.append($("<b>Show Alternative Names</b>"));
         $labels.append($("<br>"));
@@ -1601,6 +1648,11 @@
         $("#importPreferences").click(importPreferences);
         $("#rollbackPreferences").click(rollbackPreferences);
         $("#rollbackDefault").click(rollbackDefault);
+
+        if(preferences.realsize){
+        //Disable all width inputs.
+            $('input.segmentsWidth').prop( "disabled", true );
+        }
         //new WazeWrap.Interface.Tab('SVL', $mainDiv, null);
     }
 
@@ -1632,7 +1684,6 @@
             }else if(node.id>0){
                 //The node has just been saved
                 nodesVector.addFeatures(Array.of(drawNode(e[i])));
-                debugger;
             }//Else it is a temporary node, we won't draw it.
         }
     }
@@ -1680,23 +1731,27 @@
     }
 
     function checkZoomLayer() {
-        let zoom, zoomChanged;
-        zoom = Wmap.getZoom();
+        const zoom = Wmap.getZoom();
+        let zoomChanged;
+        //doDraw();
         //consoleDebug("Zoom: " + zoom);
+        //Decide the SVL layer status
         if (preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled) {
             roadLayer.setVisibility(false);
             $("#layer-switcher-item_street_vector_layer").prop("checked", false);
         }
         if (zoom > 1) {
+            // SVL is used from this zoom on (until 10, the closest zoom possible atm)
             if (streetVector.visibility === false && vectorAutomDisabled) {
                 vectorAutomDisabled = false;
                 //consoleDebug("Setting vector visibility to true");
+                doDraw();
                 streetVector.setVisibility(true);
                 $("#layer-switcher-item_street_vector_layer").prop("checked", true);
                 $("#layer-switcher-item_road").prop("checked", false);
-                doDraw();
                 //streetVector.display(true)
-            }else if(streetVector.visibility === false && !vectorAutomDisabled)
+            }
+            else if(streetVector.visibility === false && !vectorAutomDisabled)
             {
                 //The user disabled the layer, don't do anything else.
                 return;
@@ -1716,11 +1771,8 @@
                     $zoomDiv.addClass("closeZoom");
                     $zoomDiv.text("You are currently in CLOSE-zoom mode");
                 }
-                doDraw();
-            } else if (splittedSpeedLimits === true) {
-                //Only draw everything again if at least one splitted speed limit has been drawn.
-                doDraw();
             }
+            doDraw();
         } else {
             //Far zoom
             zoomChanged = !farZoom;
@@ -1893,7 +1945,7 @@
             if(!farZoom) {
                 registerNodeEvents();
             }
-            checkZoomLayer();
+            //checkZoomLayer();
             doDraw();
         } else {
             //consoleDebug("Unregistering events");
@@ -1911,7 +1963,7 @@
             return;
         }
 
-        if(!WazeWrap.Ready || WazeWrap.Interface === undefined){
+        if(!WazeWarp || !WazeWrap.Ready || WazeWrap.Interface === undefined){
             console.log("SVL: WazeWrap not ready, retrying in 800ms");
             setTimeout(()=>{initWazeWrap(++trial);}, 800);
             return;
@@ -1940,7 +1992,7 @@
         }catch(e){
             console.error("SVL: could not add layer checkbox");
         }
-        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", svlVersion, "Improved street labels font.");
+        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", svlVersion, "Added an option to render the streets based on their width.");
     }
 
     function initSVL(svlAttempts = 0) {
@@ -2328,13 +2380,7 @@
         }
         vectorAutomDisabled = false;
 
-        //TODO: fix when beta gets to production
-        try{
-            Wmap.events.register("zoomend", null, checkZoomLayer);
-        }
-        catch(e){
-            Wmap.getMapEventsListener().register("zoomend", null, checkZoomLayer);
-        }
+        Wmap.events.register("zoomend", null, checkZoomLayer);
 
         if (preferences.startDisabled) {
             streetVector.setVisibility(false);
