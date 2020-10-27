@@ -14,7 +14,7 @@
 
 /*jslint browser: true*/
 /*jslint white: true */
-/*global $, jQuery, W, OpenLayers, WazeWrap, GM_info.script*/
+/*global W, OpenLayers, WazeWrap, GM_info.script*/
 /*jslint nomen: true */ //for variable starting with _
 /*jshint esversion: 6*/
 
@@ -59,7 +59,7 @@
         vectorAutomDisabled,
         OLMap;
 
-    const FARZOOMTHRESHOLD = 5; //To increase performance change this value to 6.
+    const FARZOOMTHRESHOLD = 6; //To increase performance change this value to 6.
     const clutterMax = 700;
     const fontSizeMax = 32;
     const superScript = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
@@ -141,7 +141,7 @@
             pointRadius: 3.3,
             pointerEvents: "none"
         };
-       
+
         nonEditableStyle = {
             strokeColor: "#000",
             strokeWidth: 2,
@@ -206,7 +206,7 @@
         } else {
             preferences.fakelock = 6;
         }
-        preferences.hideMinorRoads = false;
+        preferences.hideMinorRoads = true;
         preferences.showDashedUnverifiedSL = true;
         preferences.showSLcolor = true;
         preferences.showSLtext = true;
@@ -416,9 +416,9 @@
         if (!farZoom && preferences.realsize) {
             //If the segment has a widht set, use it
             if (segmentWidth) {
-                return (twoWay ? segmentWidth : (segmentWidth / 2.0)) / W.map.getOLMap().getResolution();
+                return (twoWay ? segmentWidth : (segmentWidth / 2.0)) / OLMap.resolution;
             } else {
-                return (twoWay ? defaultSegmentWidhtMeters[roadType] : (defaultSegmentWidhtMeters[roadType] / 2.0)) / W.map.getOLMap().getResolution();
+                return (twoWay ? defaultSegmentWidhtMeters[roadType] : (defaultSegmentWidhtMeters[roadType] / 2.0)) / OLMap.resolution;
             }
         } else {
             //Use the value stored in the preferences //TODO: parseInt should not be needed
@@ -636,7 +636,6 @@
                     }
                 }
             }
-
         }
         if (delayed && labelFeature) {
             streetVector.addFeatures(labels);
@@ -671,6 +670,7 @@
         if (hasToBeSkipped(attributes.roadType)) {
             return [];
         }
+        farZoom = OLMap.zoom < FARZOOMTHRESHOLD;
         points = attributes.geometry.components;
         pointList = attributes.geometry.getVertices(); //is an array
         simplified = new OpenLayers.Geometry.LineString(pointList).simplify(1.5).components;
@@ -684,7 +684,7 @@
             myFeatures.push(lineFeature);
         } else {
             roadType = attributes.roadType;
-            let width = getWidth({
+            const width = getWidth({
                 segmentWidth: attributes.width,
                 roadType: attributes.roadType,
                 twoWay: attributes.fwdDirection && attributes.revDirection
@@ -841,7 +841,8 @@
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {
                     myId: attributes.id
-                }, Object.assign({}, streetStyle[roadType]));
+                },Object.assign({}, streetStyle[roadType]))
+                
                 //console.dir(lineFeature);
                 lineFeature.style.strokeWidth = width;
                 myFeatures.push(lineFeature);
@@ -1164,6 +1165,10 @@
     }
 
     function doDraw() {
+        if(OLMap.zoom < 2){
+            console.warn("Tried to draw at bad zoom");
+            return;
+        }
         consoleDebug("Drawing everything anew");
         //splittedSpeedLimits = false;
         drawAllSegments();
@@ -1265,11 +1270,8 @@
     }
 
     function exportPreferences() {
-        //prompt("Please copy this string (CTRL+C):", JSON.stringify(preferences));
-        /*jslint newcap: true */
         GM_setClipboard(JSON.stringify(preferences));
-        /*jslint bitwise: false */
-        alert("The configuration has been copied to your clipboard. Please paste it in a file (CTRL+V) to store it");
+        alert("The configuration has been copied to your clipboard. Please paste it in a file (CTRL+V) to store it.");
     }
 
     function importPreferences() {
@@ -1311,11 +1313,15 @@
             routingModeDiv.addEventListener("mouseenter", () => {
                 //Temporary disable routing mode
                 preferences.routingModeEnabled = false;
+                streetVector.destroyFeatures();
+                nodesVector.destroyFeatures();
                 doDraw();
             });
             routingModeDiv.addEventListener("mouseleave", () => {
                 //Enable routing mode again
                 preferences.routingModeEnabled = true;
+                streetVector.destroyFeatures();
+                nodesVector.destroyFeatures();
                 doDraw();
             });
             document.getElementById("map").appendChild(routingModeDiv);
@@ -1404,7 +1410,7 @@
         preferences.arrowDeclutter = document.getElementById("arrowDeclutter").value;
         preferences.labelOutlineWidth = document.getElementById("labelOutlineWidth").value;
         preferences.disableRoadLayers = document.getElementById("disableRoadLayers").checked;
-        preferences.startDisabled = document.getElementById("startdisabled").checked;
+        preferences.startDisabled = document.getElementById("startDisabled").checked;
 
         preferences.showSLtext = document.getElementById("showSLtext").checked;
         preferences.showSLcolor = document.getElementById("showSLcolor").checked;
@@ -1581,7 +1587,12 @@
         document.getElementById("closeZoomLabelSize").value = preferences.closeZoomLabelSize;
         document.getElementById("farZoomLabelSize").value = preferences.farZoomLabelSize;
         document.getElementById("arrowDeclutter").value = preferences.arrowDeclutter;
-
+        document.getElementById("disableRoadLayers").checked = preferences.disableRoadLayers;
+        document.getElementById("startDisabled").checked = preferences.startDisabled;
+        document.getElementById("showUnderGPSPoints").checked = preferences.showUnderGPSPoints;
+        document.getElementById("routingModeEnabled").checked = preferences.routingModeEnabled;
+        document.getElementById("showANs").checked = preferences.showANs;
+        
         //Speed limits
         document.getElementById("showSLtext").checked = preferences.showSLtext;
         document.getElementById("showSLcolor").checked = preferences.showSLcolor;
@@ -1674,24 +1685,6 @@
     }
 
     function initPreferences() {
-        let zoomStyleDiv, $elementDiv;
-        if (document.getElementById("PrefDiv")) {
-            return;
-        }
-        //Create the preference panel //TODO
-
-        //Create the Panel showing the current zoom status
-        /*zoomStyleDiv = document.createElement("div");
-        zoomStyleDiv.id = "zoomStyleDiv";
-        if (farZoom) {
-            zoomStyleDiv.className = "zoomDiv farZoom";
-            zoomStyleDiv.innerText = "You are currently in FAR-zoom mode";
-        } else {
-            zoomStyleDiv.className = "zoomDiv closeZoom";
-            zoomStyleDiv.innerText = "You are currently in CLOSE-zoom mode";
-        }
-        document.getElementById("map").appendChild(zoomStyleDiv);*/
-
         const style = document.createElement("style");
         style.innerHTML = `
         <style>
@@ -1708,9 +1701,6 @@
         .prefLineSlider input{float:right;}
         #sidepanel-svl h5{text-transform: capitalize;}
         .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}
-        .farZoom{background-color:orange}
-        .closeZoom{background-color:#6495ED}
-        .zoomDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:8em; right:2em; padding:1em;}
         summary{font-weight:bold}</style>`;
         document.body.appendChild(style);
         const mainDiv = document.createElement("div");
@@ -1828,10 +1818,10 @@
             step: 1
         }));
 
-        const closeZoom = document.createElement("h5");
-        closeZoom.innerText = "Close-zoom only";
+        const closeZoomTitle = document.createElement("h5");
+        closeZoomTitle.innerText = "Close-zoom only";
 
-        labels.appendChild(closeZoom);
+        labels.appendChild(closeZoomTitle);
 
         labels.appendChild(createCheckboxOption({
             id: "renderGeomNodes",
@@ -1841,13 +1831,13 @@
 
         labels.appendChild(createCheckboxOption({
             id: "disableRoadLayers",
-            title: "Hide WME road layer",
+            title: "Hide WME Road Layer",
             description: "When enabled, the WME standard road layer gets hidden automatically."
         }));
 
         labels.appendChild(createCheckboxOption({
-            id: "startdisabled",
-            title: "SVL initially disabled",
+            id: "startDisabled",
+            title: "SVL Initially Disabled",
             description: "When enabled, the SVL does not get enabled automatically."
         }));
 
@@ -1894,9 +1884,9 @@
 
 
 
-        const farZoom = document.createElement("h5");
-        farZoom.innerText = "Far-zoom only";
-        labels.appendChild(farZoom);
+        const farZoomTitle = document.createElement("h5");
+        farZoomTitle.innerText = "Far-zoom only";
+        labels.appendChild(farZoomTitle);
 
         labels.appendChild(createRangeOption({
             id: "clutterCostantFarZoom",
@@ -1953,6 +1943,30 @@
 
         mainDiv.appendChild(speedLimits);
 
+        const subTitle = document.createElement("h5");
+        subTitle.innerText = "Settings Backup";
+        mainDiv.appendChild(subTitle);
+
+        const utilityButtons = document.createElement("div");
+        utilityButtons.className="expand";
+
+        const exportButton = document.createElement("button");
+        exportButton.id = "svl_exportButton";
+        exportButton.type="button";
+        exportButton.innerText="Export";
+        exportButton.className = "btn btn-default";
+
+        const importButton = document.createElement("button");
+        importButton.id = "svl_importButton";
+        importButton.type="button";
+        importButton.innerText="Import";
+        importButton.className = "btn btn-default";
+
+        utilityButtons.appendChild(importButton);
+        utilityButtons.appendChild(exportButton);
+        mainDiv.appendChild(utilityButtons);
+
+
         new WazeWrap.Interface.Tab('SVL 🗺️', mainDiv.innerHTML, updatePreferenceValues);
 
         const prefElements = document.querySelectorAll(".prefElement");
@@ -1963,6 +1977,8 @@
         document.getElementById("svl_saveNewPref").addEventListener("click", saveNewPref);
         document.getElementById("svl_rollbackButton").addEventListener("click", rollbackPreferences);
         document.getElementById("svl_resetButton").addEventListener("click", rollbackDefault);
+        document.getElementById("svl_importButton").addEventListener("click", importPreferences);
+        document.getElementById("svl_exportButton").addEventListener("click", exportPreferences);
 
 
 
@@ -1979,21 +1995,7 @@
                 $speedLimits.append($('<span style="color:hsl(' + getColorSpeed(k * 10) + ',100%,50%)">' + k * 10 + ' </span>'));
             }
         }
-        $speedLimits.append("<hr>");
-        $elementDiv.append($speedLimits);
-
-        $mainDiv.append($elementDiv);
-        $mainDiv.append($('<div class="panel-footer" style="margin-top:2px"><button id="exportPreferences" class="btn btn-default">Export</button> <button id="importPreferences" class="btn btn-default">Import</button><div>'));
-
-        //$("body").append($mainDiv);
-        //$(".prefElement").change(updatePref);
-        //$("#close").click(closePrefPanel);
-        //$("#svl_saveNewPref").click(saveNewPref);
-        $("#exportPreferences").click(exportPreferences);
-        $("#importPreferences").click(importPreferences);
-        //$("#rollbackPreferences").click(rollbackPreferences);
-        //$("#rollbackDefault").click(rollbackDefault);
-    }
+ }
 
     function removeNodeById(id) {
         nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute("myid", id));
@@ -2040,7 +2042,7 @@
     function addNodes(e) {
         //console.debug("Add Nodes");
         let myFeatures, i;
-        if (farZoom) {
+        if (OLMap.zoom < FARZOOMTHRESHOLD) {
             console.warn("SVL: This event should not happen in far zoom");
             return;
         }
@@ -2068,57 +2070,87 @@
         return !event.svl;
     }
 
-    let nextRenderTime = null;
-    let renderTimers = null;
+    let nextRenderDeadline = null;
+    let renderInterval = null;
 
     function checkRender() {
-        if (nextRenderTime && Date.now() > nextRenderTime) {
-            console.log("R");
+        if (nextRenderDeadline && Date.now() > nextRenderDeadline) {
+            console.log("forcing to Render");
             manageZoom(false);
+            registerSegmentsEvents();
         } else {
-            if (nextRenderTime) {
-                console.log("rendering in " + (nextRenderTime - Date.now()) + " ms");
+            if (nextRenderDeadline) {
+                console.log("rendering in " + (nextRenderDeadline - Date.now()) + " ms");
+                if(!renderInterval){
+                    removeSegmentsEvents();
+                    renderInterval = setInterval(checkRender, 700);
+                }
             }
             else {
+                clearInterval(renderInterval);
+                renderInterval = null;
                 console.log("Doing nothing");
             }
         }
     }
 
-    function checkZoomLayer() {
-        streetVector.destroyFeatures();
-        nodesVector.destroyFeatures();
-        nextRenderTime = Date.now() + 1500;
-    }
-
-
     let lastZoom = 10;
+    let lastRenderAtZoom = 0;
     function manageZoom(e) {
+        console.log("manageZoom");
+        const zoom = OLMap.zoom;
+        farZoom = zoom < FARZOOMTHRESHOLD;
+        let zoomChangedfromCloseToFar = lastRenderAtZoom < FARZOOMTHRESHOLD ? false : farZoom;
+        let zoomChangedfromFarToClose = lastRenderAtZoom >= FARZOOMTHRESHOLD ? false : !farZoom;
+        if (zoomChangedfromCloseToFar) {
+            clutterConstant = preferences.clutterCostantFarZoom;
+            labelFontSize = preferences.farZoomLabelSize + "px";
+            removeNodeEvents();            
+        }else if(zoomChangedfromFarToClose){
+            clutterConstant = preferences.clutterCostantNearZoom;
+            labelFontSize = preferences.closeZoomLabelSize + "px";
+            registerNodeEvents();
+        }
+        
         if (e) {
+            console.log("was called because of a zoom event");
+            //event: zoomEnd
             if (lastZoom > e.object.zoom) {
                 //zoom out
                 streetVector.destroyFeatures();
                 nodesVector.destroyFeatures();
             }
             lastZoom = e.object.zoom;
-            nextRenderTime = Date.now() + 1500;
+            nextRenderDeadline = Date.now() + 1400;
+            if(!renderInterval){
+                renderInterval = setInterval(checkRender, 700);
+            }
             return;
         }
+        console.log("Was forced manually");
+        //else: called manually
+
+        nextRenderDeadline = null;
+        console.dir("rendering");
+        let svlWasPreviouslyDisabled = lastRenderAtZoom < 3 && zoom > 2;
+
+        /*if(zoomChangedfromCloseToFar)
+            console.log("Zoom changed Close -> Far");
+        if(zoomChangedfromFarToClose)
+            console.log("Zoom changed Far -> Close");
+        if(svlWasPreviouslyDisabled)
+            console.log("SVL was previously disabled");
+        */
+  
         streetVector.destroyFeatures();
         nodesVector.destroyFeatures();
-        nextRenderTime = null;
-        console.dir("rendering");
-        const zoom = OLMap.zoom;
-        let zoomChanged;
+
+
         //doDraw();
         //consoleDebug("Zoom: " + zoom);
         //Decide the SVL layer status
-        if (preferences.disableRoadLayers && zoom > 1 && vectorAutomDisabled) {
-            roadLayer.setVisibility(false);
-            document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-        }
-        if (zoom > 1) {
-            // SVL is used from this zoom on (until 10, the closest zoom possible atm)
+        lastRenderAtZoom = zoom;
+        if(svlWasPreviouslyDisabled){
             if (streetVector.visibility === false && vectorAutomDisabled) {
                 vectorAutomDisabled = false;
                 //consoleDebug("Setting vector visibility to true");
@@ -2126,6 +2158,10 @@
                 streetVector.setVisibility(true);
                 document.getElementById("layer-switcher-item_street_vector_layer").checked = true;
                 document.getElementById("layer-switcher-item_road").checked = false;
+                if(preferences.disableRoadLayers){
+                    roadLayer.setVisibility(false);
+                    document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
+                }
                 //streetVector.display(true)
             }
             else if (streetVector.visibility === false && !vectorAutomDisabled) {
@@ -2133,43 +2169,18 @@
                 return;
             }
         }
-        let zoomDiv = document.getElementById("zoomStyleDiv");
-        if (zoom >= FARZOOMTHRESHOLD) {
+
+
+
+        if (!farZoom) {
             //Close zoom
-            clutterConstant = preferences.clutterCostantNearZoom;
-            labelFontSize = preferences.closeZoomLabelSize + "px";
-            if (farZoom) { //Switched from far to close zoom
-                farZoom = false;
-                thresholdDistance = getThreshold();
-                registerNodeEvents();
-                if (zoomDiv) {
-                    zoomDiv.classList.remove("farZoom");
-                    zoomDiv.classList.add("closeZoom");
-                    zoomDiv.innerText = "You are currently in CLOSE-zoom mode";
-                }
-            }
+            thresholdDistance = getThreshold();
             doDraw();
         } else {
-            //Far zoom
-            zoomChanged = !farZoom;
-            farZoom = true;
-            clutterConstant = preferences.clutterCostantFarZoom;
-            labelFontSize = preferences.farZoomLabelSize + "px";
-            thresholdDistance = getThreshold();
-            if (zoomChanged) {
-                removeNodeEvents();
-                if (zoomDiv) {
-                    zoomDiv.classList.remove("closeZoom");
-                    zoomDiv.classList.add("farZoom");
-                    zoomDiv.innerText = "You are currently in FAR-zoom mode";
-                }
-                //nodesVector.destroyFeatures();
-                doDraw();
-            }
             if (zoom < 2) { //There is nothing to draw, enable road layer
                 //consoleDebug("Road layer automatically enabled because of zoom out");
                 //consoleDebug("Vector visibility: ", streetVector.visibility);
-                if (streetVector.getVisibility() === true) {
+                if (streetVector.visibility === true) {
                     //consoleDebug("Setting vector visibility to false");
                     streetVector.setVisibility(false);
                     document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
@@ -2177,6 +2188,12 @@
                     vectorAutomDisabled = true;
                     roadLayer.setVisibility(true);
                 }
+            }else
+            {
+                //Far zoom
+                thresholdDistance = getThreshold();
+                nodesVector.destroyFeatures();
+                doDraw();
             }
         }
     }
@@ -2249,12 +2266,8 @@
     }
 
     function addSegments(e) {
-        //console.debug("Add Segments");
+        console.debug("Add Segments");
         let i, j, features, myFeatures;
-        //console.log("Segments added to model");
-        //console.log("Size: " + e.length);
-        //e = e.filter(function(value) {return value != undefined;})
-        //consoleDebug(e);
         e.sort(function (a, b) {
             return (a.attributes.level - b.attributes.level);
         });
@@ -2264,13 +2277,6 @@
             if (e[i] !== null) {
                 features = drawSegment(e[i]);
                 myFeatures.push(...features);
-                //for (j = 0; j < features.length; j += 1) {
-                //if (features[j] !== undefined) { //T0D0 find out what makes it undefined
-                //myFeatures.push(features[j]);
-                //} else {
-                //    console.warn("SVL, feature was undefined.", j, features.length);
-                //}
-                //}
             }
         }
         streetVector.addFeatures(myFeatures);
@@ -2386,7 +2392,7 @@
 
     function initSVL(svlAttempts = 0) {
         //Initialize variables
-        let i, labelStyleMap, layerName, len, layers;
+        let labelStyleMap, layerName, len, layers;
         try {
             svlWazeBits();
         } catch (e) {
@@ -2430,6 +2436,10 @@
             labelOutlineWidth: "${outlinewidth}",
             label: "${label}",
             angle: "${angle}",
+            pointerEvents: "none",
+            strokeColor: "#F53BFF",
+            strokeWidth: "${width}",
+            strokeDashstyle: "solid",
             labelAlign: "cm" //set to center middle
         });
         layerName = "Street Vector Layer";
@@ -2589,8 +2599,8 @@
         initWazeWrap();
 
         //TODO: disable when layer is disabled
-        consoleDebug("Setting timer");
-        renderTimers = setInterval(checkRender, 2000);
+        //consoleDebug("Setting timer");
+        //renderInterval = setInterval(checkRender, 700);
 
         console.log("Street Vector Layer v. " + svlVersion + " initialized correctly.");
     }
