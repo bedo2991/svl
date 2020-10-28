@@ -93,10 +93,13 @@
     //splittedSpeedLimits;
 
     //End of global variable declaration
+    function isFarZoom(zoom = OLMap.zoom){
+        return zoom < FARZOOMTHRESHOLD;
+    }
 
     function svlGlobals() {
         OLMap = W.map.getOLMap();
-        farZoom = OLMap.zoom < FARZOOMTHRESHOLD;
+        farZoom = isFarZoom();
         svlVersion = GM_info.script.version;
         preferences = null;
 
@@ -670,7 +673,7 @@
         if (hasToBeSkipped(attributes.roadType)) {
             return [];
         }
-        farZoom = OLMap.zoom < FARZOOMTHRESHOLD;
+        farZoom = isFarZoom();
         points = attributes.geometry.components;
         pointList = attributes.geometry.getVertices(); //is an array
         simplified = new OpenLayers.Geometry.LineString(pointList).simplify(1.5).components;
@@ -2039,7 +2042,7 @@
     function addNodes(e) {
         //console.debug("Add Nodes");
         let myFeatures, i;
-        if (OLMap.zoom < FARZOOMTHRESHOLD) {
+        if (isFarZoom()) {
             console.warn("SVL: This event should not happen in far zoom");
             return;
         }
@@ -2096,9 +2099,9 @@
     function manageZoom(e) {
         console.log("manageZoom");
         const zoom = OLMap.zoom;
-        farZoom = zoom < FARZOOMTHRESHOLD;
-        let zoomChangedfromCloseToFar = lastRenderAtZoom < FARZOOMTHRESHOLD ? false : farZoom;
-        let zoomChangedfromFarToClose = lastRenderAtZoom >= FARZOOMTHRESHOLD ? false : !farZoom;
+        farZoom = isFarZoom();
+        let zoomChangedfromCloseToFar = isFarZoom(lastRenderAtZoom) ? false : farZoom;
+        let zoomChangedfromFarToClose = !isFarZoom(lastRenderAtZoom) ? false : !farZoom;
         if (zoomChangedfromCloseToFar) {
             clutterConstant = preferences.clutterCostantFarZoom;
             labelFontSize = preferences.farZoomLabelSize + "px";
@@ -2379,7 +2382,7 @@
 
     function initValues() {
         //TODO set farZoom
-        farZoom = OLMap.zoom < FARZOOMTHRESHOLD;
+        farZoom = isFarZoom();
         clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
         thresholdDistance = getThreshold();
         labelFontSize = (farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize) + "px";
