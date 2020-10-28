@@ -841,8 +841,8 @@
                 lineFeature = new OpenLayers.Feature.Vector(
                     new OpenLayers.Geometry.LineString(pointList), {
                     myId: attributes.id
-                },Object.assign({}, streetStyle[roadType]))
-                
+                }, Object.assign({}, streetStyle[roadType]));
+
                 //console.dir(lineFeature);
                 lineFeature.style.strokeWidth = width;
                 myFeatures.push(lineFeature);
@@ -1165,7 +1165,7 @@
     }
 
     function doDraw() {
-        if(OLMap.zoom < 2){
+        if (OLMap.zoom < 2) {
             console.warn("Tried to draw at bad zoom");
             return;
         }
@@ -1446,7 +1446,7 @@
         preferences.realsize = document.getElementById("realsize").checked;
 
         if (preferences.realsize) {
-            //Disable all width inputs.
+            //Disable all width inputs
             $('input.segmentsWidth').prop("disabled", true);
         } else {
             $('input.segmentsWidth').prop("disabled", false);
@@ -1463,7 +1463,7 @@
     }
 
     function rollbackDefault(dontask) {
-        if (dontask === true || confirm("Are you sure you want to rollback to the default style?\nANY CHANGE WILL BE LOST!")) {
+        if (dontask === true || confirm("Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!")) {
             saveDefaultPreferences();
             updateStylesFromPreferences(preferences);
             updatePreferenceValues();
@@ -1592,7 +1592,7 @@
         document.getElementById("showUnderGPSPoints").checked = preferences.showUnderGPSPoints;
         document.getElementById("routingModeEnabled").checked = preferences.routingModeEnabled;
         document.getElementById("showANs").checked = preferences.showANs;
-        
+
         //Speed limits
         document.getElementById("showSLtext").checked = preferences.showSLtext;
         document.getElementById("showSLcolor").checked = preferences.showSLcolor;
@@ -1923,6 +1923,19 @@
             description: "Show the speed limit by coloring the segment's outline."
         }));
 
+        for (let k = W.prefs.attributes.isImperial ? 9 : 15; k > 1; k -= 1) {
+            const span = document.createElement("span");
+            if (W.prefs.attributes.isImperial) {
+                span.style.color = `hsl(${getColorSpeed((k * 10 - 5) * 1.609344)},100%,50%)`;
+                span.innerText = k * 10 - 5;
+            } else {
+                span.style.color = `hsl(${getColorSpeed(k * 10)},100%,50%)`;
+                span.innerText = k * 10;
+            }
+            span.style.marginRight = "1pt";
+            speedLimits.appendChild(span);
+        }
+
         speedLimits.appendChild(createCheckboxOption({
             id: "showSLSinglecolor",
             title: "Show using Single Color",
@@ -1948,18 +1961,18 @@
         mainDiv.appendChild(subTitle);
 
         const utilityButtons = document.createElement("div");
-        utilityButtons.className="expand";
+        utilityButtons.className = "expand";
 
         const exportButton = document.createElement("button");
         exportButton.id = "svl_exportButton";
-        exportButton.type="button";
-        exportButton.innerText="Export";
+        exportButton.type = "button";
+        exportButton.innerText = "Export";
         exportButton.className = "btn btn-default";
 
         const importButton = document.createElement("button");
         importButton.id = "svl_importButton";
-        importButton.type="button";
-        importButton.innerText="Import";
+        importButton.type = "button";
+        importButton.innerText = "Import";
         importButton.className = "btn btn-default";
 
         utilityButtons.appendChild(importButton);
@@ -1979,23 +1992,7 @@
         document.getElementById("svl_resetButton").addEventListener("click", rollbackDefault);
         document.getElementById("svl_importButton").addEventListener("click", importPreferences);
         document.getElementById("svl_exportButton").addEventListener("click", exportPreferences);
-
-
-
-
-        return;
-
-        //TODO
-        $speedLimits.append($("<b>Reference colors</b>"));
-        $speedLimits.append("<br/>");
-        for (let k = W.prefs.attributes.isImperial ? 9 : 15; k > 1; k -= 1) {
-            if (W.prefs.attributes.isImperial) {
-                $speedLimits.append($('<span style="color:hsl(' + getColorSpeed((k * 10 - 5) * 1.609344) + ',100%,50%)">' + (k * 10 - 5) + ' </span>'));
-            } else {
-                $speedLimits.append($('<span style="color:hsl(' + getColorSpeed(k * 10) + ',100%,50%)">' + k * 10 + ' </span>'));
-            }
-        }
- }
+    }
 
     function removeNodeById(id) {
         nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute("myid", id));
@@ -2081,7 +2078,7 @@
         } else {
             if (nextRenderDeadline) {
                 console.log("rendering in " + (nextRenderDeadline - Date.now()) + " ms");
-                if(!renderInterval){
+                if (!renderInterval) {
                     removeSegmentsEvents();
                     renderInterval = setInterval(checkRender, 700);
                 }
@@ -2105,13 +2102,13 @@
         if (zoomChangedfromCloseToFar) {
             clutterConstant = preferences.clutterCostantFarZoom;
             labelFontSize = preferences.farZoomLabelSize + "px";
-            removeNodeEvents();            
-        }else if(zoomChangedfromFarToClose){
+            removeNodeEvents();
+        } else if (zoomChangedfromFarToClose) {
             clutterConstant = preferences.clutterCostantNearZoom;
             labelFontSize = preferences.closeZoomLabelSize + "px";
             registerNodeEvents();
         }
-        
+
         if (e) {
             console.log("was called because of a zoom event");
             //event: zoomEnd
@@ -2122,7 +2119,7 @@
             }
             lastZoom = e.object.zoom;
             nextRenderDeadline = Date.now() + 1400;
-            if(!renderInterval){
+            if (!renderInterval) {
                 renderInterval = setInterval(checkRender, 700);
             }
             return;
@@ -2141,7 +2138,7 @@
         if(svlWasPreviouslyDisabled)
             console.log("SVL was previously disabled");
         */
-  
+
         streetVector.destroyFeatures();
         nodesVector.destroyFeatures();
 
@@ -2150,7 +2147,7 @@
         //consoleDebug("Zoom: " + zoom);
         //Decide the SVL layer status
         lastRenderAtZoom = zoom;
-        if(svlWasPreviouslyDisabled){
+        if (svlWasPreviouslyDisabled) {
             if (streetVector.visibility === false && vectorAutomDisabled) {
                 vectorAutomDisabled = false;
                 //consoleDebug("Setting vector visibility to true");
@@ -2158,7 +2155,7 @@
                 streetVector.setVisibility(true);
                 document.getElementById("layer-switcher-item_street_vector_layer").checked = true;
                 document.getElementById("layer-switcher-item_road").checked = false;
-                if(preferences.disableRoadLayers){
+                if (preferences.disableRoadLayers) {
                     roadLayer.setVisibility(false);
                     document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
                 }
@@ -2188,8 +2185,7 @@
                     vectorAutomDisabled = true;
                     roadLayer.setVisibility(true);
                 }
-            }else
-            {
+            } else {
                 //Far zoom
                 thresholdDistance = getThreshold();
                 nodesVector.destroyFeatures();
