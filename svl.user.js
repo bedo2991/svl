@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.1
+// @version    4.9.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -14,9 +14,10 @@
 
 /*jslint browser: true*/
 /*jslint white: true */
-/*global W, OpenLayers, WazeWrap, GM_info.script*/
 /*jslint nomen: true */ //for variable starting with _
 /*jshint esversion: 6*/
+/* jshint nocomma:true, maxcomplexity: 10, freeze: true, forin: true, latedef: nofunc, curly: true, bitwise: true, undef: true, unused: true, browser: true, strict: true, devel:true*/
+/* globals I18n:false, W:false, OpenLayers:false, WazeWrap:false, GM_info:false, $:false, GM_setClipboard:false */
 
 
 //Code minifier: https://closure-compiler.appspot.com/home
@@ -99,6 +100,14 @@
         pointerEvents: "none"
     };
 
+    const nodeStyleDeadEnd = {
+        stroke: false,
+        fillColor: "#C31CFF",
+        fillOpacity: 0.9,
+        pointRadius: 2.5,
+        pointerEvents: "none"
+    };
+
     const unknownDirStyle = {
         graphicName: "x",
         strokeColor: "#f00",
@@ -166,9 +175,9 @@
         }
     }
 
+    //TODO
     function hasToBeSkipped(roadid) {
         return preferences.hideMinorRoads && OLMap.zoom === 3 && svlIgnoredStreets[roadid] === true;
-
     }
 
     function savePreferences(preferences) {
@@ -395,6 +404,11 @@
             //consoleDebug("Creating new preferences from default");
             saveDefaultPreferences();
             return false;
+        }else{
+            if(typeof preferences.dirty.strokeOpacity === "undefined" || preferences.dirty.strokeOpacity > 1)
+            {
+                preferences.dirty.strokeOpacity = 0.6;
+            }
         }
         return true;
     }
@@ -1160,9 +1174,15 @@
     function drawNode(model) {
         let point, pointFeature;
         point = new OpenLayers.Geometry.Point(model.attributes.geometry.x, model.attributes.geometry.y);
-        pointFeature = new OpenLayers.Feature.Vector(point, {
-            myid: model.attributes.id
-        }, nodeStyle);
+        if (model.attributes.segIDs?.length === 1) { // jshint ignore:line
+            pointFeature = new OpenLayers.Feature.Vector(point, {
+                myid: model.attributes.id
+            }, nodeStyleDeadEnd);
+        } else { // jshint ignore:line
+            pointFeature = new OpenLayers.Feature.Vector(point, {
+                myid: model.attributes.id
+            }, nodeStyle);
+        }
         return pointFeature;
     }
 
@@ -1187,12 +1207,12 @@
     }*/
 
     //TODO remove
-    function doDraw() {
-        if (OLMap.zoom < 2) {
-            console.warn("Tried to draw at bad zoom");
-            return;
-        }
-    }
+    // function doDraw() {
+    //     if (OLMap.zoom < 2) {
+    //         console.warn("Tried to draw at bad zoom");
+    //         return;
+    //     }
+    // }
 
     function updateStylesFromPreferences(preferences) {
         let i, len;
@@ -1300,7 +1320,7 @@
             document.getElementById("map").appendChild(routingModeDiv);
         } else {
             //Remove the routing panel
-            document.getElementById("routingModeDiv")?.remove();
+            document.getElementById("routingModeDiv")?.remove(); // jshint ignore:line
         }
     }
 
@@ -1452,9 +1472,32 @@
         return newSelect;
     }
 
+    function getLocalisedString(i) {
+        const locale = I18n.translations[I18n.locale];
+        console.log(locale.segment.road_types[i]);
+        switch (i) {
+            case "red":
+                return locale?.segment?.address?.none || i;
+            case "toll":
+                return locale?.edit?.segment?.fields?.toll_road || i;
+            case "restriction":
+                return locale?.restrictions?.modal_headers?.restriction_summary || i;
+            case "dirty":
+                return locale?.edit?.segment?.fields?.unpaved || i;
+            case "closure":
+                return locale?.objects?.roadClosure?.name || i;
+            case "headlights":
+                return locale?.edit?.segment?.fields?.headlights || i;
+                case "lanes":
+                    return locale?.objects?.lanes?.title || i;
+        }
+        return locale?.segment?.road_types[i] || i;
+
+    }
+
     function createStreetOptionLine(i, showWidth = true, showOpacity = false) {
         const title = document.createElement("h5");
-        title.innerText = svlStreetTypes[i] || i;
+        title.innerText = getLocalisedString(i);
 
         const color = document.createElement("input");
         color.id = "streetColor_" + i;
@@ -2000,6 +2043,10 @@
 
     function nodeStateDeleted(e) {
         //console.debug("Node state deleted");
+        for (let i = 0; i < e.length; i++) {
+            let n = e[i].attributes;
+            removeNodeById(n.id);
+        }
     }
 
     function segmentsStateDeleted(e) {
@@ -2038,7 +2085,7 @@
     }
 
 
-    function manageZoom(e) {
+    function manageZoom() {
         consoleDebug("manageZoom");
         const farZoom = isFarZoom();
         if (farZoom) {
@@ -2203,7 +2250,6 @@
             }
             manageZoom();
             redrawAllSegments();
-            //checkZoomLayer();
             //doDraw();
         } else {
             //SVL was disabled
@@ -2258,6 +2304,8 @@
         <br>- Added an option to render the streets based on their width;
         <br>- NEW: The width in the settings is now expressed in meters
         <br>- NEW: preference panel in the sidebar (SVL 🗺️)
+        <br>- NEW: road types in the preference panel are now localised
+        <br>- NEW: dead-end nodes are rendered with a different color
         <br>- NEW: Rendering completely rewritten: performance improvements
         <br>- Removed: the zoom-level indicator while editing the preferences
         <br>- Bug fixes and new bugs :)`);
@@ -2273,7 +2321,7 @@
 
     function initSVL(svlAttempts = 0) {
         //Initialize variables
-        let labelStyleMap, layerName, len, layers;
+        let labelStyleMap, layerName, layers;
         try {
             svlWazeBits();
         } catch (e) {
@@ -2296,7 +2344,7 @@
             alert("This is the first time that you run Street Vector Layer in this browser.\n" +
                 "Some info about it:\n" +
                 "By default, use ALT+L to toggle the layer.\n" +
-                "You can change the streets color, thickness and style by clicking on the attribution bar at the bottom of the editor.\n" +
+                "You can change the streets color, thickness and style using the panel on the left sidebar.\n" +
                 "Your preferences will be saved for the next time in your browser.\n" +
                 "The other road layers will be automatically hidden (you can change this behaviour in the preference panel).\n" +
                 "Have fun and tell us on the Waze forum if you liked the script!");
@@ -2633,7 +2681,7 @@
 
 
         //TODO remove in the next releases
-        $(".olControlAttribution").click(()=>{alert("The preferences have been moved to the sidebar on the left. Please look for the \"SVL 🗺️\" tab.");});
+        $(".olControlAttribution").click(() => { alert("The preferences have been moved to the sidebar on the left. Please look for the \"SVL 🗺️\" tab."); });
 
         console.log("Street Vector Layer v. " + GM_info.script.version + " initialized correctly.");
     }
