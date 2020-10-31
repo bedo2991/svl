@@ -2616,7 +2616,11 @@
         OLMap.addLayer(streetVector);
         OLMap.addLayer(labelsVector);
         OLMap.addLayer(nodesVector);
-        document.sv = streetVector;
+
+        if(localStorage.getItem("svlDebugOn") === "true"){
+            document.sv = streetVector;
+            document.nv = nodesVector;
+        }
 
 
 
