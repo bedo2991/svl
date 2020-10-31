@@ -168,6 +168,7 @@
         localStorage.setItem("svl", JSON.stringify(preferences));
     }
 
+
     function saveDefaultPreferences() {
         preferences = {};
 
@@ -177,7 +178,7 @@
 
         preferences.showSLSinglecolor = false;
         preferences.SLColor = "#ffdf00";
-        
+
         preferences.fakelock = WazeWrap?.User?.Rank() || 6; // jshint ignore:line
         preferences.hideMinorRoads = true;
         preferences.showDashedUnverifiedSL = true;
@@ -186,11 +187,10 @@
         preferences.version = GM_info.script.version;
         preferences.disableRoadLayers = true;
         preferences.startDisabled = false;
-        preferences.clutterCostantNearZoom = 400.0;
+        preferences.clutterConstant = 400;
         preferences.labelOutlineWidth = 3;
         preferences.closeZoomLabelSize = 11;
         preferences.farZoomLabelSize = 11;
-        preferences.clutterCostantFarZoom = 410.0;
         preferences.streets = [];
         //Street: 1
         preferences.streets[1] = {
@@ -388,6 +388,8 @@
             if (typeof preferences.dirty.strokeOpacity === "undefined" || preferences.dirty.strokeOpacity > 1) {
                 preferences.dirty.strokeOpacity = 0.6;
             }
+            clutterConstant = preferences.clutterConstant || 400;
+            thresholdDistance = getThreshold();
         }
         return true;
     }
@@ -534,7 +536,7 @@
 
             for (p = 0, len = simplified.length - 1; p < len; p += 1) {
                 distance = simplified[p].distanceTo(simplified[p + 1]);
-                if (thresholdDistance && distance >= thresholdDistance) {
+                if (distance >= thresholdDistance) {
                     //consoleDebug("Label can be inserted:");
                     //console.dir(address);
                     dx = 0;
@@ -818,7 +820,7 @@
                         new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
                         color: nonEditableStyle.strokeColor,
-                        width: width*0.15,
+                        width: width * 0.15,
                         dash: nonEditableStyle.strokeDashstyle,
                         zIndex: baselevel + 147
                     });
@@ -861,7 +863,7 @@
             myFeatures.push(lineFeature);
         }
 
-        if (attributes.fwdToll || attributes.revToll || attributes.restrictions.some(r=>r._defaultType === "TOLL") ) { //It is a toll road
+        if (attributes.fwdToll || attributes.revToll || attributes.restrictions.some(r => r._defaultType === "TOLL")) { //It is a toll road
             //consoleDebug("Segment is toll");
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {
@@ -1134,15 +1136,9 @@
     function drawNode(model) {
         let point, pointFeature;
         point = new OpenLayers.Geometry.Point(model.attributes.geometry.x, model.attributes.geometry.y);
-        if (model.attributes.segIDs?.length === 1) { // jshint ignore:line
-            pointFeature = new OpenLayers.Feature.Vector(point, {
-                myid: model.attributes.id
-            }, nodeStyleDeadEnd);
-        } else { // jshint ignore:line
-            pointFeature = new OpenLayers.Feature.Vector(point, {
-                myid: model.attributes.id
-            }, nodeStyle);
-        }
+        pointFeature = new OpenLayers.Feature.Vector(point, {
+            myid: model.attributes.id
+        }, getNodeStyle(model.attributes));
         return pointFeature;
     }
 
@@ -1190,15 +1186,11 @@
 
         //Rendering
         //Labels
-        //clutterCostantNearZoom = preferences.clutterCostantNearZoom;
-        //clutterCostantFarZoom = preferences.clutterCostantFarZoom;
-        const farZoom = isFarZoom();
-        clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
+        clutterConstant = preferences.clutterConstant;
         thresholdDistance = getThreshold();
 
         //ArrowDeclutter
         arrowDeclutter = preferences.arrowDeclutter;
-        labelOutlineWidth = preferences.labelOutlineWidth;
 
         labelOutlineWidth = preferences.labelOutlineWidth + "px";
         //showSLtext = preferences.showSLtext;
@@ -1357,8 +1349,7 @@
         preferences.autoReload.interval = document.getElementById("autoReload_interval").value * 1000;
         preferences.autoReload.enabled = document.getElementById("autoReload_enabled").checked;
 
-        preferences.clutterCostantNearZoom = document.getElementById("clutterCostantNearZoom").value;
-        preferences.clutterCostantFarZoom = document.getElementById("clutterCostantFarZoom").value;
+        preferences.clutterConstant = document.getElementById("clutterConstant").value;
 
         preferences.arrowDeclutter = document.getElementById("arrowDeclutter").value;
         preferences.labelOutlineWidth = document.getElementById("labelOutlineWidth").value;
@@ -1434,7 +1425,6 @@
 
     function getLocalisedString(i) {
         const locale = I18n.translations[I18n.locale];
-        console.log(locale.segment.road_types[i]);
         switch (i) {
             case "red":
                 return locale?.segment?.address?.none || i; // jshint ignore:line
@@ -1558,8 +1548,7 @@
         document.getElementById("hideMinorRoads").checked = preferences.hideMinorRoads;
         document.getElementById("autoReload_interval").value = preferences.autoReload.interval / 1000;
 
-        document.getElementById("clutterCostantNearZoom").value = preferences.clutterCostantNearZoom;
-        document.getElementById("clutterCostantFarZoom").value = preferences.clutterCostantFarZoom;
+        document.getElementById("clutterConstant").value = preferences.clutterConstant || 400;
         document.getElementById("closeZoomLabelSize").value = preferences.closeZoomLabelSize;
         document.getElementById("farZoomLabelSize").value = preferences.farZoomLabelSize;
         document.getElementById("arrowDeclutter").value = preferences.arrowDeclutter;
@@ -1806,6 +1795,13 @@
             description: "When enabled, the SVL does not get enabled automatically."
         }));
 
+        labels.appendChild(createRangeOption({
+            id: "clutterConstant",
+            title: "Street Names Density",
+            description: "For an higher value, less elements will be shown.",
+            min: 10, max: clutterMax, step: 1
+        }));
+
         const closeZoomTitle = document.createElement("h5");
         closeZoomTitle.innerText = "Close-zoom only";
 
@@ -1838,13 +1834,6 @@
         }));
 
         labels.appendChild(createRangeOption({
-            id: "clutterCostantNearZoom",
-            title: "Street Names Density",
-            description: "For an higher value, less elements will be shown.",
-            min: 10, max: clutterMax, step: 1
-        }));
-
-        labels.appendChild(createRangeOption({
             id: "closeZoomLabelSize",
             title: "Font Size",
             description: "Increase this value if you can't read the street names because they are too small.",
@@ -1863,13 +1852,6 @@
         const farZoomTitle = document.createElement("h5");
         farZoomTitle.innerText = "Far-zoom only";
         labels.appendChild(farZoomTitle);
-
-        labels.appendChild(createRangeOption({
-            id: "clutterCostantFarZoom",
-            title: "Street Names Density",
-            description: "For an higher value, less arrows will be shown.",
-            min: 10, max: clutterMax
-        }));
 
         labels.appendChild(createRangeOption({
             id: "farZoomLabelSize",
@@ -1983,16 +1965,24 @@
         return true;
     }
 
+    function getNodeStyle(attributes){
+        if(attributes.segIDs?.length===1) //jshint ignore:line
+        {
+            return nodeStyleDeadEnd;
+        }
+        return nodeStyle;
+    }
     function changeNodes(e) {
         consoleDebug("Change nodes");
-        for (let i = 0; i < e.length; i++) {
-            let node = e[i].attributes;
-            let nodeFeature = nodesVector.getFeaturesByAttribute("myid", node.id)[0];
+        for (let node of e) {
+            let attr = node.attributes;
+            let nodeFeature = nodesVector.getFeaturesByAttribute("myid", attr.id)[0];
             if (nodeFeature) {
-                nodeFeature.move(new OpenLayers.LonLat(node.geometry.x, node.geometry.y));
-            } else if (node.id > 0) {
+                nodeFeature.style = getNodeStyle(attr);
+                nodeFeature.move(new OpenLayers.LonLat(attr.geometry.x, attr.geometry.y));
+            } else if (attr.id > 0) {
                 //The node has just been saved
-                nodesVector.addFeatures(Array.of(drawNode(e[i])));
+                nodesVector.addFeatures(Array.of(drawNode(node)));
             }//Else it is a temporary node, we won't draw it.
         }
     }
@@ -2040,16 +2030,8 @@
         return !event.svl;
     }
 
-
-    function manageZoom() {
-        consoleDebug("manageZoom");
-        const farZoom = isFarZoom();
-        if (farZoom) {
-            clutterConstant = preferences.clutterCostantFarZoom;
-        } else {
-            clutterConstant = preferences.clutterCostantNearZoom;
-        }
-
+    function updateStatusBasedOnZoom(){
+        consoleDebug("updateStatusBasedOnZoom running");
         if (OLMap.zoom < 2) { //There is nothing to draw, enable road layer
             //consoleDebug("Road layer automatically enabled because of zoom out");
             //consoleDebug("Vector visibility: ", streetVector.visibility);
@@ -2069,6 +2051,14 @@
             SVLAutomDisabled = true;
             WMERoadLayer.setVisibility(false);
         }
+    }
+
+    let timer = null;
+    function manageZoom() {
+        //Event deferring
+        clearTimeout(timer);
+        consoleDebug("manageZoom clearing timer");
+        timer = setTimeout(updateStatusBasedOnZoom, 600);
     }
 
     function registerSegmentsEvents() {
@@ -2138,25 +2128,28 @@
         });
     }
 
-    function addSegments(e) {
+    /**
+     * Draws the given array of segments
+     *
+     * @param {[]} segments
+     */
+    function addSegments(segments) {
         consoleDebug("Add Segments");
-        let i, myFeatures;
-        /*e.sort(function (a, b) {
-            return (a.attributes.level - b.attributes.level);
-        });*/
-        myFeatures = [];
+        let myFeatures = [];
         //console.log("Size: " + e.length);
-        for (i = 0; i < e.length; i += 1) {
-            if (e[i] !== null) {
-                myFeatures = myFeatures.concat(drawSegment(e[i]));
+        for (let el of segments) {
+            if (el !== null) {
+                myFeatures = myFeatures.concat(drawSegment(el));
                 //myFeatures.push(...features);
             }
         }
-        streetVector.addFeatures(myFeatures);
+        if (myFeatures.length > 0) {
+            streetVector.addFeatures(myFeatures);
+        }
     }
 
     function removeSegmentById(id) {
-        //consoleDebug("RemoveById", id, typeof (id));
+        consoleDebug("RemoveSegmentById", id, typeof (id));
         streetVector.destroyFeatures(streetVector.getFeaturesByAttribute("myId", id));
         labelsVector.destroyFeatures(labelsVector.getFeaturesByAttribute("myId", id));
     }
@@ -2199,23 +2192,22 @@
         labelsVector.setVisibility(e.object.visibility);
         if (e.object.visibility) {
             //SVL was just enabled
-            //consoleDebug("Registering events");
+            consoleDebug("enabled: registering events");
             registerSegmentsEvents();
             if (!isFarZoom()) {
                 registerNodeEvents();
             }
-            manageZoom();
+            updateStatusBasedOnZoom();
             redrawAllSegments();
-            //doDraw();
         } else {
             //SVL was disabled
-            //consoleDebug("Unregistering events");
+            consoleDebug("disabled: unregistering events");
             removeSegmentsEvents();
             removeNodeEvents();
 
-            /*nodesVector.destroyFeatures();
+            nodesVector.destroyFeatures();
             labelsVector.destroyFeatures();
-            streetVector.destroyFeatures();*/
+            streetVector.destroyFeatures();
         }
     }
 
@@ -2273,9 +2265,6 @@
 
 
     function initValues() {
-        const farZoom = isFarZoom();
-        clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
-        thresholdDistance = getThreshold();
         labelOutlineWidth = preferences.labelOutlineWidth + "px";
     }
 
@@ -2598,20 +2587,18 @@
         OLMap.addLayer(labelsVector);
         OLMap.addLayer(nodesVector);
 
-        if(localStorage.getItem("svlDebugOn") === "true"){
+        if (localStorage.getItem("svlDebugOn") === "true") {
             document.sv = streetVector;
             document.nv = nodesVector;
         }
 
 
-
         streetVector.events.register("visibilitychanged", streetVector, manageVisibilityChanged);
-
-        //initialisation
+        //Trigger the event manually
         manageVisibilityChanged({
             object: streetVector
         });
-
+        //initialisation
         layers = OLMap.getLayersBy("uniqueName", "roads");
         WMERoadLayer = null;
         if (layers.length === 1) {
@@ -2620,12 +2607,11 @@
                 WMERoadLayer.setVisibility(true);
             } else if (WMERoadLayer.getVisibility() && preferences.disableRoadLayers) {
                 WMERoadLayer.setVisibility(false);
+                document.getElementById("layer-switcher-item_road").checked = false;
                 console.log("WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel.");
             }
         }
         SVLAutomDisabled = false;
-
-        OLMap.events.register("zoomend", null, manageZoom);
 
 
         if (preferences.showUnderGPSPoints) { //By default, WME places the GPS points under the layer, no need to move it.
@@ -2634,6 +2620,8 @@
 
         updateRoutingModePanel();
         updateRefreshStatus();
+
+        OLMap.events.register("zoomend", null, manageZoom, true);
 
         initWazeWrap();
 
@@ -2648,7 +2636,8 @@
 
     function bootstrapSVL(trials = 0) {
         // Check all requisites for the script
-        if (W === undefined || W.map === undefined) {
+
+        if (W === undefined || W.map === undefined || document.getElementById("layer-switcher-item_road") === null) {
             console.log("SVL not ready to start, retrying in 600ms");
             trials += 1;
             if (trials < 20) {
@@ -2661,5 +2650,6 @@
         /* begin running the code! */
         initSVL();
     }
+
     bootstrapSVL();
 }());
