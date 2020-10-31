@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.2
+// @version    4.9.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -26,7 +26,11 @@
     "use strict";
     const consoleDebug = localStorage.getItem("svlDebugOn") === "true" ? (...args) => {
         for (let i = 0; i < args.length; i++) {
-            console.dir(args[i]);
+            if (typeof args[i] === "string") {
+                console.log(`[SVL] ${GM_info.script.version}: ${args[i]}`);
+            } else {
+                console.dir(args[i]);
+            }
         }
     } : () => { };
 
@@ -129,19 +133,16 @@
 
     const nonEditableStyle = {
         strokeColor: "#000",
-        strokeWidth: 2,
+        //strokeWidth: 2, 20%
         strokeDashstyle: "solid",
     };
     const tunnelFlagStyle2 = {
         strokeColor: "#C90",
-        strokeWidth: 1,
-        graphicZIndex: 177,
         strokeDashstyle: "longdash",
     };
     const tunnelFlagStyle1 = {
         strokeColor: "#fff",
-        strokeWidth: 2,
-        graphicZIndex: 176,
+        strokeOpacity: 0.8,
         strokeDashstyle: "longdash",
     };
 
@@ -194,11 +195,8 @@
 
         preferences.showSLSinglecolor = false;
         preferences.SLColor = "#ffdf00";
-        if (WazeWrap && WazeWrap.User) {
-            preferences.fakelock = WazeWrap.User.Rank();
-        } else {
-            preferences.fakelock = 6;
-        }
+        
+        preferences.fakelock = WazeWrap?.User?.Rank() || 6; // jshint ignore:line
         preferences.hideMinorRoads = true;
         preferences.showDashedUnverifiedSL = true;
         preferences.showSLcolor = true;
@@ -404,9 +402,8 @@
             //consoleDebug("Creating new preferences from default");
             saveDefaultPreferences();
             return false;
-        }else{
-            if(typeof preferences.dirty.strokeOpacity === "undefined" || preferences.dirty.strokeOpacity > 1)
-            {
+        } else {
+            if (typeof preferences.dirty.strokeOpacity === "undefined" || preferences.dirty.strokeOpacity > 1) {
                 preferences.dirty.strokeOpacity = 0.6;
             }
         }
@@ -649,6 +646,7 @@
         const myFeatures = [];
         const baselevel = attributes.level * 100;
         const isTwoWay = attributes.fwdDirection && attributes.revDirection;
+        let width = 0;
         lineFeature = null;
         if (null === attributes.primaryStreetID) {
             //consoleDebug("RED segment", model);
@@ -661,7 +659,7 @@
             myFeatures.push(lineFeature);
         } else {
             let roadType = attributes.roadType;
-            const width = getWidth({
+            width = getWidth({
                 segmentWidth: attributes.width,
                 roadType: attributes.roadType,
                 twoWay: isTwoWay
@@ -831,25 +829,20 @@
                     });
                     myFeatures.push(lineFeature);
                 }
-                let u;
-                try {
-                    u = WazeWrap.User;
-                } catch (e) { }
-                if (u) {
-                    let currentLock = model.getLockRank() + 1;
-                    if (currentLock > preferences.fakelock || currentLock > u.Rank()) {
-                        lineFeature = new OpenLayers.Feature.Vector(
-                            new OpenLayers.Geometry.LineString(pointList), {
-                            myId: attributes.id,
-                            color: nonEditableStyle.strokeColor,
-                            width: nonEditableStyle.strokeWidth,
-                            dash: nonEditableStyle.strokeDashstyle,
-                            zIndex: baselevel + 130
-                        });
 
-                        myFeatures.push(lineFeature);
-                        locked = true;
-                    }
+                const currentLock = model.getLockRank() + 1;
+                if (currentLock > preferences.fakelock || currentLock > WazeWrap?.User?.Rank()) { // jshint ignore:line
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: nonEditableStyle.strokeColor,
+                        width: width*0.15,
+                        dash: nonEditableStyle.strokeDashstyle,
+                        zIndex: baselevel + 147
+                    });
+
+                    myFeatures.push(lineFeature);
+                    locked = true;
                 }
             }
 
@@ -886,36 +879,18 @@
             myFeatures.push(lineFeature);
         }
 
-        if (!locked && (attributes.fwdToll || attributes.revToll)) { //It is a toll road
+        if (attributes.fwdToll || attributes.revToll || attributes.restrictions.some(r=>r._defaultType === "TOLL") ) { //It is a toll road
             //consoleDebug("Segment is toll");
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {
                 myId: attributes.id,
                 color: preferences.toll.strokeColor,
-                width: preferences.toll.strokeWidth,
+                width: width * 0.2,//TODO preferences.toll.strokeWidth,
                 dash: preferences.toll.strokeDashstyle,
                 opacity: 0.9,
-                closeZoomOnly: true,
                 zIndex: baselevel + 145
             });
             myFeatures.push(lineFeature);
-        } else {
-            restr = attributes.restrictions;
-            for (i = 0; i < restr.length; i += 1) {
-                if (restr[i]._defaultType === "TOLL") { //If it has at least a "toll free" restriction
-                    lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
-                        myId: attributes.id,
-                        color: preferences.toll.strokeColor,
-                        width: preferences.toll.strokeWidth,
-                        dash: preferences.toll.strokeDashstyle,
-                        opacity: 0.9,
-                        closeZoomOnly: true,
-                        zIndex: baselevel + 145
-                    });
-                    myFeatures.push(lineFeature);
-                    break;
-                }
-            }
         }
 
         if (null !== attributes.junctionID) { //It is a roundabout
@@ -1138,16 +1113,19 @@
                 new OpenLayers.Geometry.LineString(pointList), {
                 myId: attributes.id,
                 color: tunnelFlagStyle1.strokeColor,
-                width: tunnelFlagStyle1.strokeWidth,
-                dash: tunnelFlagStyle1.strokeDashstyle
+                opacity: tunnelFlagStyle1.strokeOpacity,
+                width: width * 0.3,
+                dash: tunnelFlagStyle1.strokeDashstyle,
+                zIndex: baselevel + 177
             });
             myFeatures.push(lineFeature);
             lineFeature = new OpenLayers.Feature.Vector(
                 new OpenLayers.Geometry.LineString(pointList), {
                 myId: attributes.id,
                 color: tunnelFlagStyle2.strokeColor,
-                width: tunnelFlagStyle2.strokeWidth,
-                dash: tunnelFlagStyle2.strokeDashstyle
+                width: width * 0.1,
+                dash: tunnelFlagStyle2.strokeDashstyle,
+                zIndex: baselevel + 177
             });
             myFeatures.push(lineFeature);
         }
@@ -1488,8 +1466,8 @@
                 return locale?.objects?.roadClosure?.name || i;
             case "headlights":
                 return locale?.edit?.segment?.fields?.headlights || i;
-                case "lanes":
-                    return locale?.objects?.lanes?.title || i;
+            case "lanes":
+                return locale?.objects?.lanes?.title || i;
         }
         return locale?.segment?.road_types[i] || i;
 
@@ -1834,17 +1812,6 @@
             step: 1
         }));
 
-        const closeZoomTitle = document.createElement("h5");
-        closeZoomTitle.innerText = "Close-zoom only";
-
-        labels.appendChild(closeZoomTitle);
-
-        labels.appendChild(createCheckboxOption({
-            id: "renderGeomNodes",
-            title: "Render Geometry Nodes",
-            description: "When enabled, the geometry nodes are drawn, too."
-        }));
-
         labels.appendChild(createCheckboxOption({
             id: "disableRoadLayers",
             title: "Hide WME Road Layer",
@@ -1855,6 +1822,17 @@
             id: "startDisabled",
             title: "SVL Initially Disabled",
             description: "When enabled, the SVL does not get enabled automatically."
+        }));
+
+        const closeZoomTitle = document.createElement("h5");
+        closeZoomTitle.innerText = "Close-zoom only";
+
+        labels.appendChild(closeZoomTitle);
+
+        labels.appendChild(createCheckboxOption({
+            id: "renderGeomNodes",
+            title: "Render Geometry Nodes",
+            description: "When enabled, the geometry nodes are drawn, too."
         }));
 
         labels.appendChild(createCheckboxOption({
@@ -2024,11 +2002,7 @@
     }
 
     function changeNodes(e) {
-        //console.debug("Change nodes");
-        if (isFarZoom()) {
-            console.warn("SVL: This event should not happen in far zoom");
-            return;
-        }
+        consoleDebug("Change nodes");
         for (let i = 0; i < e.length; i++) {
             let node = e[i].attributes;
             let nodeFeature = nodesVector.getFeaturesByAttribute("myid", node.id)[0];
@@ -2042,7 +2016,7 @@
     }
 
     function nodeStateDeleted(e) {
-        //console.debug("Node state deleted");
+        consoleDebug("Node state deleted");
         for (let i = 0; i < e.length; i++) {
             let n = e[i].attributes;
             removeNodeById(n.id);
@@ -2057,7 +2031,7 @@
     }
 
     function addNodes(e) {
-        //console.debug("Add Nodes");
+        consoleDebug("Add Nodes");
         let myFeatures, i;
         myFeatures = [];
         for (i = 0; i < e.length; i += 1) {
@@ -2295,6 +2269,10 @@
         //Add the layer checkbox
         try {
             WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked) => { streetVector.setVisibility(checked); }, streetVector);
+            if (preferences.startDisabled) {
+                document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
+                streetVector.setVisibility(false);
+            }
         } catch (e) {
             console.error("SVL: could not add layer checkbox");
         }
@@ -2368,6 +2346,7 @@
             labelOutlineColor: "${outlinecolor}",
             labelOutlineWidth: "${outlinewidth}",
             label: "${label}",
+            visibility: preferences.startDisabled || true,
             angle: "${angle}",
             pointerEvents: "none",
             labelAlign: "cm" //set to center middle
@@ -2378,9 +2357,9 @@
             styleMap: roadStyleMap,
             uniqueName: "vectorStreet",
             accelerator: "toggle" + layerName.replace(/\s+/g, ''),
-            visibility: true,
+            visibility: preferences.startDisabled || true,
             isVector: true,
-            attribution: "Street Vector Layer",
+            attribution: "SVL v. " + GM_info.script.version,
             rendererOptions: {
                 zIndexing: true
             }
@@ -2388,18 +2367,14 @@
 
         streetVector.renderer.drawFeature =
             function (feature, style) {
-                if (OLMap.zoom < 2) {
-                    return false;
-                }
                 if (style == null) {
                     style = feature.style;
                 }
 
-
                 if (feature.geometry) {
                     //if (bounds) {
                     const farZoom = isFarZoom();
-                    if ((feature.attributes.closeZoomOnly && farZoom) || (feature.attributes.farZoomOnly && !farZoom)) {
+                    if (OLMap.zoom < 2 || (feature.attributes.closeZoomOnly && farZoom) || (feature.attributes.farZoomOnly && !farZoom)) {
                         style = { display: "none" };
                     }
                     else {
@@ -2426,13 +2401,15 @@
 
         nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
+            visibility: preferences.startDisabled || true,
             visibility: true,
         });
 
         nodesVector.renderer.drawFeature =
             function (feature, style) {
                 if (OLMap.zoom < 2) {
-                    return false;
+                    style = { display: "none" };
+                    return this.drawGeometry(feature.geometry, style, feature.id);
                 }
                 if (style == null) {
                     style = feature.style;
@@ -2665,10 +2642,6 @@
 
         OLMap.events.register("zoomend", null, manageZoom);
 
-        if (preferences.startDisabled) {
-            streetVector.setVisibility(false);
-            document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-        }
 
         if (preferences.showUnderGPSPoints) { //By default, WME places the GPS points under the layer, no need to move it.
             updateLayerPosition();
@@ -2678,6 +2651,8 @@
         updateRefreshStatus();
 
         initWazeWrap();
+
+
 
 
         //TODO remove in the next releases
