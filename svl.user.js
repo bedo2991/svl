@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.3.2
+// @version    4.9.3.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -1290,101 +1290,101 @@
         for (i = 0, len = preferences.streets.length; i < len; i += 1) {
             if (preferences.streets[i]) {
                 preferences.streets[i] = {};
-                preferences.streets[i].strokeColor = document.getElementById("streetColor_" + i).value;
-                preferences.streets[i].strokeWidth = document.getElementById("streetWidth_" + i).value;
-                preferences.streets[i].strokeDashstyle = document.querySelector(`#strokeDashstyle_${i} option:checked`).value;
+                preferences.streets[i].strokeColor = document.getElementById("svl_streetColor_" + i).value;
+                preferences.streets[i].strokeWidth = document.getElementById("svl_streetWidth_" + i).value;
+                preferences.streets[i].strokeDashstyle = document.querySelector(`#svl_strokeDashstyle_${i} option:checked`).value;
             }
         }
 
-        preferences.fakelock = document.getElementById("fakelock").value;
+        preferences.fakelock = document.getElementById("svl_fakelock").value;
 
 
         //Red
         preferences.red = {};
-        preferences.red.strokeColor = document.getElementById("streetColor_red").value;
-        preferences.red.strokeWidth = document.getElementById("streetWidth_red").value;
-        preferences.red.strokeDashstyle = document.querySelector("#strokeDashstyle_red option:checked").value;
+        preferences.red.strokeColor = document.getElementById("svl_streetColor_red").value;
+        preferences.red.strokeWidth = document.getElementById("svl_streetWidth_red").value;
+        preferences.red.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_red option:checked").value;
 
         //Dirty
         preferences.dirty = {};
-        preferences.dirty.strokeColor = document.getElementById("streetColor_dirty").value;
-        preferences.dirty.strokeOpacity = document.getElementById("streetOpacity_dirty").value / 100.0;
-        preferences.dirty.strokeDashstyle = document.querySelector("#strokeDashstyle_dirty option:checked").value;
+        preferences.dirty.strokeColor = document.getElementById("svl_streetColor_dirty").value;
+        preferences.dirty.strokeOpacity = document.getElementById("svl_streetOpacity_dirty").value / 100.0;
+        preferences.dirty.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_dirty option:checked").value;
 
         //Lanes
         preferences.lanes = {};
-        preferences.lanes.strokeColor = document.getElementById("streetColor_lanes").value;
-        preferences.lanes.strokeWidth = document.getElementById("streetWidth_lanes").value;
-        preferences.lanes.strokeDashstyle = document.querySelector("#strokeDashstyle_lanes option:checked").value;
+        preferences.lanes.strokeColor = document.getElementById("svl_streetColor_lanes").value;
+        preferences.lanes.strokeWidth = document.getElementById("svl_streetWidth_lanes").value;
+        preferences.lanes.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_lanes option:checked").value;
 
         //Toll
         preferences.toll = {};
-        preferences.toll.strokeColor = document.getElementById("streetColor_toll").value;
-        preferences.toll.strokeWidth = document.getElementById("streetWidth_toll").value;
-        preferences.toll.strokeDashstyle = document.querySelector("#strokeDashstyle_toll option:checked").value;
+        preferences.toll.strokeColor = document.getElementById("svl_streetColor_toll").value;
+        preferences.toll.strokeWidth = document.getElementById("svl_streetWidth_toll").value;
+        preferences.toll.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_toll option:checked").value;
 
         //Restrictions
         preferences.restriction = {};
-        preferences.restriction.strokeColor = document.getElementById("streetColor_restriction").value;
-        preferences.restriction.strokeWidth = document.getElementById("streetWidth_restriction").value;
-        preferences.restriction.strokeDashstyle = document.querySelector("#strokeDashstyle_restriction option:checked").value;
+        preferences.restriction.strokeColor = document.getElementById("svl_streetColor_restriction").value;
+        preferences.restriction.strokeWidth = document.getElementById("svl_streetWidth_restriction").value;
+        preferences.restriction.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_restriction option:checked").value;
 
         //Closures
         preferences.closure = {};
-        preferences.closure.strokeColor = document.getElementById("streetColor_closure").value;
-        preferences.closure.strokeWidth = document.getElementById("streetWidth_closure").value;
-        preferences.closure.strokeDashstyle = document.querySelector("#strokeDashstyle_closure option:checked").value;
+        preferences.closure.strokeColor = document.getElementById("svl_streetColor_closure").value;
+        preferences.closure.strokeWidth = document.getElementById("svl_streetWidth_closure").value;
+        preferences.closure.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_closure option:checked").value;
 
         //HeadlightsRequired
         preferences.headlights = {};
-        preferences.headlights.strokeColor = document.getElementById("streetColor_headlights").value;
-        preferences.headlights.strokeWidth = document.getElementById("streetWidth_headlights").value;
-        preferences.headlights.strokeDashstyle = document.querySelector("#strokeDashstyle_headlights option:checked").value;
+        preferences.headlights.strokeColor = document.getElementById("svl_streetColor_headlights").value;
+        preferences.headlights.strokeWidth = document.getElementById("svl_streetWidth_headlights").value;
+        preferences.headlights.strokeDashstyle = document.querySelector("#svl_strokeDashstyle_headlights option:checked").value;
 
         //AutoReload
         preferences.autoReload = {};
-        preferences.autoReload.interval = document.getElementById("autoReload_interval").value * 1000;
-        preferences.autoReload.enabled = document.getElementById("autoReload_enabled").checked;
+        preferences.autoReload.interval = document.getElementById("svl_autoReload_interval").value * 1000;
+        preferences.autoReload.enabled = document.getElementById("svl_autoReload_enabled").checked;
 
-        preferences.clutterConstant = document.getElementById("clutterConstant").value;
+        preferences.clutterConstant = document.getElementById("svl_clutterConstant").value;
 
-        preferences.arrowDeclutter = document.getElementById("arrowDeclutter").value;
-        preferences.labelOutlineWidth = document.getElementById("labelOutlineWidth").value;
-        preferences.disableRoadLayers = document.getElementById("disableRoadLayers").checked;
-        preferences.startDisabled = document.getElementById("startDisabled").checked;
+        preferences.arrowDeclutter = document.getElementById("svl_arrowDeclutter").value;
+        preferences.labelOutlineWidth = document.getElementById("svl_labelOutlineWidth").value;
+        preferences.disableRoadLayers = document.getElementById("svl_disableRoadLayers").checked;
+        preferences.startDisabled = document.getElementById("svl_startDisabled").checked;
 
-        preferences.showSLtext = document.getElementById("showSLtext").checked;
-        preferences.showSLcolor = document.getElementById("showSLcolor").checked;
-        preferences.showSLSinglecolor = document.getElementById("showSLSinglecolor").checked;
-        preferences.SLColor = document.getElementById("SLColor").value;
+        preferences.showSLtext = document.getElementById("svl_showSLtext").checked;
+        preferences.showSLcolor = document.getElementById("svl_showSLcolor").checked;
+        preferences.showSLSinglecolor = document.getElementById("svl_showSLSinglecolor").checked;
+        preferences.SLColor = document.getElementById("svl_SLColor").value;
 
-        preferences.hideMinorRoads = document.getElementById("hideMinorRoads").checked;
-        preferences.showDashedUnverifiedSL = document.getElementById("showDashedUnverifiedSL").checked;
-        preferences.farZoomLabelSize = document.getElementById("farZoomLabelSize").value;
-        preferences.closeZoomLabelSize = document.getElementById("closeZoomLabelSize").value;
+        preferences.hideMinorRoads = document.getElementById("svl_hideMinorRoads").checked;
+        preferences.showDashedUnverifiedSL = document.getElementById("svl_showDashedUnverifiedSL").checked;
+        preferences.farZoomLabelSize = document.getElementById("svl_farZoomLabelSize").value;
+        preferences.closeZoomLabelSize = document.getElementById("svl_closeZoomLabelSize").value;
 
-        preferences.renderGeomNodes = document.getElementById("renderGeomNodes").checked;
+        preferences.renderGeomNodes = document.getElementById("svl_renderGeomNodes").checked;
 
         //Check if showUnderGPSPoints has been toggled
-        if (preferences.showUnderGPSPoints !== document.getElementById("showUnderGPSPoints").checked) {
+        if (preferences.showUnderGPSPoints !== document.getElementById("svl_showUnderGPSPoints").checked) {
             //This value has been updated, change the layer positions.
-            preferences.showUnderGPSPoints = document.getElementById("showUnderGPSPoints").checked;
+            preferences.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked;
             updateLayerPosition();
         } else {
-            preferences.showUnderGPSPoints = document.getElementById("showUnderGPSPoints").checked;
+            preferences.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked;
         }
 
         //Check if routing mode has been toggled
-        if (preferences.routingModeEnabled !== document.getElementById("routingModeEnabled").checked) {
+        if (preferences.routingModeEnabled !== document.getElementById("svl_routingModeEnabled").checked) {
             //This value has been updated, change the layer positions.
-            preferences.routingModeEnabled = document.getElementById("routingModeEnabled").checked;
+            preferences.routingModeEnabled = document.getElementById("svl_routingModeEnabled").checked;
             updateRoutingModePanel();
         } else {
-            preferences.routingModeEnabled = document.getElementById("routingModeEnabled").checked;
+            preferences.routingModeEnabled = document.getElementById("svl_routingModeEnabled").checked;
         }
 
-        preferences.showANs = document.getElementById("showANs").checked;
-        preferences.realsize = document.getElementById("realsize").checked;
+        preferences.showANs = document.getElementById("svl_showANs").checked;
+        preferences.realsize = document.getElementById("svl_realsize").checked;
 
         if (preferences.realsize) {
             //Disable all width inputs
@@ -1415,7 +1415,7 @@
         let newSelect = document.createElement("select");
         newSelect.className = "prefElement";
         newSelect.title = "Stroke style";
-        newSelect.id = id;
+        newSelect.id = "svl_"+id;
         newSelect.innerHTML = "<option value=\"solid\">Solid</option><option value=\"dash\">Dashed</option><option value=\"dashdot\">Dash Dot</option><option value=\"longdash\">Long Dash</option><option value=\"longdashdot\">Long Dash Dot</option><option value=\"dot\">Dot</option>";
         return newSelect;
     }
@@ -1447,7 +1447,7 @@
         title.innerText = getLocalisedString(i);
 
         const color = document.createElement("input");
-        color.id = "streetColor_" + i;
+        color.id = "svl_streetColor_" + i;
         color.className = "prefElement form-control";
         color.style.width = "55pt";
         color.title = "Color";
@@ -1457,7 +1457,7 @@
 
         if (showWidth) {
             const width = document.createElement("input");
-            width.id = "streetWidth_" + i;
+            width.id = "svl_streetWidth_" + i;
             width.className = Number.isInteger(i) ? "form-control prefElement segmentsWidth" : "form-control prefElement";
             width.style.width = "40pt";
             width.title = "Width (in meters)";
@@ -1469,7 +1469,7 @@
 
         if (showOpacity) {
             const opacity = document.createElement("input");
-            opacity.id = "streetOpacity_" + i;
+            opacity.id = "svl_streetOpacity_" + i;
             opacity.className = "form-control prefElement";
             opacity.style.width = "40pt";
             opacity.title = "Opacity";
@@ -1515,53 +1515,53 @@
         for (let i = 0, len = preferences.streets.length; i < len; i++) {
 
             if (preferences.streets[i]) {
-                document.getElementById("streetWidth_" + i).value = preferences.streets[i].strokeWidth;
-                document.getElementById("streetColor_" + i).value = preferences.streets[i].strokeColor;
-                document.getElementById("strokeDashstyle_" + i).value = preferences.streets[i].strokeDashstyle;
+                document.getElementById("svl_streetWidth_" + i).value = preferences.streets[i].strokeWidth;
+                document.getElementById("svl_streetColor_" + i).value = preferences.streets[i].strokeColor;
+                document.getElementById("svl_strokeDashstyle_" + i).value = preferences.streets[i].strokeDashstyle;
             }
         }
 
         const options = getOptions();
         for (let o of options.streets) {
-            document.getElementById("streetWidth_" + o).value = preferences[o].strokeWidth;
-            document.getElementById("streetColor_" + o).value = preferences[o].strokeColor;
-            document.getElementById("strokeDashstyle_" + o).value = preferences[o].strokeDashstyle;
+            document.getElementById("svl_streetWidth_" + o).value = preferences[o].strokeWidth;
+            document.getElementById("svl_streetColor_" + o).value = preferences[o].strokeColor;
+            document.getElementById("svl_strokeDashstyle_" + o).value = preferences[o].strokeDashstyle;
         }
 
         for (let o of options.decorations) {
             if (o === "dirty") {
-                document.getElementById("streetOpacity_" + o).value = preferences[o].strokeOpacity * 100.0;
+                document.getElementById("svl_streetOpacity_" + o).value = preferences[o].strokeOpacity * 100.0;
             } else {
-                document.getElementById("streetWidth_" + o).value = preferences[o].strokeWidth;
+                document.getElementById("svl_streetWidth_" + o).value = preferences[o].strokeWidth;
             }
-            document.getElementById("streetColor_" + o).value = preferences[o].strokeColor;
-            document.getElementById("strokeDashstyle_" + o).value = preferences[o].strokeDashstyle;
+            document.getElementById("svl_streetColor_" + o).value = preferences[o].strokeColor;
+            document.getElementById("svl_strokeDashstyle_" + o).value = preferences[o].strokeDashstyle;
         }
 
-        document.getElementById("fakelock").value = WazeWrap && WazeWrap.User ? WazeWrap.User.Rank() : 7;
-        document.getElementById("autoReload_enabled").checked = preferences.autoReload.enabled;
-        document.getElementById("renderGeomNodes").checked = preferences.renderGeomNodes;
-        document.getElementById("labelOutlineWidth").value = preferences.labelOutlineWidth;
-        document.getElementById("hideMinorRoads").checked = preferences.hideMinorRoads;
-        document.getElementById("autoReload_interval").value = preferences.autoReload.interval / 1000;
+        document.getElementById("svl_fakelock").value = WazeWrap && WazeWrap.User ? WazeWrap.User.Rank() : 7;
+        document.getElementById("svl_autoReload_enabled").checked = preferences.autoReload.enabled;
+        document.getElementById("svl_renderGeomNodes").checked = preferences.renderGeomNodes;
+        document.getElementById("svl_labelOutlineWidth").value = preferences.labelOutlineWidth;
+        document.getElementById("svl_hideMinorRoads").checked = preferences.hideMinorRoads;
+        document.getElementById("svl_autoReload_interval").value = preferences.autoReload.interval / 1000;
 
-        document.getElementById("clutterConstant").value = preferences.clutterConstant || 400;
-        document.getElementById("closeZoomLabelSize").value = preferences.closeZoomLabelSize;
-        document.getElementById("farZoomLabelSize").value = preferences.farZoomLabelSize;
-        document.getElementById("arrowDeclutter").value = preferences.arrowDeclutter;
-        document.getElementById("disableRoadLayers").checked = preferences.disableRoadLayers;
-        document.getElementById("startDisabled").checked = preferences.startDisabled;
-        document.getElementById("showUnderGPSPoints").checked = preferences.showUnderGPSPoints;
-        document.getElementById("routingModeEnabled").checked = preferences.routingModeEnabled;
-        document.getElementById("showANs").checked = preferences.showANs;
+        document.getElementById("svl_clutterConstant").value = preferences.clutterConstant || 400;
+        document.getElementById("svl_closeZoomLabelSize").value = preferences.closeZoomLabelSize;
+        document.getElementById("svl_farZoomLabelSize").value = preferences.farZoomLabelSize;
+        document.getElementById("svl_arrowDeclutter").value = preferences.arrowDeclutter;
+        document.getElementById("svl_disableRoadLayers").checked = preferences.disableRoadLayers;
+        document.getElementById("svl_startDisabled").checked = preferences.startDisabled;
+        document.getElementById("svl_showUnderGPSPoints").checked = preferences.showUnderGPSPoints;
+        document.getElementById("svl_routingModeEnabled").checked = preferences.routingModeEnabled;
+        document.getElementById("svl_showANs").checked = preferences.showANs;
 
         //Speed limits
-        document.getElementById("showSLtext").checked = preferences.showSLtext;
-        document.getElementById("showSLcolor").checked = preferences.showSLcolor;
-        document.getElementById("showSLSinglecolor").checked = preferences.showSLSinglecolor;
-        document.getElementById("showDashedUnverifiedSL").checked = preferences.showDashedUnverifiedSL;
-        document.getElementById("SLColor").value = preferences.SLColor;
-        document.getElementById("realsize").checked = preferences.realsize;
+        document.getElementById("svl_showSLtext").checked = preferences.showSLtext;
+        document.getElementById("svl_showSLcolor").checked = preferences.showSLcolor;
+        document.getElementById("svl_showSLSinglecolor").checked = preferences.showSLSinglecolor;
+        document.getElementById("svl_showDashedUnverifiedSL").checked = preferences.showDashedUnverifiedSL;
+        document.getElementById("svl_SLColor").value = preferences.SLColor;
+        document.getElementById("svl_realsize").checked = preferences.realsize;
 
         const segmentWidhts = document.querySelectorAll(".segmentsWidth");
         segmentWidhts.forEach(el => { el.disabled = preferences.realsize; });
@@ -1576,7 +1576,7 @@
         const input = document.createElement("input");
         input.className = "prefElement";
         input.title = "True or False";
-        input.id = id;
+        input.id = "svl_"+id;
         input.type = "checkbox";
         input.checked = preferences[id];
 
@@ -1599,7 +1599,7 @@
         const input = document.createElement("input");
         input.className = "prefElement form-control";
         input.title = "Insert a number";
-        input.id = id;
+        input.id = "svl_" + id;
         input.type = "number";
 
         input.min = min;
@@ -1627,7 +1627,7 @@
         const input = document.createElement("input");
         input.className = "prefElement form-control";
         input.title = "Pick a value using the slider";
-        input.id = id;
+        input.id = "svl_" + id;
         input.type = "range";
 
         input.min = min;
@@ -1666,7 +1666,7 @@
         summary{font-weight:bold}</style>`;
         document.body.appendChild(style);
         const mainDiv = document.createElement("div");
-        mainDiv.id = "PrefDiv";
+        //mainDiv.id = "svl_PrefDiv";
 
         const saveButton = document.createElement("button");
         saveButton.id = "svl_saveNewPref";
@@ -1900,7 +1900,7 @@
         const colorPicker = document.createElement("input");
         colorPicker.type = "color";
         colorPicker.className = "prefElement form-control";
-        colorPicker.id = "SLColor";
+        colorPicker.id = "svl_SLColor";
         speedLimits.appendChild(colorPicker);
 
         speedLimits.appendChild(createCheckboxOption({
@@ -2040,6 +2040,7 @@
                 SVLAutomDisabled = true;
                 WMERoadLayer.setVisibility(true);
             }
+            return false;
         } else if (SVLAutomDisabled) {
             SVLAutomDisabled = false;
             streetVector.setVisibility(true);
@@ -2047,6 +2048,7 @@
             document.getElementById("layer-switcher-item_road").checked = false;
             SVLAutomDisabled = true;
             WMERoadLayer.setVisibility(false);
+            return true;
         }
     }
 
@@ -2100,6 +2102,7 @@
         events.objectschanged = events.objectschanged.filter(removeSVLEvents);
         events["objects-state-deleted"] = events["objects-state-deleted"].filter(removeSVLEvents);
     }
+
     function registerNodeEvents() {
         consoleDebug("SVL: Registering node events");
         const events = W.model.nodes._events;
@@ -2191,11 +2194,13 @@
             //SVL was just enabled
             consoleDebug("enabled: registering events");
             registerSegmentsEvents();
-            if (!isFarZoom()) {
-                registerNodeEvents();
+            registerNodeEvents();
+            let res = updateStatusBasedOnZoom();
+            if(res === false){
+                alert("Please Zoom-in to enable the Street Vector Layer");
+            }else{
+                redrawAllSegments();
             }
-            updateStatusBasedOnZoom();
-            redrawAllSegments();
         } else {
             //SVL was disabled
             consoleDebug("disabled: unregistering events");
@@ -2587,11 +2592,6 @@
         }
 
 
-        streetVector.events.register("visibilitychanged", streetVector, manageVisibilityChanged);
-        //Trigger the event manually
-        manageVisibilityChanged({
-            object: streetVector
-        });
         //initialisation
         layers = OLMap.getLayersBy("uniqueName", "roads");
         WMERoadLayer = null;
@@ -2619,8 +2619,11 @@
 
         initWazeWrap();
 
-
-
+        streetVector.events.register("visibilitychanged", streetVector, manageVisibilityChanged);
+        //Trigger the event manually
+        manageVisibilityChanged({
+            object: streetVector
+        });
 
         //TODO remove in the next releases
         $(".olControlAttribution").click(() => { alert("The preferences have been moved to the sidebar on the left. Please look for the \"SVL 🗺️\" tab."); });
