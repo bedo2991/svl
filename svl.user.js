@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.3.1
+// @version    4.9.3.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -43,7 +43,6 @@
         streetVector,
         nodesVector,
         labelsVector,
-        labelOutlineWidth,
         arrowDeclutter,
         preferences,
         WMERoadLayer,
@@ -82,7 +81,7 @@
         stroke: false,
         fillColor: "#0015FF",
         fillOpacity: 0.9,
-        pointRadius: 2.5,
+        pointRadius: 3,
         pointerEvents: "none"
     };
 
@@ -90,7 +89,7 @@
         stroke: false,
         fillColor: "#C31CFF",
         fillOpacity: 0.9,
-        pointRadius: 2.5,
+        pointRadius: 3,
         pointerEvents: "none"
     };
 
@@ -362,17 +361,16 @@
 
     function getWidth({ segmentWidth, roadType, twoWay }) {
         //If in close zoom and user enabled the realsize mode
-        if (false) {
+        if (preferences.realsize) {
             //If the segment has a widht set, use it
             if (segmentWidth) {
-                return (twoWay ? segmentWidth : (segmentWidth / 2.0)) / OLMap.resolution;
+                return (twoWay ? segmentWidth : (segmentWidth * 0.6));
             } else {
-                return (twoWay ? defaultSegmentWidhtMeters[roadType] : (defaultSegmentWidhtMeters[roadType] / 2.0)) / OLMap.resolution;
+                return (twoWay ? defaultSegmentWidhtMeters[roadType] : (defaultSegmentWidhtMeters[roadType] * 0.6));
             }
         } else {
             //Use the value stored in the preferences //TODO: parseInt should not be needed
-            const prefInt = parseInt(streetStyles[roadType].strokeWidth, 10);
-            return (!twoWay && preferences.realsize) ? prefInt * 0.6 : prefInt;
+            return parseInt(streetStyles[roadType].strokeWidth, 10);
         }
     }
 
@@ -453,39 +451,37 @@
 
     function drawLabels(model, simplified, delayed = false) {
         //consoleDebug("drawLabels");
-        let labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
-            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, doubleLabelDistance, ANsShown, i, altStreet, altStreetPart;
-        labels = [];
+        let labelFeature, labelText, dx, dy, centroid, directionArrow, streetNameThresholdDistance, p0, p1, doubleLabelDistance, altStreetPart;
+        const labels = [];
         labelFeature = null;
-        attributes = model.attributes;
-        address = model.getAddress();
-        //consoleDebug(address, attributes);
+        const attributes = model.attributes;
+        const address = model.getAddress();
         if (attributes.primaryStreetID !== null && address.attributes.state === undefined) {
-            //console.error("NOT READY");
+            consoleDebug("Address not ready", address, attributes);
             setTimeout(function () {
                 drawLabels(model, simplified, true);
             }, 500);
-        } else /*if ((preferences.showSLtext && attributes.fwdMaxSpeed | attributes.revMaxSpeed) || (address.street && !address.street.isEmpty))*/ {
-            //maxDistance = 0;
-            //maxDistanceIndex = -1;
-            address = address.attributes;
-            streetPart = ((address.street !== null && !address.street.isEmpty) ? address.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
+        } else {
+            let addressAttributes = address.attributes;
+            let streetPart = ((addressAttributes.street !== null && !addressAttributes.street.isEmpty) ? addressAttributes.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
             //consoleDebug("Streetpart:" +streetPart);
 
             // add alt street names
             altStreetPart = "";
             if (preferences.showANs) {
-                for (i = 0, ANsShown = 0; i < attributes.streetIDs.length; i++) {
+                let ANsShown = 0;
+                for (let streetID of attributes.streetIDs) {
                     if (ANsShown === 2) {//Show maximum 2 alternative names
                         altStreetPart += " …";
                         break;
                     }
-                    altStreet = model.model.streets.objects[attributes.streetIDs[i]];
-                    if (altStreet && altStreet.name !== address.street.name) {
+                    let altStreet = model.model.streets.objects[streetID];
+                    if (altStreet && altStreet.name !== addressAttributes.street.name) {
                         ANsShown++;
                         altStreetPart += (altStreet.name ? "(" + altStreet.name + ")" : "");
                     }
                 }
+
                 altStreetPart = altStreetPart.replace(")(", ", ");
                 if (altStreetPart != "") {
                     altStreetPart = "\n" + altStreetPart;
@@ -495,8 +491,8 @@
             if (!streetStyles[attributes.roadType]) {
                 streetPart += "\n!! UNSUPPORTED ROAD TYPE !!";
             }
-            speedPart = "";
-            speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed;
+            let speedPart = "";
+            let speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed;
             if (speed && preferences.showSLtext) {
                 if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
                     speedPart = getSuperScript(attributes.fwdMaxSpeed);
@@ -530,12 +526,13 @@
                 myId: attributes.id,
                 color: streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].strokeColor : "#f00",
                 outlinecolor: streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].outlineColor : "#fff",
-                outlinewidth: labelOutlineWidth
+                outlinewidth: preferences.labelOutlineWidth
             });
 
 
-            for (p = 0, len = simplified.length - 1; p < len; p += 1) {
-                distance = simplified[p].distanceTo(simplified[p + 1]);
+            const len = simplified.length - 1;
+            for (let p = 0; p < len; p += 1) {
+                const distance = simplified[p].distanceTo(simplified[p + 1]);
                 if (distance >= thresholdDistance) {
                     //consoleDebug("Label can be inserted:");
                     //console.dir(address);
@@ -562,8 +559,8 @@
                             dx = p0.x - p1.x;
                             dy = p0.y - p1.y;
                         }
-                        angle = Math.atan2(dx, dy);
-                        degrees = 90 + angle * 180 / Math.PI;
+                        const angle = Math.atan2(dx, dy);
+                        let degrees = 90 + angle * 180 / Math.PI;
                         directionArrow = " ▶ ";
                         if (degrees > 90 && degrees < 270) {
                             degrees -= 180;
@@ -779,7 +776,7 @@
                                 new OpenLayers.Geometry.LineString(pointList), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(speedValue),
-                                width: width + 2,
+                                width: width + 2.5,
                                 dash: speedStrokeStyle,
                                 closeZoomOnly: true,
                                 zIndex: baselevel + 115
@@ -1192,7 +1189,7 @@
         //ArrowDeclutter
         arrowDeclutter = preferences.arrowDeclutter;
 
-        labelOutlineWidth = preferences.labelOutlineWidth + "px";
+        //labelOutlineWidth = preferences.labelOutlineWidth;
         //showSLtext = preferences.showSLtext;
         //showSLcolor = preferences.showSLcolor;
 
@@ -1965,8 +1962,8 @@
         return true;
     }
 
-    function getNodeStyle(attributes){
-        if(attributes.segIDs?.length===1) //jshint ignore:line
+    function getNodeStyle(attributes) {
+        if (attributes.segIDs?.length === 1) //jshint ignore:line
         {
             return nodeStyleDeadEnd;
         }
@@ -2030,7 +2027,7 @@
         return !event.svl;
     }
 
-    function updateStatusBasedOnZoom(){
+    function updateStatusBasedOnZoom() {
         consoleDebug("updateStatusBasedOnZoom running");
         if (OLMap.zoom < 2) { //There is nothing to draw, enable road layer
             //consoleDebug("Road layer automatically enabled because of zoom out");
@@ -2264,10 +2261,6 @@
     }
 
 
-    function initValues() {
-        labelOutlineWidth = preferences.labelOutlineWidth + "px";
-    }
-
     function initSVL(svlAttempts = 0) {
         //Initialize variables
         let labelStyleMap, layerName, layers;
@@ -2299,7 +2292,6 @@
                 "Have fun and tell us on the Waze forum if you liked the script!");
         }
 
-        initValues();
 
         const roadStyleMap = new OpenLayers.StyleMap({
             pointerEvents: "none",
@@ -2357,7 +2349,7 @@
 
                             style.pointerEvents = "none";
                             if (!farZoom) {
-                                if (!feature.attributes.isArrow) {
+                                if (!feature.attributes.isArrow && preferences.realsize) {
                                     style.strokeWidth = style.strokeWidth / OLMap.resolution;
                                 }
                             }
@@ -2398,7 +2390,9 @@
                             style = { display: "none" };
                         } else {
                             this.featureDx = 0;
-                            style.pointRadius = style.pointRadius / OLMap.resolution;
+                            if (preferences.realsize) {
+                                style.pointRadius = style.pointRadius / OLMap.resolution;
+                            }
                         }
                     } else {
                         style = { display: "none" };
@@ -2438,7 +2432,7 @@
                         } else {
                             this.featureDx = 0;
                             style.pointerEvents = "none";
-                            style.fontSize = (farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize) + "px";
+                            style.fontSize = farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize;
                         }
                     }
 
@@ -2637,6 +2631,7 @@
     function bootstrapSVL(trials = 0) {
         // Check all requisites for the script
 
+        //TODO: to make loading faster, the document.getElementById can run later
         if (W === undefined || W.map === undefined || document.getElementById("layer-switcher-item_road") === null) {
             console.log("SVL not ready to start, retrying in 600ms");
             trials += 1;
