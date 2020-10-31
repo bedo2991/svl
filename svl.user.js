@@ -4,7 +4,7 @@
 // @version    4.9.3.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
-// @downloadURL  https://github.com/bedo2991/svl/raw/development/svl.user.js
+// @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
 // @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
 // @require    https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
 // @author     bedo2991
