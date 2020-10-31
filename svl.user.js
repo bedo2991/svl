@@ -64,26 +64,6 @@
         22: true,
     };
 
-    const svlStreetTypes = {
-        1: "Street",
-        2: "Primary Street",
-        3: "Freeway",
-        4: "Ramp",
-        5: "Walking Trail",
-        6: "Major Highway",
-        7: "Minor Highway",
-        8: "Off-road / Not maintained",
-        10: "Pedestrian Boardwalk",
-        15: "Ferry",
-        16: "Stairway",
-        17: "Private Road",
-        18: "Railroad",
-        19: "Runway",
-        20: "Parking Lot Road",
-        22: "Alley"
-        /*"service": 21,*/
-    };
-
     //Styles that are not changeable in the preferences:
     const validatedStyle = {
         strokeColor: "#F53BFF",
@@ -635,8 +615,8 @@
 
     function drawSegment(model) {
         //consoleDebug("DrawSegment");
-        let i, lineFeature, locked, speed,
-            speedStrokeStyle, speedValue, restr, simplifiedPoints, arrowFeature, p, len, dx, dy, labels,
+        let lineFeature, locked, speed,
+            speedStrokeStyle, speedValue, simplifiedPoints, arrowFeature, p, len, dx, dy, labels,
             left, right, k, pk, pk1, offset, m, mb, temp,
             step, degrees, segmentLenght, minDistance, segmentLineString,
             numPoints, stepx, stepy, px, py, ix; //dx, dy
@@ -1457,21 +1437,21 @@
         console.log(locale.segment.road_types[i]);
         switch (i) {
             case "red":
-                return locale?.segment?.address?.none || i;
+                return locale?.segment?.address?.none || i; // jshint ignore:line
             case "toll":
-                return locale?.edit?.segment?.fields?.toll_road || i;
+                return locale?.edit?.segment?.fields?.toll_road || i; // jshint ignore:line
             case "restriction":
-                return locale?.restrictions?.modal_headers?.restriction_summary || i;
+                return locale?.restrictions?.modal_headers?.restriction_summary || i; // jshint ignore:line
             case "dirty":
-                return locale?.edit?.segment?.fields?.unpaved || i;
+                return locale?.edit?.segment?.fields?.unpaved || i; // jshint ignore:line
             case "closure":
-                return locale?.objects?.roadClosure?.name || i;
+                return locale?.objects?.roadClosure?.name || i; // jshint ignore:line
             case "headlights":
-                return locale?.edit?.segment?.fields?.headlights || i;
+                return locale?.edit?.segment?.fields?.headlights || i; // jshint ignore:line
             case "lanes":
-                return locale?.objects?.lanes?.title || i;
+                return locale?.objects?.lanes?.title || i; // jshint ignore:line
         }
-        return locale?.segment?.road_types[i] || i;
+        return locale?.segment?.road_types[i] || i; // jshint ignore:line
 
     }
 
@@ -2403,8 +2383,7 @@
 
         nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
-            visibility: preferences.startDisabled || true,
-            visibility: true,
+            visibility: preferences.startDisabled || true
         });
 
         nodesVector.renderer.drawFeature =
