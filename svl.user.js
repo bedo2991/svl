@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.7.7
+// @version    4.9.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -33,19 +33,17 @@
         clutterConstant,
         thresholdDistance,
         streetStyles = [],
-        labelFontSize,
         streetVector,
         nodesVector,
         labelsVector,
         labelOutlineWidth,
         arrowDeclutter,
-        farZoom,
         preferences,
         WMERoadLayer,
         SVLAutomDisabled,
         OLMap;
 
-    const FARZOOMTHRESHOLD = 6; //To increase performance change this value to 6.
+    const FARZOOMTHRESHOLD = 5; //To increase performance change this value to 6.
     const clutterMax = 700;
     const fontSizeMax = 32;
     const superScript = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
@@ -90,14 +88,14 @@
         strokeColor: "#111111",
         strokeWidth: 1,
         strokeDashstyle: "dash",
-        strokeOpacity: 0.9,
+        strokeOpacity: 0.6,
     };
 
     const nodeStyle = {
         stroke: false,
         fillColor: "#0015FF",
-        fillOpacity: 0.7,
-        pointRadius: 4.0,
+        fillOpacity: 0.9,
+        pointRadius: 2.5,
         pointerEvents: "none"
     };
 
@@ -116,6 +114,7 @@
         fillColor: "#000",
         fillOpacity: 0.5,
         pointRadius: 3.3,
+        graphicZIndex: 179,
         pointerEvents: "none"
     };
 
@@ -127,11 +126,13 @@
     const tunnelFlagStyle2 = {
         strokeColor: "#C90",
         strokeWidth: 1,
+        graphicZIndex: 177,
         strokeDashstyle: "longdash",
     };
     const tunnelFlagStyle1 = {
         strokeColor: "#fff",
         strokeWidth: 2,
+        graphicZIndex: 176,
         strokeDashstyle: "longdash",
     };
 
@@ -142,7 +143,6 @@
 
     function svlGlobals() {
         OLMap = W.map.getOLMap();
-        farZoom = isFarZoom();
         preferences = null;
         OpenLayers.Renderer.symbol.myTriangle = [-2, 0, 2, 0, 0, -6, -2, 0];
     }
@@ -373,7 +373,7 @@
 
     function getWidth({ segmentWidth, roadType, twoWay }) {
         //If in close zoom and user enabled the realsize mode
-        if (!farZoom && preferences.realsize) {
+        if (false) {
             //If the segment has a widht set, use it
             if (segmentWidth) {
                 return (twoWay ? segmentWidth : (segmentWidth / 2.0)) / OLMap.resolution;
@@ -382,7 +382,8 @@
             }
         } else {
             //Use the value stored in the preferences //TODO: parseInt should not be needed
-            return parseInt(streetStyles[roadType].strokeWidth, 10);
+            const prefInt = parseInt(streetStyles[roadType].strokeWidth, 10);
+            return (!twoWay && preferences.realsize) ? prefInt * 0.6 : prefInt;
         }
     }
 
@@ -458,8 +459,7 @@
     function drawLabels(model, simplified, delayed = false) {
         //consoleDebug("drawLabels");
         let labels, labelFeature, len, attributes, address, /* maxDistance, maxDistanceIndex,*/ p, streetPart, speedPart, speed, distance,
-            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, defaultLabel, doubleLabelDistance, ANsShown, i, altStreet, altStreetPart;
-        defaultLabel = null;
+            labelText, dx, dy, centroid, angle, degrees, directionArrow, streetNameThresholdDistance, p0, p1, doubleLabelDistance, ANsShown, i, altStreet, altStreetPart;
         labels = [];
         labelFeature = null;
         attributes = model.attributes;
@@ -531,14 +531,12 @@
             streetNameThresholdDistance = labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
             doubleLabelDistance = 4 * streetNameThresholdDistance;
 
-            defaultLabel = new OpenLayers.Feature.Vector(simplified[0], {
-                myId: attributes.id
+            const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
+                myId: attributes.id,
+                color: streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].strokeColor : "#f00",
+                outlinecolor: streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].outlineColor : "#fff",
+                outlinewidth: labelOutlineWidth
             });
-
-            defaultLabel.attributes.color = streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].strokeColor : "#f00";
-            defaultLabel.attributes.outlinecolor = streetStyles[attributes.roadType] ? streetStyles[attributes.roadType].outlineColor : "#fff";
-            defaultLabel.attributes.outlinewidth = labelOutlineWidth;
-            defaultLabel.attributes.fsize = labelFontSize;
 
 
             for (p = 0, len = simplified.length - 1; p < len; p += 1) {
@@ -551,7 +549,7 @@
                     if (distance > streetNameThresholdDistance) {
                         //consoleDebug("Label inserted");
                         //p = maxDistanceIndex;
-                        if (farZoom || distance < doubleLabelDistance) {
+                        if (distance < doubleLabelDistance) { // || farzoom
                             p0 = simplified[p];
                             p1 = simplified[p + 1];
                         } else {
@@ -560,7 +558,7 @@
                         }
                         centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true); /*Important pass true parameter otherwise it will return start point as centroid*/
                         //Clone the label
-                        labelFeature = defaultLabel.clone();
+                        labelFeature = sampleLabel.clone();
                         labelFeature.geometry = centroid;
                         if (attributes.fwdDirection) {
                             dx = p1.x - p0.x;
@@ -584,13 +582,15 @@
                         labelFeature.attributes.label = directionArrow + labelText + directionArrow + altStreetPart;
 
                         labelFeature.attributes.angle = degrees;
+                        labelFeature.attributes.closeZoomOnly = p % 2 == 1;
                         labels.push(labelFeature);
-                        if (!farZoom && distance >= doubleLabelDistance) { //Create the second label on a long segment
+                        if (distance >= doubleLabelDistance) { //Create the second label on a long segment //!farZoom &&
                             p0 = p1;
                             p1 = simplified[p + 1];
                             centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(true);
                             labelFeature = labelFeature.clone();
                             labelFeature.geometry = centroid;
+                            labelFeature.attributes.closeZoomOnly = true;
                             labels.push(labelFeature);
                         }
                     }
@@ -613,7 +613,7 @@
             externalGraphic: "https://raw.githubusercontent.com/bedo2991/svl/master/average.png",
             graphicWidth: 36,
             graphicHeight: 36,
-            graphicZIndex: 100,
+            graphicZIndex: 300,
             fillOpacity: 1,
             pointerEvents: "none"
         });
@@ -628,21 +628,20 @@
             step, degrees, segmentLenght, minDistance, segmentLineString,
             numPoints, stepx, stepy, px, py, ix; //dx, dy
         const attributes = model.attributes;
-        if (hasToBeSkipped(attributes.roadType)) {
-            return [];
-        }
-        const farZoom = isFarZoom();
+        //TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
         const points = attributes.geometry.components;
         const pointList = attributes.geometry.getVertices(); //is an array
         const simplified = new OpenLayers.Geometry.LineString(pointList).simplify(1.5).components;
         const myFeatures = [];
+        const baselevel = attributes.level * 100;
+        const isTwoWay = attributes.fwdDirection && attributes.revDirection;
         lineFeature = null;
         if (null === attributes.primaryStreetID) {
             //consoleDebug("RED segment", model);
             lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
                 myId: attributes.id,
                 color: preferences.red.strokeColor,
-                width: preferences.red.strokeWidth,
+                width: (!isTwoWay && preferences.realsize) ? preferences.red.strokeWidth * 0.6 : preferences.red.strokeWidth,
                 dash: preferences.red.strokeDashstyle
             });
             myFeatures.push(lineFeature);
@@ -651,13 +650,15 @@
             const width = getWidth({
                 segmentWidth: attributes.width,
                 roadType: attributes.roadType,
-                twoWay: attributes.fwdDirection && attributes.revDirection
+                twoWay: isTwoWay
             });
             //consoleDebug(width);
             if (preferences.routingModeEnabled && attributes.routingRoadType !== null) {
                 roadType = attributes.routingRoadType;
             }
+
             if (streetStyles[roadType] !== undefined) {
+
                 locked = false;
                 speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed; //If it remains null it does not have a speed limit
                 //consoleDebug("Road Type: ", roadType);
@@ -667,12 +668,13 @@
                         new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
                         color: "#000000",
-                        width: width + (speed && preferences.showSLcolor && !farZoom ? 6 : 4),
+                        zIndex: baselevel + 100,
+                        width: width + (speed && preferences.showSLcolor ? 4 : 2),
                     });
                     myFeatures.push(lineFeature);
                 }
 
-                if (speed && !farZoom && preferences.showSLcolor) { //it has a speed limit
+                if (speed && preferences.showSLcolor) { //it has a speed limit
                     //consoleDebug("SpeedLimit");
                     speedStrokeStyle = (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified || attributes.revMaxSpeedUnverified) ? "dash" : "solid");
 
@@ -749,16 +751,20 @@
                                 new OpenLayers.Geometry.LineString(left), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(attributes.fwdMaxSpeed),
-                                width: width,
-                                dash: speedStrokeStyle
+                                width: width + 0.5,
+                                dash: speedStrokeStyle,
+                                closeZoomOnly: true,
+                                zIndex: baselevel + 105
                             });
                             myFeatures.push(lineFeature);
                             lineFeature = new OpenLayers.Feature.Vector(
                                 new OpenLayers.Geometry.LineString(right), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(attributes.revMaxSpeed),
-                                width: width,
-                                dash: speedStrokeStyle
+                                width: width + 0.5,
+                                dash: speedStrokeStyle,
+                                closeZoomOnly: true,
+                                zIndex: baselevel + 110
                             });
                             myFeatures.push(lineFeature);
                         }
@@ -777,8 +783,10 @@
                                 new OpenLayers.Geometry.LineString(pointList), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(speedValue),
-                                width: width + 4,
-                                dash: speedStrokeStyle
+                                width: width + 2,
+                                dash: speedStrokeStyle,
+                                closeZoomOnly: true,
+                                zIndex: baselevel + 115
                             });
                             myFeatures.push(lineFeature);
                         }
@@ -791,10 +799,9 @@
                     myId: attributes.id,
                     color: streetStyles[roadType].strokeColor,
                     width: width,
-                    dash: streetStyles[roadType].strokeDashstyle
+                    dash: streetStyles[roadType].strokeDashstyle,
+                    zIndex: baselevel + 120
                 });
-
-                //console.dir(lineFeature);
                 myFeatures.push(lineFeature);
 
                 if (attributes.level < 0) {
@@ -805,6 +812,7 @@
                         color: "#000000",
                         width: width,
                         opacity: 0.35,
+                        zIndex: baselevel + 125
                         //dash:"solid"
                     });
                     myFeatures.push(lineFeature);
@@ -821,8 +829,10 @@
                             myId: attributes.id,
                             color: nonEditableStyle.strokeColor,
                             width: nonEditableStyle.strokeWidth,
-                            dash: nonEditableStyle.strokeDashstyle
+                            dash: nonEditableStyle.strokeDashstyle,
+                            zIndex: baselevel + 130
                         });
+
                         myFeatures.push(lineFeature);
                         locked = true;
                     }
@@ -839,7 +849,8 @@
                     color: preferences.dirty.strokeColor,
                     width: width - 2,
                     opacity: preferences.dirty.strokeOpacity,
-                    dash: preferences.dirty.strokeDashstyle
+                    dash: preferences.dirty.strokeDashstyle,
+                    zIndex: baselevel + 135
                 });
                 myFeatures.push(lineFeature);
             }
@@ -847,234 +858,264 @@
         //Check segment properties
 
 
-        if (!farZoom) {
-            if (attributes.hasClosures) {
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: preferences.closure.strokeColor,
-                    width: preferences.closure.strokeWidth,
-                    dash: preferences.closure.strokeDashstyle
-                });
-                myFeatures.push(lineFeature);
-            }
-            if (null !== attributes.junctionID) { //It is a roundabout
-                //consoleDebug("Segment is a roundabout");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: roundaboutStyle.strokeColor,
-                    width: roundaboutStyle.strokeWidth,
-                    dash: roundaboutStyle.strokeDashstyle,
-                    opacity: roundaboutStyle.strokeOpacity
-                });
-                myFeatures.push(lineFeature);
-            }
+        //CLOSE Zoom properties
+        if (attributes.hasClosures) {
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: preferences.closure.strokeColor,
+                width: preferences.closure.strokeWidth,
+                dash: preferences.closure.strokeDashstyle,
+                closeZoomOnly: true,
+                zIndex: baselevel + 140
+            });
+            myFeatures.push(lineFeature);
+        }
 
-            if (!locked && (attributes.fwdToll || attributes.revToll)) { //It is a toll road
-                //consoleDebug("Segment is toll");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: preferences.toll.strokeColor,
-                    width: preferences.toll.strokeWidth,
-                    dash: preferences.toll.strokeDashstyle,
-                    opacity: 0.9
-                });
-                myFeatures.push(lineFeature);
-            } else {
-                restr = attributes.restrictions;
-                for (i = 0; i < restr.length; i += 1) {
-                    if (restr[i]._defaultType === "TOLL") { //If it has at least a "toll free" restriction
-                        lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
-                            myId: attributes.id,
-                            color: preferences.toll.strokeColor,
-                            width: preferences.toll.strokeWidth,
-                            dash: preferences.toll.strokeDashstyle,
-                            opacity: 0.9
-                        });
-                        myFeatures.push(lineFeature);
-                        break;
-                    }
+        if (!locked && (attributes.fwdToll || attributes.revToll)) { //It is a toll road
+            //consoleDebug("Segment is toll");
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: preferences.toll.strokeColor,
+                width: preferences.toll.strokeWidth,
+                dash: preferences.toll.strokeDashstyle,
+                opacity: 0.9,
+                closeZoomOnly: true,
+                zIndex: baselevel + 145
+            });
+            myFeatures.push(lineFeature);
+        } else {
+            restr = attributes.restrictions;
+            for (i = 0; i < restr.length; i += 1) {
+                if (restr[i]._defaultType === "TOLL") { //If it has at least a "toll free" restriction
+                    lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: preferences.toll.strokeColor,
+                        width: preferences.toll.strokeWidth,
+                        dash: preferences.toll.strokeDashstyle,
+                        opacity: 0.9,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 145
+                    });
+                    myFeatures.push(lineFeature);
+                    break;
                 }
             }
-            if (attributes.restrictions.length > 0) {
-                //It has restrictions
-                //consoleDebug("Segment has restrictions");
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: preferences.restriction.strokeColor,
-                    width: preferences.restriction.strokeWidth,
-                    dash: preferences.restriction.strokeDashstyle
-                });
-                myFeatures.push(lineFeature);
+        }
+
+        if (null !== attributes.junctionID) { //It is a roundabout
+            //consoleDebug("Segment is a roundabout");
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: roundaboutStyle.strokeColor,
+                width: roundaboutStyle.strokeWidth,
+                dash: roundaboutStyle.strokeDashstyle,
+                opacity: roundaboutStyle.strokeOpacity,
+                closeZoomOnly: true,
+                zIndex: baselevel + 150
+            });
+            myFeatures.push(lineFeature);
+        }
+
+
+        if (attributes.restrictions.length > 0) {
+            //It has restrictions
+            //consoleDebug("Segment has restrictions");
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: preferences.restriction.strokeColor,
+                width: preferences.restriction.strokeWidth,
+                dash: preferences.restriction.strokeDashstyle,
+                closeZoomOnly: true,
+                zIndex: baselevel + 155
+            });
+            myFeatures.push(lineFeature);
+        }
+
+        if (!locked && attributes.validated === false) { //Segments that needs validation
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: validatedStyle.strokeColor,
+                width: validatedStyle.strokeWidth,
+                dash: validatedStyle.strokeDashstyle,
+                closeZoomOnly: true,
+                zIndex: baselevel + 160
+            });
+            myFeatures.push(lineFeature);
+        }
+
+        //Headlights
+        /*jslint bitwise: true */
+        if (attributes.flags & 32) {
+            /*jslint bitwise: false */
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(pointList), {
+                myId: attributes.id,
+                color: preferences.headlights.strokeColor,
+                width: preferences.headlights.strokeWidth,
+                dash: preferences.headlights.strokeDashstyle,
+                closeZoomOnly: true,
+                zIndex: baselevel + 165
+            });
+            myFeatures.push(lineFeature);
+        }
+
+        if (attributes.fwdLaneCount > 0) {
+            //console.log("LANE fwd");
+            let res = pointList.slice(-2);
+            //if(pointList.length === 2){
+            res[0] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+            //}
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(res), {
+                myId: attributes.id,
+                color: preferences.lanes.strokeColor,
+                width: preferences.lanes.strokeWidth,
+                dash: preferences.lanes.strokeDashstyle,
+                opacity: 0.9,
+                closeZoomOnly: true,
+                zIndex: baselevel + 170
+            });
+            myFeatures.push(lineFeature);
+        }
+
+        if (attributes.revLaneCount > 0) {
+            //console.log("LANE rev");
+            let res = pointList.slice(0, 2);
+            //if(pointList.length === 2){
+            res[1] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+            //}
+            lineFeature = new OpenLayers.Feature.Vector(
+                new OpenLayers.Geometry.LineString(res), {
+                myId: attributes.id,
+                color: preferences.lanes.strokeColor,
+                width: preferences.lanes.strokeWidth,
+                dash: preferences.lanes.strokeDashstyle,
+                opacity: 0.9,
+                closeZoomOnly: true,
+                zIndex: baselevel + 175
+            });
+            myFeatures.push(lineFeature);
+        }
+
+        if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
+            //consoleDebug("The segment is oneway or has unknown direction");
+            simplifiedPoints = points;
+            if (attributes.junctionID === null && (attributes.length / points.length < arrowDeclutter)) {
+                simplifiedPoints = simplified;
             }
 
-            if (!locked && attributes.validated === false) { //Segments that needs validation
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: validatedStyle.strokeColor,
-                    width: validatedStyle.strokeWidth,
-                    dash: validatedStyle.strokeDashstyle
-                });
-                myFeatures.push(lineFeature);
-            }
-
-            //Headlights
             /*jslint bitwise: true */
-            if (attributes.flags & 32) {
+            if ((attributes.fwdDirection | attributes.revDirection) === 0) {
                 /*jslint bitwise: false */
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: preferences.headlights.strokeColor,
-                    width: preferences.headlights.strokeWidth,
-                    dash: preferences.headlights.strokeDashstyle
-                });
-                myFeatures.push(lineFeature);
-            }
-
-            if (attributes.fwdLaneCount > 0) {
-                //console.log("LANE fwd");
-                let res = pointList.slice(-2);
-                //if(pointList.length === 2){
-                res[0] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
-                //}
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(res), {
-                    myId: attributes.id,
-                    color: preferences.lanes.strokeColor,
-                    width: preferences.lanes.strokeWidth,
-                    dash: preferences.lanes.strokeDashstyle,
-                    opacity: 0.9
-                });
-                myFeatures.push(lineFeature);
-            }
-
-            if (attributes.revLaneCount > 0) {
-                //console.log("LANE rev");
-                let res = pointList.slice(0, 2);
-                //if(pointList.length === 2){
-                res[1] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
-                //}
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(res), {
-                    myId: attributes.id,
-                    color: preferences.lanes.strokeColor,
-                    width: preferences.lanes.strokeWidth,
-                    dash: preferences.lanes.strokeDashstyle,
-                    opacity: 0.9
-                });
-                myFeatures.push(lineFeature);
-            }
-
-            if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
-                //consoleDebug("The segment is oneway or has unknown direction");
-                simplifiedPoints = points;
-                if (attributes.junctionID === null && (attributes.length / points.length < arrowDeclutter)) {
-                    simplifiedPoints = simplified;
+                //Unknown direction
+                for (p = 0, len = simplifiedPoints.length - 1; p < len; p += 1) {
+                    //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
+                    arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
+                        myId: attributes.id,
+                        closeZoomOnly: true,
+                        isArrow: true,
+                        zIndex: baselevel + 180
+                    }, unknownDirStyle);
+                    myFeatures.push(arrowFeature);
                 }
+            } else {
+                //Draw normal arrows
 
-                /*jslint bitwise: true */
-                if ((attributes.fwdDirection | attributes.revDirection) === 0) {
-                    /*jslint bitwise: false */
-                    //Unknown direction
-                    for (p = 0, len = simplifiedPoints.length - 1; p < len; p += 1) {
-                        //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
-                        arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
-                            myId: attributes.id
-                        }, unknownDirStyle);
+                step = attributes.junctionID !== null ? 3 : 1; //It is a roundabout
+                for (p = step - 1, len = simplifiedPoints.length - 1; p < len; p += step) {
+                    //it is one way
+                    degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p + 1]);
+                    segmentLenght = simplifiedPoints[p].distanceTo(simplifiedPoints[p + 1]);
+                    minDistance = 15.0 * (11 - OLMap.zoom);
+                    if (segmentLenght < minDistance * 2) {
+                        segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
+                        arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {
+                            myId: attributes.id,
+                            closeZoomOnly: true,
+                            isArrow: true
+                        }, {
+                            graphicName: "myTriangle",
+                            rotation: degrees,
+                            stroke: true,
+                            strokeColor: "#000",
+                            strokeWidth: 1.5,
+                            fill: true,
+                            fillColor: "#fff",
+                            graphicZIndex: 180,
+                            fillOpacity: 0.7,
+                            pointRadius: 5,
+                            pointerEvents: "none"
+                        });
                         myFeatures.push(arrowFeature);
-                    }
-                } else {
-                    //Draw normal arrows
+                    } else {
+                        dx = simplifiedPoints[p + 1].x - simplifiedPoints[p].x;
+                        dy = simplifiedPoints[p + 1].y - simplifiedPoints[p].y;
 
-                    step = attributes.junctionID !== null ? 3 : 1; //It is a roundabout
-                    for (p = step - 1, len = simplifiedPoints.length - 1; p < len; p += step) {
-                        //it is one way
-                        degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p + 1]);
-                        segmentLenght = simplifiedPoints[p].distanceTo(simplifiedPoints[p + 1]);
-                        minDistance = 15.0 * (11 - OLMap.zoom);
-                        if (segmentLenght < minDistance * 2) {
-                            segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
-                            arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {
-                                myId: attributes.id
+                        numPoints = Math.floor(Math.sqrt(dx * dx + dy * dy) / minDistance) - 1;
+
+                        stepx = dx / numPoints;
+                        stepy = dy / numPoints;
+                        px = simplifiedPoints[p].x + stepx;
+                        py = simplifiedPoints[p].y + stepy;
+                        for (ix = 0; ix < numPoints; ix += 1) {
+                            arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {
+                                myId: attributes.id,
+                                closeZoomOnly: true,
+                                isArrow: true
                             }, {
                                 graphicName: "myTriangle",
                                 rotation: degrees,
                                 stroke: true,
                                 strokeColor: "#000",
+                                graphiczIndex: baselevel + 180,
                                 strokeWidth: 1.5,
                                 fill: true,
                                 fillColor: "#fff",
                                 fillOpacity: 0.7,
                                 pointRadius: 5,
-                                pointerEvents: "none"
                             });
                             myFeatures.push(arrowFeature);
-                        } else {
-                            dx = simplifiedPoints[p + 1].x - simplifiedPoints[p].x;
-                            dy = simplifiedPoints[p + 1].y - simplifiedPoints[p].y;
-
-                            numPoints = Math.floor(Math.sqrt(dx * dx + dy * dy) / minDistance) - 1;
-
-                            stepx = dx / numPoints;
-                            stepy = dy / numPoints;
-                            px = simplifiedPoints[p].x + stepx;
-                            py = simplifiedPoints[p].y + stepy;
-                            for (ix = 0; ix < numPoints; ix += 1) {
-                                arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {
-                                    myId: attributes.id
-                                }, {
-                                    graphicName: "myTriangle",
-                                    rotation: degrees,
-                                    stroke: true,
-                                    strokeColor: "#000",
-                                    strokeWidth: 1.5,
-                                    fill: true,
-                                    fillColor: "#fff",
-                                    fillOpacity: 0.7,
-                                    pointRadius: 5,
-                                    pointerEvents: "none"
-                                });
-                                myFeatures.push(arrowFeature);
-                                px += stepx;
-                                py += stepy;
-                            }
+                            px += stepx;
+                            py += stepy;
                         }
                     }
                 }
             }
+        }
 
 
-            /*jslint bitwise: true */
-            if (attributes.fwdFlags & 0x1) { //check if speed camera
-                /*jslint bitwise: false */
-                myFeatures.push(createAverageSpeedCamera(attributes.id, false, attributes.fwdDirection, points[0], points[1]));
+        /*jslint bitwise: true */
+        if (attributes.fwdFlags & 0x1) { //check if speed camera
+            /*jslint bitwise: false */
+            myFeatures.push(createAverageSpeedCamera(attributes.id, false, attributes.fwdDirection, points[0], points[1]));
+        }
+
+        /*jslint bitwise: true */
+        if (attributes.revFlags & 0x1) { //check if speed camera
+            /*jslint bitwise: false */
+            myFeatures.push(createAverageSpeedCamera(attributes.id, true, attributes.fwdDirection, points[points.length - 1], points[points.length - 2]));
+        }
+
+        //Show geometry points
+        if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
+            for (p = 1, len = points.length - 2; p < len; p += 1) {
+                //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
+                arrowFeature = new OpenLayers.Feature.Vector(points[p], {
+                    myId: attributes.id,
+                    closeZoomOnly: true
+                }, geometryNodeStyle);
+                myFeatures.push(arrowFeature);
             }
+        }
+        //END: show geometry points
+        // End: Close Zoom
 
-            /*jslint bitwise: true */
-            if (attributes.revFlags & 0x1) { //check if speed camera
-                /*jslint bitwise: false */
-                myFeatures.push(createAverageSpeedCamera(attributes.id, true, attributes.fwdDirection, points[points.length - 1], points[points.length - 2]));
-            }
-
-            //Show geometry points
-            if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
-                for (p = 1, len = points.length - 2; p < len; p += 1) {
-                    //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
-                    arrowFeature = new OpenLayers.Feature.Vector(points[p], {
-                        myId: attributes.id
-                    }, geometryNodeStyle);
-                    myFeatures.push(arrowFeature);
-                }
-            }
-            //END: show geometry points
-        } // End: Close Zoom
-
-        //Far Zoom:
+        //In any Zoom:
 
         /*jslint bitwise: true */
         if (attributes.flags & 1) { //The tunnel flag is enabled
@@ -1107,23 +1148,13 @@
         return myFeatures;
     }
 
-    function drawAllSegments() {
-        //console.log("DrawAllSegments");
-        let segments = W.model.segments.objects,
-            keysSorted, myFeatures = [],
-            i, len;
-        //streetVector.destroyFeatures();
-        //consoleDebug(W.model.segments);
-        if (Object.keys(segments).length === 0) {
-            return; // exit now if there are no segments to draw, otherwise remainder of function will bomb out
-        }
-        keysSorted = Object.keys(segments).sort(function (a, b) {
-            return segments[a].attributes.level - segments[b].attributes.level;
-        });
-        for (i = 0, len = keysSorted.length; i < len; i += 1) {
-            myFeatures.push.apply(myFeatures, drawSegment(segments[keysSorted[i]]));
-        }
-        streetVector.addFeatures(myFeatures);
+    function redrawAllSegments() {
+        consoleDebug("DrawAllSegments");
+        streetVector.destroyFeatures();
+        labelsVector.destroyFeatures();
+        addSegments(Object.values(W.model.segments.objects));
+        nodesVector.destroyFeatures();
+        addNodes(Object.values(W.model.nodes.objects));
     }
 
     function drawNode(model) {
@@ -1135,12 +1166,15 @@
         return pointFeature;
     }
 
+    /*
     function drawAllNodes() {
         //console.debug("Drawing ALL nodes");
         let node, nodeFeatures, nodes;
         //nodesVector.destroyFeatures();
         nodeFeatures = [];
         nodes = W.model.nodes.objects;
+        addNodes(Object.values(W.model.nodes.objects));
+        return;
         //consoleDebug("nodes", nodes);
         for (node in nodes) {
             if (nodes.hasOwnProperty(node)) {
@@ -1150,19 +1184,13 @@
             }
         } //End: For all the nodes
         nodesVector.addFeatures(nodeFeatures);
-    }
+    }*/
 
+    //TODO remove
     function doDraw() {
         if (OLMap.zoom < 2) {
             console.warn("Tried to draw at bad zoom");
             return;
-        }
-        consoleDebug("Drawing everything anew");
-        //splittedSpeedLimits = false;
-        drawAllSegments();
-
-        if (!farZoom) {
-            drawAllNodes();
         }
     }
 
@@ -1184,6 +1212,7 @@
         //Labels
         //clutterCostantNearZoom = preferences.clutterCostantNearZoom;
         //clutterCostantFarZoom = preferences.clutterCostantFarZoom;
+        const farZoom = isFarZoom();
         clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
         thresholdDistance = getThreshold();
 
@@ -1191,16 +1220,16 @@
         arrowDeclutter = preferences.arrowDeclutter;
         labelOutlineWidth = preferences.labelOutlineWidth;
 
-        labelFontSize = farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize;
         labelOutlineWidth = preferences.labelOutlineWidth + "px";
         //showSLtext = preferences.showSLtext;
         //showSLcolor = preferences.showSLcolor;
 
         //Delete all elements
-        nodesVector.destroyFeatures();
-        labelsVector.destroyFeatures();
-        streetVector.destroyFeatures();
-        doDraw();
+        //nodesVector.destroyFeatures();
+        //labelsVector.destroyFeatures();
+        //streetVector.destroyFeatures();
+        //doDraw();
+        redrawAllSegments();
     }
 
     function rollbackPreferences() {
@@ -1256,7 +1285,8 @@
                 streetVector.destroyFeatures();
                 labelsVector.destroyFeatures();
                 nodesVector.destroyFeatures();
-                doDraw();
+                redrawAllSegments();
+                //doDraw();
             });
             routingModeDiv.addEventListener("mouseleave", () => {
                 //Enable routing mode again
@@ -1264,7 +1294,8 @@
                 streetVector.destroyFeatures();
                 labelsVector.destroyFeatures();
                 nodesVector.destroyFeatures();
-                doDraw();
+                redrawAllSegments();
+                //                doDraw();
             });
             document.getElementById("map").appendChild(routingModeDiv);
         } else {
@@ -1439,10 +1470,10 @@
             width.id = "streetWidth_" + i;
             width.className = Number.isInteger(i) ? "form-control prefElement segmentsWidth" : "form-control prefElement";
             width.style.width = "40pt";
-            width.title = "Width";
+            width.title = "Width (in meters)";
             width.type = "number";
-            width.min = 2;
-            width.max = 15;
+            width.min = 1;
+            width.max = 20;
             inputs.appendChild(width);
         }
 
@@ -1951,7 +1982,7 @@
 
     function changeNodes(e) {
         //console.debug("Change nodes");
-        if (farZoom) {
+        if (isFarZoom()) {
             console.warn("SVL: This event should not happen in far zoom");
             return;
         }
@@ -1981,10 +2012,6 @@
     function addNodes(e) {
         //console.debug("Add Nodes");
         let myFeatures, i;
-        if (isFarZoom()) {
-            console.warn("SVL: This event should not happen in far zoom");
-            return;
-        }
         myFeatures = [];
         for (i = 0; i < e.length; i += 1) {
             //console.error(e[i].state);
@@ -1995,6 +2022,7 @@
                 return;
             }*/
             if (e[i].attributes.geometry !== undefined) {
+                //TODO: check !== "Delete"?
                 if (e[i].attributes.id > 0) {
                     myFeatures.push(drawNode(e[i]));
                 }
@@ -2009,132 +2037,34 @@
         return !event.svl;
     }
 
-    let nextRenderDeadline = null;
-    let renderInterval = null;
 
-    function checkRender() {
-        if (nextRenderDeadline && Date.now() > nextRenderDeadline) {
-            consoleDebug("forcing to Render");
-            manageZoom(false);
-            registerSegmentsEvents();
-        } else {
-            if (nextRenderDeadline) {
-                consoleDebug("rendering in " + (nextRenderDeadline - Date.now()) + " ms");
-                if (!renderInterval) {
-                    removeSegmentsEvents();
-                    renderInterval = setInterval(checkRender, 700);
-                }
-            }
-            else {
-                clearInterval(renderInterval);
-                renderInterval = null;
-                consoleDebug("Doing nothing");
-            }
-        }
-    }
-
-    let lastZoom = 10;
-    let lastRenderAtZoom = 0;
     function manageZoom(e) {
         consoleDebug("manageZoom");
-        farZoom = isFarZoom();
-        let zoomChangedfromCloseToFar = isFarZoom(lastRenderAtZoom) ? false : farZoom;
-        let zoomChangedfromFarToClose = !isFarZoom(lastRenderAtZoom) ? false : !farZoom;
-        if (zoomChangedfromCloseToFar) {
+        const farZoom = isFarZoom();
+        if (farZoom) {
             clutterConstant = preferences.clutterCostantFarZoom;
-            labelFontSize = preferences.farZoomLabelSize + "px";
-            removeNodeEvents();
-        } else if (zoomChangedfromFarToClose) {
-            clutterConstant = preferences.clutterCostantNearZoom;
-            labelFontSize = preferences.closeZoomLabelSize + "px";
-            registerNodeEvents();
-        }
-
-        if (e) {
-            consoleDebug("was called because of a zoom event");
-            //event: zoomEnd
-            if (lastZoom > e.object.zoom) {
-                //zoom out
-                streetVector.destroyFeatures();
-                labelsVector.destroyFeatures();
-                nodesVector.destroyFeatures();
-            }
-            lastZoom = e.object.zoom;
-            nextRenderDeadline = Date.now() + 1400;
-            if (!renderInterval) {
-                renderInterval = setInterval(checkRender, 700);
-            }
-            return;
-        }
-        consoleDebug("Was forced manually");
-        //else: called manually
-
-        nextRenderDeadline = null;
-        consoleDebug("rendering");
-        const zoom = OLMap.zoom;
-        const svlWasPreviouslyDisabled = lastRenderAtZoom < 3 && zoom > 2;
-
-        /*if(zoomChangedfromCloseToFar)
-            console.log("Zoom changed Close -> Far");
-        if(zoomChangedfromFarToClose)
-            console.log("Zoom changed Far -> Close");
-        if(svlWasPreviouslyDisabled)
-            console.log("SVL was previously disabled");
-        */
-
-        streetVector.destroyFeatures();
-        labelsVector.destroyFeatures();
-        nodesVector.destroyFeatures();
-
-
-        //doDraw();
-        //consoleDebug("Zoom: " + zoom);
-        //Decide the SVL layer status
-        lastRenderAtZoom = zoom;
-        if (svlWasPreviouslyDisabled) {
-            if (streetVector.visibility === false && SVLAutomDisabled) {
-                SVLAutomDisabled = false;
-                //consoleDebug("Setting vector visibility to true");
-                //doDraw();
-                streetVector.setVisibility(true);
-                document.getElementById("layer-switcher-item_street_vector_layer").checked = true;
-                document.getElementById("layer-switcher-item_road").checked = false;
-                if (preferences.disableRoadLayers) {
-                    WMERoadLayer.setVisibility(false);
-                    document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-                }
-                //streetVector.display(true)
-            }
-            else if (streetVector.visibility === false && !SVLAutomDisabled) {
-                //The user disabled the layer, don't do anything else.
-                return;
-            }
-        }
-
-
-
-        if (!farZoom) {
-            //Close zoom
-            thresholdDistance = getThreshold();
-            doDraw();
         } else {
-            if (zoom < 2) { //There is nothing to draw, enable road layer
-                //consoleDebug("Road layer automatically enabled because of zoom out");
-                //consoleDebug("Vector visibility: ", streetVector.visibility);
-                if (streetVector.visibility === true) {
-                    //consoleDebug("Setting vector visibility to false");
-                    streetVector.setVisibility(false);
-                    document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-                    document.getElementById("layer-switcher-item_road").checked = true;
-                    SVLAutomDisabled = true;
-                    WMERoadLayer.setVisibility(true);
-                }
-            } else {
-                //Far zoom
-                thresholdDistance = getThreshold();
-                nodesVector.destroyFeatures();
-                doDraw();
+            clutterConstant = preferences.clutterCostantNearZoom;
+        }
+
+        if (OLMap.zoom < 2) { //There is nothing to draw, enable road layer
+            //consoleDebug("Road layer automatically enabled because of zoom out");
+            //consoleDebug("Vector visibility: ", streetVector.visibility);
+            if (streetVector.visibility === true) {
+                //consoleDebug("Setting vector visibility to false");
+                streetVector.setVisibility(false);
+                document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
+                document.getElementById("layer-switcher-item_road").checked = true;
+                SVLAutomDisabled = true;
+                WMERoadLayer.setVisibility(true);
             }
+        } else if (SVLAutomDisabled) {
+            SVLAutomDisabled = false;
+            streetVector.setVisibility(true);
+            document.getElementById("layer-switcher-item_street_vector_layer").checked = true;
+            document.getElementById("layer-switcher-item_road").checked = false;
+            SVLAutomDisabled = true;
+            WMERoadLayer.setVisibility(false);
         }
     }
 
@@ -2164,7 +2094,7 @@
     }
 
     function removeSegmentsEvents() {
-        //console.debug("SVL: Removing segment events");
+        consoleDebug("SVL: Removing segments events");
         const events = W.model.segments._events;
         events.objectsadded = events.objectsadded.filter(removeSVLEvents);
         events.objectschanged = events.objectschanged.filter(removeSVLEvents);
@@ -2173,7 +2103,7 @@
     }
 
     function removeNodeEvents() {
-        //console.debug("SVL: Removing node events");
+        consoleDebug("SVL: Removing node events");
         const events = W.model.nodes._events;
         events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
         events.objectsadded = events.objectsadded.filter(removeSVLEvents);
@@ -2181,7 +2111,7 @@
         events["objects-state-deleted"] = events["objects-state-deleted"].filter(removeSVLEvents);
     }
     function registerNodeEvents() {
-        //console.debug("SVL: Registering node events");
+        consoleDebug("SVL: Registering node events");
         const events = W.model.nodes._events;
         events.objectsremoved.push({
             context: nodesVector,
@@ -2206,17 +2136,17 @@
     }
 
     function addSegments(e) {
-        console.debug("Add Segments");
-        let i, j, features, myFeatures;
-        e.sort(function (a, b) {
+        consoleDebug("Add Segments");
+        let i, myFeatures;
+        /*e.sort(function (a, b) {
             return (a.attributes.level - b.attributes.level);
-        });
+        });*/
         myFeatures = [];
         //console.log("Size: " + e.length);
         for (i = 0; i < e.length; i += 1) {
             if (e[i] !== null) {
-                features = drawSegment(e[i]);
-                myFeatures.push(...features);
+                myFeatures = myFeatures.concat(drawSegment(e[i]));
+                //myFeatures.push(...features);
             }
         }
         streetVector.addFeatures(myFeatures);
@@ -2268,10 +2198,11 @@
             //SVL was just enabled
             //consoleDebug("Registering events");
             registerSegmentsEvents();
-            if (!farZoom) {
+            if (!isFarZoom()) {
                 registerNodeEvents();
             }
             manageZoom();
+            redrawAllSegments();
             //checkZoomLayer();
             //doDraw();
         } else {
@@ -2280,9 +2211,9 @@
             removeSegmentsEvents();
             removeNodeEvents();
 
-            nodesVector.destroyFeatures();
+            /*nodesVector.destroyFeatures();
             labelsVector.destroyFeatures();
-            streetVector.destroyFeatures();
+            streetVector.destroyFeatures();*/
         }
     }
 
@@ -2322,20 +2253,21 @@
             console.error("SVL: could not add layer checkbox");
         }
         initPreferences();
-        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", GM_info.script.version, 
-        `Major update!
-        - Added an option to render the streets based on their width;
-        - New preference panel in the sidebar (SVL 🗺️)
-        - Performance improvements (when zooming)
-        - Bug fixes and new bugs :)`);
+        WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", GM_info.script.version,
+            `<b>Major update!</b>
+        <br>- Added an option to render the streets based on their width;
+        <br>- NEW: The width in the settings is now expressed in meters
+        <br>- NEW: preference panel in the sidebar (SVL 🗺️)
+        <br>- NEW: Rendering completely rewritten: performance improvements
+        <br>- Removed: the zoom-level indicator while editing the preferences
+        <br>- Bug fixes and new bugs :)`);
     }
 
 
     function initValues() {
-        farZoom = isFarZoom();
+        const farZoom = isFarZoom();
         clutterConstant = farZoom ? preferences.clutterCostantFarZoom : preferences.clutterCostantNearZoom;
         thresholdDistance = getThreshold();
-        labelFontSize = (farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize) + "px";
         labelOutlineWidth = preferences.labelOutlineWidth + "px";
     }
 
@@ -2378,6 +2310,7 @@
             strokeWidth: "${width}",
             strokeOpacity: "${opacity}",
             strokeDashstyle: "${dash}",
+            graphicZIndex: "${zIndex}"
         });
 
         labelStyleMap = new OpenLayers.StyleMap({
@@ -2385,9 +2318,6 @@
             fontWeight: "800",
             fontColor: "${color}",
             labelOutlineColor: "${outlinecolor}",
-            fontSize: "${fsize}",
-            labelXOffset: 0,
-            labelYOffset: 0,
             labelOutlineWidth: "${outlinewidth}",
             label: "${label}",
             angle: "${angle}",
@@ -2404,112 +2334,254 @@
             isVector: true,
             attribution: "Street Vector Layer",
             rendererOptions: {
-                zOrdering: true
+                zIndexing: true
             }
         });
+
+        streetVector.renderer.drawFeature =
+            function (feature, style) {
+                if (OLMap.zoom < 2) {
+                    return false;
+                }
+                if (style == null) {
+                    style = feature.style;
+                }
+
+
+                if (feature.geometry) {
+                    //if (bounds) {
+                    const farZoom = isFarZoom();
+                    if ((feature.attributes.closeZoomOnly && farZoom) || (feature.attributes.farZoomOnly && !farZoom)) {
+                        style = { display: "none" };
+                    }
+                    else {
+                        const bounds = feature.geometry.getBounds();
+                        if (!bounds.intersectsBounds(this.extent)) {
+                            style = { display: "none" };
+                        } else {
+                            this.featureDx = 0;
+
+                            style.pointerEvents = "none";
+                            if (!farZoom) {
+                                if (!feature.attributes.isArrow) {
+                                    style.strokeWidth = style.strokeWidth / OLMap.resolution;
+                                }
+                            }
+                        }
+                    }
+
+                    return this.drawGeometry(feature.geometry, style, feature.id);
+                    //} else { alert("No bounds!"); }
+                }
+            };
+
 
         nodesVector = new OpenLayers.Layer.Vector("Nodes Vector", {
             uniqueName: "vectorNodes",
             visibility: true,
         });
+
+        nodesVector.renderer.drawFeature =
+            function (feature, style) {
+                if (OLMap.zoom < 2) {
+                    return false;
+                }
+                if (style == null) {
+                    style = feature.style;
+                }
+
+                style = OpenLayers.Util.extend({}, style);
+
+
+                if (feature.geometry) {
+
+                    //if (bounds) {
+                    const farZoom = isFarZoom();
+                    if (!farZoom) {
+                        const bounds = feature.geometry.getBounds();
+                        if (!bounds.intersectsBounds(this.extent)) {
+                            style = { display: "none" };
+                        } else {
+                            this.featureDx = 0;
+                            style.pointRadius = style.pointRadius / OLMap.resolution;
+                        }
+                    } else {
+                        style = { display: "none" };
+                    }
+                    return this.drawGeometry(feature.geometry, style, feature.id);
+
+                    //} else { alert("No bounds!"); }
+                }
+            };
+
         labelsVector = new OpenLayers.Layer.Vector("Labels Vector", {
             uniqueName: "vectorLabels",
             styleMap: labelStyleMap,
             visibility: true,
         });
 
-        labelsVector.renderer.drawText = function (e, t, i) {
-            var n, s, r, layer, feature, rotate, h, c, p, g, f, o, a, l, u, d;
-            n = !!t.labelOutlineWidth;
-            if (n) {
-                s = OpenLayers.Util.extend({}, t);
-                s.fontColor = s.labelOutlineColor;
-                s.fontStrokeColor = s.labelOutlineColor;
-                s.fontStrokeWidth = t.labelOutlineWidth;
-                delete s.labelOutlineWidth;
-                this.drawText(e, s, i);
+        labelsVector.renderer.drawFeature =
+            function (feature, style) {
+                if (OLMap.zoom < 2) {
+                    return false;
+                }
+                if (style == null) {
+                    style = feature.style;
+                }
+
+
+                if (feature.geometry) {
+                    //if (bounds) {
+                    const farZoom = isFarZoom();
+                    if ((feature.attributes.closeZoomOnly && farZoom) || (feature.attributes.farZoomOnly && !farZoom)) {
+                        style = { display: "none" };
+                    }
+                    else {
+                        const bounds = feature.geometry.getBounds();
+                        if (!bounds.intersectsBounds(this.extent)) {
+                            style = { display: "none" };
+                        } else {
+                            this.featureDx = 0;
+                            style.pointerEvents = "none";
+                            style.fontSize = (farZoom ? preferences.farZoomLabelSize : preferences.closeZoomLabelSize) + "px";
+                        }
+                    }
+
+                    var rendered = this.drawGeometry(feature.geometry, style, feature.id);
+                    if (style.display != "none" && style.label && rendered !== false) {
+
+                        var location = feature.geometry.getCentroid();
+                        if (style.labelXOffset || style.labelYOffset) {
+                            var xOffset = isNaN(style.labelXOffset) ? 0 : style.labelXOffset;
+                            var yOffset = isNaN(style.labelYOffset) ? 0 : style.labelYOffset;
+                            var res = this.getResolution();
+                            location.move(xOffset * res, yOffset * res);
+                        }
+                        this.drawText(feature.id, style, location);
+                    } else {
+                        this.removeText(feature.id);
+                    }
+                    return rendered;
+                    //} else { alert("No bounds!"); }
+                }
+            };
+
+
+        labelsVector.renderer.drawText = function (featureId, style, location) {
+            const drawOutline = (!!style.labelOutlineWidth);
+            // First draw text in halo color and size and overlay the
+            // normal text afterwards
+            if (drawOutline) {
+                const outlineStyle = OpenLayers.Util.extend({}, style);
+                outlineStyle.fontColor = outlineStyle.labelOutlineColor;
+                outlineStyle.fontStrokeColor = outlineStyle.labelOutlineColor;
+                outlineStyle.fontStrokeWidth = style.labelOutlineWidth;
+                if (style.labelOutlineOpacity) {
+                    outlineStyle.fontOpacity = style.labelOutlineOpacity;
+                }
+                delete outlineStyle.labelOutlineWidth;
+                this.drawText(featureId, outlineStyle, location);
             }
-            r = this.getResolution();
-            layer = this.map.getLayer(this.container.id);
-            feature = layer.getFeatureById(e);
-            i = feature.attributes.centroid || i;
-            o = (i.x - this.featureDx) / r + this.left;
-            a = i.y / r - this.top;
-            l = n ? this.LABEL_OUTLINE_SUFFIX : this.LABEL_ID_SUFFIX;
-            u = this.nodeFactory(e + l, "text");
-            u.setAttributeNS(null, "x", o);
-            u.setAttributeNS(null, "y", -a);
-            if (t.angle || t.angle === 0) {
-                rotate = 'rotate(' + t.angle + ',' + o + "," + -a + ')';
-                u.setAttributeNS(null, "transform", rotate);
+
+            const resolution = this.getResolution();
+
+            const x = ((location.x - this.featureDx) / resolution + this.left);
+            const y = (location.y / resolution - this.top);
+
+            const suffix = (drawOutline) ? this.LABEL_OUTLINE_SUFFIX : this.LABEL_ID_SUFFIX;
+            const label = this.nodeFactory(featureId + suffix, "text");
+
+            label.setAttributeNS(null, "x", x);
+            label.setAttributeNS(null, "y", -y);
+
+            if (style.angle || style.angle === 0) {
+                const rotate = `rotate(${style.angle},${x},${-y})`;
+                label.setAttributeNS(null, "transform", rotate);
             }
-            if (t.fontColor) {
-                u.setAttributeNS(null, "fill", t.fontColor);
+            if (style.fontFamily) {
+                label.setAttributeNS(null, "font-family", style.fontFamily);
             }
-            if (t.fontStrokeColor) {
-                u.setAttributeNS(null, "stroke", t.fontStrokeColor);
+            if (style.fontWeight) {
+                label.setAttributeNS(null, "font-weight", style.fontWeight);
             }
-            if (t.fontStrokeWidth) {
-                u.setAttributeNS(null, "stroke-width", t.fontStrokeWidth);
+
+            if (style.fontSize) {
+                label.setAttributeNS(null, "font-size", style.fontSize);
             }
-            if (t.fontOpacity) {
-                u.setAttributeNS(null, "opacity", t.fontOpacity);
+
+            if (style.fontColor) {
+                label.setAttributeNS(null, "fill", style.fontColor);
             }
-            if (t.fontFamily) {
-                u.setAttributeNS(null, "font-family", t.fontFamily);
+            if (style.fontStrokeColor) {
+                label.setAttributeNS(null, "stroke", style.fontStrokeColor);
             }
-            if (t.fontSize) {
-                u.setAttributeNS(null, "font-size", t.fontSize);
+
+            if (style.fontStrokeWidth) {
+                label.setAttributeNS(null, "stroke-width", style.fontStrokeWidth);
             }
-            if (t.fontWeight) {
-                u.setAttributeNS(null, "font-weight", t.fontWeight);
+
+            /*
+
+
+            if (style.fontOpacity) {
+                label.setAttributeNS(null, "opacity", style.fontOpacity);
             }
-            if (t.fontStyle) {
-                u.setAttributeNS(null, "font-style", t.fontStyle);
+
+            if (style.fontStyle) {
+                label.setAttributeNS(null, "font-style", style.fontStyle);
             }
-            if (t.labelSelect === true) {
-                u.setAttributeNS(null, "pointer-events", "visible");
-                u._featureId = e;
+            if (style.labelSelect === true) {
+                label.setAttributeNS(null, "pointer-events", "visible");
+                label._featureId = featureId;
             } else {
-                u.setAttributeNS(null, "pointer-events", "none");
+                label.setAttributeNS(null, "pointer-events", "none");
             }
-            h = t.labelAlign || OpenLayers.Renderer.defaultSymbolizer.labelAlign;
-            u.setAttributeNS(null, "text-anchor", OpenLayers.Renderer.SVG.LABEL_ALIGN[h[0]] || "middle");
+            */
+            label.setAttributeNS(null, "pointer-events", "none");
+
+            const align = style.labelAlign || OpenLayers.Renderer.defaultSymbolizer.labelAlign;
+            label.setAttributeNS(null, "text-anchor",
+                OpenLayers.Renderer.SVG.LABEL_ALIGN[align[0]] || "middle");
+
             if (OpenLayers.IS_GECKO === true) {
-                u.setAttributeNS(null, "dominant-baseline", OpenLayers.Renderer.SVG.LABEL_ALIGN[h[1]] || "central");
+                label.setAttributeNS(null, "dominant-baseline",
+                    OpenLayers.Renderer.SVG.LABEL_ALIGN[align[1]] || "central");
             }
-            c = t.label.split("\n");
-            d = c.length;
-            while (u.childNodes.length > d) {
-                u.removeChild(u.lastChild);
+
+            const labelRows = style.label.split('\n');
+            const numRows = labelRows.length;
+            while (label.childNodes.length > numRows) {
+                label.removeChild(label.lastChild);
             }
-            for (p = 0; d > p; p += 1) {
-                g = this.nodeFactory(e + l + "_tspan_" + p, "tspan");
-                if (t.labelSelect === true) {
-                    g._featureId = e;
-                    g._geometry = i;
-                    g._geometryClass = i.CLASS_NAME;
+            for (let i = 0; i < numRows; i++) {
+                const tspan = this.nodeFactory(featureId + suffix + "_tspan_" + i, "tspan");
+                if (style.labelSelect === true) {
+                    tspan._featureId = featureId;
+                    tspan._geometry = location;
+                    tspan._geometryClass = location.CLASS_NAME;
                 }
                 if (OpenLayers.IS_GECKO === false) {
-                    g.setAttributeNS(null, "baseline-shift", OpenLayers.Renderer.SVG.LABEL_VSHIFT[h[1]] || "-35%");
+                    tspan.setAttributeNS(null, "baseline-shift",
+                        OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] || "-35%");
                 }
-                g.setAttribute("x", o);
-                if (0 === p) {
-                    f = OpenLayers.Renderer.SVG.LABEL_VFACTOR[h[1]];
-                    if (f === undefined) {
-                        f = -0.5;
+                tspan.setAttribute("x", x);
+                if (i == 0) {
+                    let vfactor = OpenLayers.Renderer.SVG.LABEL_VFACTOR[align[1]];
+                    if (vfactor == null) {
+                        vfactor = -0.5;
                     }
-                    g.setAttribute("dy", f * (d - 1) + "em");
+                    tspan.setAttribute("dy", (vfactor * (numRows - 1)) + "em");
                 } else {
-                    g.setAttribute("dy", "1em");
+                    tspan.setAttribute("dy", "1em");
                 }
-                g.textContent = "" === c[p] ? " " : c[p];
-                if (!g.parentNode) {
-                    u.appendChild(g);
+                tspan.textContent = (labelRows[i] === '') ? ' ' : labelRows[i];
+                if (!tspan.parentNode) {
+                    label.appendChild(tspan);
                 }
             }
-            if (!u.parentNode) {
-                this.textRoot.appendChild(u);
+
+            if (!label.parentNode) {
+                this.textRoot.appendChild(label);
             }
         };
 
@@ -2519,6 +2591,9 @@
         OLMap.addLayer(streetVector);
         OLMap.addLayer(labelsVector);
         OLMap.addLayer(nodesVector);
+        document.sv = streetVector;
+
+
 
         streetVector.events.register("visibilitychanged", streetVector, manageVisibilityChanged);
 
@@ -2556,9 +2631,9 @@
 
         initWazeWrap();
 
-        //TODO: disable when layer is disabled
-        //consoleDebug("Setting timer");
-        //renderInterval = setInterval(checkRender, 700);
+
+        //TODO remove in the next releases
+        $(".olControlAttribution").click(()=>{alert("The preferences have been moved to the sidebar on the left. Please look for the \"SVL 🗺️\" tab.");});
 
         console.log("Street Vector Layer v. " + GM_info.script.version + " initialized correctly.");
     }
