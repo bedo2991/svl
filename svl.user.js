@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.3.5
+// @version    4.9.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -1362,6 +1362,7 @@
         document.getElementById("svl_saveNewPref").classList.remove("disabled");
         document.getElementById("svl_saveNewPref").classList.add("btn-primary");
         document.getElementById("svl_rollbackButton").classList.remove("disabled");
+        document.getElementById("sidepanel-svl").classList.add("svl_unsaved");
         //$("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
         for (i = 0, len = preferences.streets.length; i < len; i += 1) {
             if (preferences.streets[i]) {
@@ -1648,6 +1649,7 @@
         document.getElementById("svl_saveNewPref").classList.add("disabled");
         document.getElementById("svl_rollbackButton").classList.add("disabled");
         document.getElementById("svl_saveNewPref").classList.remove("btn-primary");
+        document.getElementById("sidepanel-svl").classList.remove("svl_unsaved");
         for (let i = 0, len = preferences.streets.length; i < len; i++) {
 
             if (preferences.streets[i]) {
@@ -1796,6 +1798,7 @@
         style.innerHTML = `
         <style>
         #sidepanel-svl details{margin-bottom:9pt;}
+        .svl_unsaved{background-color:#ffcc00}
         .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
         .prefLineCheckbox{width:100%; margin-bottom:1vh;}
         .prefLineCheckbox label{display:block;width:100%}
@@ -1806,23 +1809,41 @@
         .prefLineSlider {width:100%; margin-bottom:1vh;}
         .prefLineSlider label{display:block;width:100%}
         .prefLineSlider input{float:right;}
+        .svl_logo {width:130px; display:inline-block; float:right}
         #sidepanel-svl h5{text-transform: capitalize;}
-        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em black solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}
-        summary{font-weight:bold}</style>`;
+        .svl_support-link{display:inline-block; width:100%; text-align:center;}
+        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
+        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}
+        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>`;
+
+
         document.body.appendChild(style);
         const mainDiv = document.createElement("div");
+
+        const logo = document.createElement("img");
+        logo.className="svl_logo";
+        logo.src = "https://raw.githubusercontent.com/bedo2991/svl/master/logo.png";
+        logo.alt = "Street Vector Layer Logo";
+        mainDiv.appendChild(logo);
 
         const spanThanks = document.createElement("span");
         spanThanks.innerText = "Thanks for using";
         mainDiv.appendChild(spanThanks);
 
-        const svlTitle = document.createElement("h3");
+        const svlTitle = document.createElement("h4");
         svlTitle.innerText = "Street Vector Layer";
         mainDiv.appendChild(svlTitle);
 
         const spanVersion = document.createElement("span");
         spanVersion.innerText = "Version " + GM_info.script.version;
         mainDiv.appendChild(spanVersion);
+
+        const supportForum = document.createElement("a");
+        supportForum.innerText = "Something not working? Report it here.";
+        supportForum.href=GM_info.script.supportURL;
+        supportForum.target="_blank";
+        supportForum.className="svl_support-link";
+        mainDiv.appendChild(supportForum);
 
         //mainDiv.id = "svl_PrefDiv";
 
@@ -1850,15 +1871,10 @@
         resetButton.title = "Overwrite your current settings with the default ones";
 
         const buttons = document.createElement("div");
+        buttons.className="svl_buttons expand";
         buttons.appendChild(saveButton);
         buttons.appendChild(rollbackButton);
         buttons.appendChild(resetButton);
-        buttons.style.position = "sticky";
-        buttons.style.padding = "1vh";
-        buttons.style.display = "flex";
-        buttons.style.backgroundColor = "#eeeeee";
-        buttons.style.justifyContent = "space-around";
-        buttons.style.top = "0";
 
         mainDiv.appendChild(buttons);
 
@@ -2403,12 +2419,14 @@
         initPreferencePanel();
         WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", GM_info.script.version,
             `<b>Major update!</b>
+            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
         <br>- NEW: Rendering completely rewritten: performance improvements
-        <br>- NEW: You can set what color to use for each speed limit
-        <br>- NEW: Added an option to render the streets based on their width;
-        <br>- NEW: preference panel is now in the sidebar (SVL 🗺️)
-        <br>- NEW: some options are now are now localised using WME's strings
-        <br>- NEW: dead-end nodes are rendered with a different color
+        <br>- NEW: The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
+        <br>- NEW: You can set what color to use for each speed limit (User request)
+        <br>- NEW: Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
+        <br>- NEW: Some options are now are now localised using WME's strings
+        <br>- NEW: Dead-end nodes are rendered with a different color
+        <br>- NEW: The Preference panel changes color when you have unsaved changes
         <br>- Removed: the zoom-level indicator while editing the preferences
         <br>- Bug fixes and new bugs :)`);
     }
