@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.3.4
+// @version    4.9.3.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
 // @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
 // @require    https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
+// @icon       https://raw.githubusercontent.com/bedo2991/svl/master/logo_noText.png
 // @author     bedo2991
 // @grant    GM_setClipboard
 // @copyright  2015+, bedo2991
@@ -1605,6 +1606,11 @@
             slValue.min = 0;
             slValue.max = 150;
             inputs.appendChild(slValue);
+
+            const span = document.createElement("span");
+            span.innerText = metric? "km/h":"mph";
+            inputs.appendChild(span);
+
         }
 
 
@@ -1790,7 +1796,7 @@
         style.innerHTML = `
         <style>
         #sidepanel-svl details{margin-bottom:9pt;}
-        .expand{display:flex; width:100%; justify-content:space-around;}
+        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
         .prefLineCheckbox{width:100%; margin-bottom:1vh;}
         .prefLineCheckbox label{display:block;width:100%}
         .prefLineCheckbox input{float:right;}
@@ -1805,6 +1811,19 @@
         summary{font-weight:bold}</style>`;
         document.body.appendChild(style);
         const mainDiv = document.createElement("div");
+
+        const spanThanks = document.createElement("span");
+        spanThanks.innerText = "Thanks for using";
+        mainDiv.appendChild(spanThanks);
+
+        const svlTitle = document.createElement("h3");
+        svlTitle.innerText = "Street Vector Layer";
+        mainDiv.appendChild(svlTitle);
+
+        const spanVersion = document.createElement("span");
+        spanVersion.innerText = "Version " + GM_info.script.version;
+        mainDiv.appendChild(spanVersion);
+
         //mainDiv.id = "svl_PrefDiv";
 
         const saveButton = document.createElement("button");
