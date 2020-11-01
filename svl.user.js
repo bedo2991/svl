@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.3.3
+// @version    4.9.3.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -40,14 +40,20 @@
         clutterConstant,
         thresholdDistance,
         streetStyles = [],
-        streetVector,
+        streetVectorLayer,
         nodesVector,
         labelsVector,
-        arrowDeclutter,
         preferences,
         WMERoadLayer,
         SVLAutomDisabled,
         OLMap;
+
+    const ROAD_LAYER = 0;
+    const SVL_LAYER = 1;
+    const layerCheckboxes = {
+        ROAD_LAYER: null,
+        SVL_LAYER: null
+    };
 
     const FARZOOMTHRESHOLD = 5; //To increase performance change this value to 6.
     const clutterMax = 700;
@@ -157,186 +163,48 @@
         }
     }
 
+    function setLayerVisibility(layer, visibility) {
+        //Toggle layers
+        if (layer === SVL_LAYER) {
+            consoleDebug("Changing SVL Layer visibility to " + visibility);
+            streetVectorLayer.setVisibility(visibility);
+        } else {
+            if (WMERoadLayer) {
+                consoleDebug("Changing Road Layer visibility to " + visibility);
+                WMERoadLayer.setVisibility(visibility);
+            }
+            else {
+                console.warn("SVL: cannot toggle the WME's road layer");
+            }
+        }
+        //Toggle checkboxes
+        if (!layerCheckboxes[layer]) {
+            consoleDebug("Initialising layer " + layer);
+            layerCheckboxes[layer] = document.getElementById(layer === SVL_LAYER ? "layer-switcher-item_street_vector_layer" : "layer-switcher-item_road");
+            if (!layerCheckboxes[layer]) {
+                console.warn("SVL: cannot find checkbox for layer number " + layer);
+                return;
+            }
+        }
+        console.dir(layerCheckboxes[layer]);
+        layerCheckboxes[layer].checked = visibility;
+    }
+
     //TODO
     function hasToBeSkipped(roadid) {
         return preferences.hideMinorRoads && OLMap.zoom === 3 && svlIgnoredStreets[roadid] === true;
     }
 
     function savePreferences(preferences) {
+        consoleDebug("savePreferences");
         preferences.version = GM_info.script.version;
         localStorage.setItem("svl", JSON.stringify(preferences));
     }
 
 
     function saveDefaultPreferences() {
-        preferences = {};
-
-        preferences.autoReload = {};
-        preferences.autoReload.interval = 60000;
-        preferences.autoReload.enabled = false;
-
-        preferences.showSLSinglecolor = false;
-        preferences.SLColor = "#ffdf00";
-
-        preferences.fakelock = WazeWrap?.User?.Rank() || 6; // jshint ignore:line
-        preferences.hideMinorRoads = true;
-        preferences.showDashedUnverifiedSL = true;
-        preferences.showSLcolor = true;
-        preferences.showSLtext = true;
-        preferences.version = GM_info.script.version;
-        preferences.disableRoadLayers = true;
-        preferences.startDisabled = false;
-        preferences.clutterConstant = 400;
-        preferences.labelOutlineWidth = 3;
-        preferences.closeZoomLabelSize = 11;
-        preferences.farZoomLabelSize = 11;
-        preferences.streets = [];
-        //Street: 1
-        preferences.streets[1] = {
-            strokeColor: "#FFFFFF",
-            strokeWidth: 5,
-            strokeDashstyle: "solid",
-        };
-        //Parking: 20
-        preferences.streets[20] = {
-            strokeColor: "#2282ab",
-            strokeWidth: 5,
-            strokeDashstyle: "solid",
-        };
-        //Ramp: 4
-        preferences.streets[4] = {
-            strokeColor: "#3FC91C",
-            strokeWidth: 6,
-            strokeDashstyle: "solid",
-        };
-        //Freeway: 3
-        preferences.streets[3] = {
-            strokeColor: "#387FB8",
-            strokeWidth: 9,
-            strokeDashstyle: "solid",
-        };
-        //Minor: 7
-        preferences.streets[7] = {
-            strokeColor: "#ECE589",
-            strokeWidth: 7,
-            strokeDashstyle: "solid",
-        };
-        //Major: 6
-        preferences.streets[6] = {
-            strokeColor: "#C13040",
-            strokeWidth: 8,
-            strokeDashstyle: "solid",
-        };
-        //Stairway: 16
-        preferences.streets[16] = {
-            strokeColor: "#B700FF",
-            strokeWidth: 3,
-            strokeDashstyle: "dash",
-        };
-        //Walking: 5
-        preferences.streets[5] = {
-            strokeColor: "#00FF00",
-            strokeWidth: 3,
-            strokeDashstyle: "dash",
-        };
-        //Dirty: 8
-        preferences.streets[8] = {
-            strokeColor: "#82614A",
-            strokeWidth: 5,
-            strokeDashstyle: "solid",
-        };
-        //Ferry: 15
-        preferences.streets[15] = {
-            strokeColor: "#FF8000",
-            strokeWidth: 3,
-            strokeDashstyle: "dashdot",
-        };
-        //Railroad: 18
-        preferences.streets[18] = {
-            strokeColor: "#FFFFFF",
-            strokeWidth: 4,
-            strokeDashstyle: "dash",
-        };
-        //Private: 17
-        preferences.streets[17] = {
-            strokeColor: "#00FFB3",
-            strokeWidth: 4,
-            strokeDashstyle: "solid",
-        };
-        //Alley: 22
-        preferences.streets[22] = {
-            strokeColor: "#C6C7FF",
-            strokeWidth: 4,
-            strokeDashstyle: "solid",
-        };
-        //Runway: 19
-        preferences.streets[19] = {
-            strokeColor: "#00FF00",
-            strokeWidth: 4,
-            strokeDashstyle: "dashdot",
-        };
-        //Primary: 2
-        preferences.streets[2] = {
-            strokeColor: "#CBA12E",
-            strokeWidth: 6,
-            strokeDashstyle: "solid",
-        };
-        //Pedestrian: 10
-        preferences.streets[10] = {
-            strokeColor: "#0000FF",
-            strokeWidth: 6,
-            strokeDashstyle: "dash",
-        };
-        //Red segments (without names)
-        preferences.red = {
-            strokeColor: "#FF0000",
-            strokeWidth: 6,
-            strokeDashstyle: "solid",
-        };
-
-        preferences.roundabout = {
-            strokeColor: "#111",
-            strokeWidth: 1,
-            strokeDashstyle: "dash",
-        };
-        preferences.lanes = {
-            strokeColor: "#454443",
-            strokeWidth: 3,
-            strokeDashstyle: "dash",
-        };
-        preferences.toll = {
-            strokeColor: "#00E1FF",
-            strokeWidth: 2,
-            strokeDashstyle: "solid"
-        };
-        preferences.closure = {
-            strokeColor: "#FF00FF",
-            strokeWidth: 4,
-            strokeDashstyle: "dash",
-        };
-        preferences.headlights = {
-            strokeColor: "#bfff00",
-            strokeWidth: 3,
-            strokeDashstyle: "dot",
-        };
-        preferences.restriction = {
-            strokeColor: "#F2FF00",
-            strokeWidth: 2,
-            strokeDashstyle: "dash",
-        };
-        preferences.dirty = {
-            strokeColor: "#82614A",
-            strokeOpacity: 0.6,
-            strokeDashstyle: "longdash",
-        };
-        preferences.arrowDeclutter = 25;
-
-        preferences.showUnderGPSPoints = false;
-        preferences.routingModeEnabled = false;
-        preferences.realsize = false;
-        preferences.showANs = false;
-
-        savePreferences(preferences);
+        consoleDebug("saveDefaultPreferences");
+        loadPreferences(true);
     }
 
     const defaultSegmentWidhtMeters = {
@@ -375,21 +243,250 @@
     }
 
 
-    function loadPreferences() {
-        preferences = JSON.parse(localStorage.getItem("svl"));
-        //consoleDebug("Loading preferences");
-        if (preferences === null) {
-            //consoleDebug("Creating new preferences from default");
-            saveDefaultPreferences();
-            return false;
+    function loadPreferences(overwrite = false) {
+        let oldUser = true;
+        let loadedPreferences = null;
+
+        if (overwrite === true) {
+            localStorage.removeItem("svl");
         } else {
-            if (typeof preferences.dirty.strokeOpacity === "undefined" || preferences.dirty.strokeOpacity > 1) {
-                preferences.dirty.strokeOpacity = 0.6;
-            }
-            clutterConstant = preferences.clutterConstant || 400;
-            thresholdDistance = getThreshold();
+            loadedPreferences = JSON.parse(localStorage.getItem("svl"));
         }
-        return true;
+
+        //consoleDebug("Loading preferences");
+        if (loadedPreferences === null) {
+            if (overwrite) {
+                consoleDebug("Overwriting existing preferences");
+            } else {
+                oldUser = false;
+                consoleDebug("Creating new preferences for the first time");
+            }
+        }
+        //else: preference read from localstorage
+
+        preferences = {};
+        preferences.autoReload = {};
+        //jshint ignore: start
+        preferences.autoReload.interval = loadedPreferences?.autoReload?.interval || 60000;
+        preferences.autoReload.enabled = loadedPreferences?.autoReload?.enabled || false;
+
+        preferences.showSLSinglecolor = loadedPreferences?.showSLSinglecolor || false;
+        preferences.SLColor = loadedPreferences?.SLColor || "#ffdf00";
+
+        preferences.fakelock = loadedPreferences?.fakelock || WazeWrap?.User?.Rank() || 6; // jshint ignore:line
+        preferences.hideMinorRoads = loadedPreferences?.hideMinorRoads || true;
+        preferences.showDashedUnverifiedSL = loadedPreferences?.showDashedUnverifiedSL || true;
+        preferences.showSLcolor = loadedPreferences?.showSLcolor || true;
+        preferences.showSLtext = loadedPreferences?.showSLtext || true;
+        //preferences.version = GM_info.script.version; Automatically added by savePreferences
+        preferences.disableRoadLayers = loadedPreferences?.disableRoadLayers || true;
+        preferences.startDisabled = loadedPreferences?.startDisabled || false;
+        preferences.clutterConstant = loadedPreferences?.clutterConstant || 200;
+        preferences.labelOutlineWidth = loadedPreferences?.labelOutlineWidth || 3;
+        preferences.closeZoomLabelSize = loadedPreferences?.closeZoomLabelSize || 14;
+        preferences.farZoomLabelSize = loadedPreferences?.farZoomLabelSize || 12;
+
+        preferences.arrowDeclutter = loadedPreferences?.arrowDeclutter || 140;
+
+        preferences.showUnderGPSPoints = loadedPreferences?.showUnderGPSPoints || false;
+        preferences.routingModeEnabled = loadedPreferences?.routingModeEnabled || false;
+        preferences.realsize = loadedPreferences?.realsize || false;
+        preferences.showANs = loadedPreferences?.showANs || false;
+
+        preferences.streets = [];
+        //Street: 1
+        preferences.streets[1] = {
+            strokeColor: loadedPreferences?.streets[1]?.strokeColor || "#FFFFFF",
+            strokeWidth: loadedPreferences?.streets[1]?.strokeWidth || 10,
+            strokeDashstyle: loadedPreferences?.streets[1]?.strokeDashstyle || "solid",
+        };
+        //Parking: 20
+        preferences.streets[20] = {
+            strokeColor: loadedPreferences?.streets[20]?.strokeColor || "#2282ab",
+            strokeWidth: loadedPreferences?.streets[20]?.strokeWidth || 9,
+            strokeDashstyle: loadedPreferences?.streets[20]?.strokeDashstyle || "solid",
+        };
+        //Ramp: 4
+        preferences.streets[4] = {
+            strokeColor: loadedPreferences?.streets[4]?.strokeColor || "#3FC91C",
+            strokeWidth: loadedPreferences?.streets[4]?.strokeWidth || 11,
+            strokeDashstyle: loadedPreferences?.streets[4]?.strokeDashstyle || "solid",
+        };
+        //Freeway: 3
+        preferences.streets[3] = {
+            strokeColor: loadedPreferences?.streets[3]?.strokeColor || "#387FB8",
+            strokeWidth: loadedPreferences?.streets[3]?.strokeWidth || 18,
+            strokeDashstyle: loadedPreferences?.streets[3]?.strokeDashstyle || "solid",
+        };
+        //Minor: 7
+        preferences.streets[7] = {
+            strokeColor: loadedPreferences?.streets[7]?.strokeColor || "#ECE589",
+            strokeWidth: loadedPreferences?.streets[7]?.strokeWidth || 14,
+            strokeDashstyle: loadedPreferences?.streets[7]?.strokeDashstyle || "solid",
+        };
+        //Major: 6
+        preferences.streets[6] = {
+            strokeColor: loadedPreferences?.streets[6]?.strokeColor || "#C13040",
+            strokeWidth: loadedPreferences?.streets[6]?.strokeWidth || 16,
+            strokeDashstyle: loadedPreferences?.streets[6]?.strokeDashstyle || "solid",
+        };
+        //Stairway: 16
+        preferences.streets[16] = {
+            strokeColor: loadedPreferences?.streets[16]?.strokeColor || "#B700FF",
+            strokeWidth: loadedPreferences?.streets[16]?.strokeWidth || 5,
+            strokeDashstyle: loadedPreferences?.streets[16]?.strokeDashstyle || "dash",
+        };
+        //Walking: 5
+        preferences.streets[5] = {
+            strokeColor: loadedPreferences?.streets[5]?.strokeColor || "#00FF00",
+            strokeWidth: loadedPreferences?.streets[5]?.strokeWidth || 5,
+            strokeDashstyle: loadedPreferences?.streets[5]?.strokeDashstyle || "dash",
+        };
+        //Dirty: 8
+        preferences.streets[8] = {
+            strokeColor: loadedPreferences?.streets[8]?.strokeColor || "#82614A",
+            strokeWidth: loadedPreferences?.streets[8]?.strokeWidth || 7,
+            strokeDashstyle: loadedPreferences?.streets[8]?.strokeDashstyle || "solid",
+        };
+        //Ferry: 15
+        preferences.streets[15] = {
+            strokeColor: loadedPreferences?.streets[15]?.strokeColor || "#FF8000",
+            strokeWidth: loadedPreferences?.streets[15]?.strokeWidth || 5,
+            strokeDashstyle: loadedPreferences?.streets[15]?.strokeDashstyle || "dashdot",
+        };
+        //Railroad: 18
+        preferences.streets[18] = {
+            strokeColor: loadedPreferences?.streets[18]?.strokeColor || "#FFFFFF",
+            strokeWidth: loadedPreferences?.streets[18]?.strokeWidth || 8,
+            strokeDashstyle: loadedPreferences?.streets[18]?.strokeDashstyle || "dash",
+        };
+        //Private: 17
+        preferences.streets[17] = {
+            strokeColor: loadedPreferences?.streets[17]?.strokeColor || "#00FFB3",
+            strokeWidth: loadedPreferences?.streets[17]?.strokeWidth || 7,
+            strokeDashstyle: loadedPreferences?.streets[17]?.strokeDashstyle || "solid",
+        };
+        //Alley: 22
+        preferences.streets[22] = {
+            strokeColor: loadedPreferences?.streets[22]?.strokeColor || "#C6C7FF",
+            strokeWidth: loadedPreferences?.streets[22]?.strokeWidth || 6,
+            strokeDashstyle: loadedPreferences?.streets[22]?.strokeDashstyle || "solid",
+        };
+        //Runway: 19
+        preferences.streets[19] = {
+            strokeColor: loadedPreferences?.streets[19]?.strokeColor || "#00FF00",
+            strokeWidth: loadedPreferences?.streets[19]?.strokeWidth || 5,
+            strokeDashstyle: loadedPreferences?.streets[19]?.strokeDashstyle || "dashdot",
+        };
+        //Primary: 2
+        preferences.streets[2] = {
+            strokeColor: loadedPreferences?.streets[2]?.strokeColor || "#CBA12E",
+            strokeWidth: loadedPreferences?.streets[2]?.strokeWidth || 12,
+            strokeDashstyle: loadedPreferences?.streets[2]?.strokeDashstyle || "solid",
+        };
+        //Pedestrian: 10
+        preferences.streets[10] = {
+            strokeColor: loadedPreferences?.streets[10]?.strokeColor || "#0000FF",
+            strokeWidth: loadedPreferences?.streets[10]?.strokeWidth || 5,
+            strokeDashstyle: loadedPreferences?.streets[10]?.strokeDashstyle || "dash",
+        };
+        //Red segments (without names)
+        preferences.red = {
+            strokeColor: loadedPreferences?.red?.strokeColor || "#FF0000",
+            strokeWidth: loadedPreferences?.red?.strokeWidth || 6,
+            strokeDashstyle: loadedPreferences?.red?.strokeDashstyle || "solid",
+        };
+
+        preferences.roundabout = {
+            strokeColor: loadedPreferences?.roundabout?.strokeColor || "#111",
+            strokeWidth: loadedPreferences?.roundabout?.strokeWidth || 1,
+            strokeDashstyle: loadedPreferences?.roundabout?.strokeDashstyle || "dash",
+        };
+        preferences.lanes = {
+            strokeColor: loadedPreferences?.lanes?.strokeColor || "#454443",
+            strokeWidth: loadedPreferences?.lanes?.strokeWidth || 3,
+            strokeDashstyle: loadedPreferences?.lanes?.strokeDashstyle || "dash",
+        };
+        preferences.toll = {
+            strokeColor: loadedPreferences?.toll?.strokeColor || "#00E1FF",
+            strokeWidth: loadedPreferences?.toll?.strokeWidth || 2,
+            strokeDashstyle: loadedPreferences?.toll?.strokeDashstyle || "solid"
+        };
+        preferences.closure = {
+            strokeColor: loadedPreferences?.closure?.strokeColor || "#FF00FF",
+            strokeWidth: loadedPreferences?.closure?.strokeWidth || 4,
+            strokeDashstyle: loadedPreferences?.closure?.strokeDashstyle || "dash",
+        };
+        preferences.headlights = {
+            strokeColor: loadedPreferences?.headlights?.strokeColor || "#bfff00",
+            strokeWidth: loadedPreferences?.headlights?.strokeWidth || 3,
+            strokeDashstyle: loadedPreferences?.headlights?.strokeDashstyle || "dot",
+        };
+        preferences.restriction = {
+            strokeColor: loadedPreferences?.restriction?.strokeColor || "#F2FF00",
+            strokeWidth: loadedPreferences?.restriction?.strokeWidth || 2,
+            strokeDashstyle: loadedPreferences?.restriction?.strokeDashstyle || "dash",
+        };
+        preferences.dirty = {
+            strokeColor: loadedPreferences?.dirty?.strokeColor || "#82614A",
+            strokeOpacity: loadedPreferences?.dirty?.strokeOpacity || 0.6,
+            strokeDashstyle: loadedPreferences?.dirty?.strokeDashstyle || "longdash",
+        };
+
+        preferences.speeds = {};
+        preferences.speeds.default = loadedPreferences?.speed?.default || "#cc0000";
+
+        if (loadedPreferences?.speeds?.metric) {
+            preferences.speeds.metric = loadedPreferences.speeds.metric;
+        } else {
+            preferences.speeds.metric = {};
+            preferences.speeds.metric[5] = loadedPreferences?.speeds?.metric[5] || "#542344";
+            preferences.speeds.metric[7] = loadedPreferences?.speeds?.metric[7] || "#ff5714";
+            preferences.speeds.metric[10] = loadedPreferences?.speeds?.metric[10] || "#ffbf00";
+            preferences.speeds.metric[20] = loadedPreferences?.speeds?.metric[20] || "#ee0000";
+            preferences.speeds.metric[30] = loadedPreferences?.speeds?.metric[30] || "#e4ff1a";
+            preferences.speeds.metric[40] = loadedPreferences?.speeds?.metric[40] || "#993300";
+            preferences.speeds.metric[50] = loadedPreferences?.speeds?.metric[50] || "#33ff33";
+            preferences.speeds.metric[60] = loadedPreferences?.speeds?.metric[60] || "#639fab";
+            preferences.speeds.metric[70] = loadedPreferences?.speeds?.metric[70] || "#00ffff";
+            preferences.speeds.metric[80] = loadedPreferences?.speeds?.metric[80] || "#00bfff";
+            preferences.speeds.metric[90] = loadedPreferences?.speeds?.metric[90] || "#0066ff";
+            preferences.speeds.metric[100] = loadedPreferences?.speeds?.metric[100] || "#ff00ff";
+            preferences.speeds.metric[110] = loadedPreferences?.speeds?.metric[110] || "#ff0080";
+            preferences.speeds.metric[120] = loadedPreferences?.speeds?.metric[120] || "#ff0000";
+            preferences.speeds.metric[130] = loadedPreferences?.speeds?.metric[130] || "#ff9000";
+            preferences.speeds.metric[140] = loadedPreferences?.speeds?.metric[140] || "#ff4000";
+            preferences.speeds.metric[150] = loadedPreferences?.speeds?.metric[150] || "#0040ff";
+        }
+
+        if (loadedPreferences?.speeds?.imperial) {
+            preferences.speeds.imperial = loadedPreferences.speeds.imperial;
+        } else {
+            preferences.speeds.imperial = {};
+            preferences.speeds.imperial[5] = loadedPreferences?.speeds?.imperial[5] || "#ff0000";
+            preferences.speeds.imperial[10] = loadedPreferences?.speeds?.imperial[10] || "#ff8000";
+            preferences.speeds.imperial[15] = loadedPreferences?.speeds?.imperial[15] || "#ffb000";
+            preferences.speeds.imperial[20] = loadedPreferences?.speeds?.imperial[20] || "#bfff00";
+            preferences.speeds.imperial[25] = loadedPreferences?.speeds?.imperial[25] || "#993300";
+            preferences.speeds.imperial[30] = loadedPreferences?.speeds?.imperial[30] || "#33ff33";
+            preferences.speeds.imperial[35] = loadedPreferences?.speeds?.imperial[35] || "#00ff90";
+            preferences.speeds.imperial[40] = loadedPreferences?.speeds?.imperial[40] || "#00ffff";
+            preferences.speeds.imperial[45] = loadedPreferences?.speeds?.imperial[45] || "#00bfff";
+            preferences.speeds.imperial[50] = loadedPreferences?.speeds?.imperial[50] || "#0066ff";
+            preferences.speeds.imperial[55] = loadedPreferences?.speeds?.imperial[55] || "#ff00ff";
+            preferences.speeds.imperial[60] = loadedPreferences?.speeds?.imperial[60] || "#ff0050";
+            preferences.speeds.imperial[65] = loadedPreferences?.speeds?.imperial[65] || "#ff9010";
+            preferences.speeds.imperial[70] = loadedPreferences?.speeds?.imperial[70] || "#0040ff";
+            preferences.speeds.imperial[75] = loadedPreferences?.speeds?.imperial[75] || "#10ff10";
+            preferences.speeds.imperial[80] = loadedPreferences?.speeds?.imperial[80] || "#ff4000";
+            preferences.speeds.imperial[85] = loadedPreferences?.speeds?.imperial[85] || "#ff0000";
+        }
+        //jshint ignore: end
+        savePreferences(preferences);
+        //Compute properties that need to be computed
+        updateComputedValues(preferences);
+
+        return oldUser;
     }
 
     function getThreshold() {
@@ -411,7 +508,8 @@
         if (preferences.showSLSinglecolor) {
             return preferences.SLColor;
         }
-
+        const type = W.prefs.attributes.isImperial ? "imperial" : "metric";
+        return preferences.speeds[type][speed] || preferences.speeds.default;
         if (W.prefs.attributes.isImperial) { // adjust scale for Imperial
             // speeds 15 to 75 mph (7 increments) are tuned to HSL 95 to 395 (35) for easy visual speed differentiation at common speeds
             return `hsl(${((speed / 1.609344 * 5) + 20) % 360}, 100%, 50%)`;
@@ -627,24 +725,29 @@
         const myFeatures = [];
         const baselevel = attributes.level * 100;
         const isTwoWay = attributes.fwdDirection && attributes.revDirection;
-        let width = 0;
+        let isBridge = false;
+        let hasSpeedLimit = false;
+
+        const totalSegmentWidth = getWidth({
+            segmentWidth: attributes.width,
+            roadType: attributes.roadType,
+            twoWay: isTwoWay
+        });
+        let roadWidth = totalSegmentWidth;
         lineFeature = null;
         if (null === attributes.primaryStreetID) {
             //consoleDebug("RED segment", model);
             lineFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(pointList), {
                 myId: attributes.id,
                 color: preferences.red.strokeColor,
-                width: (!isTwoWay && preferences.realsize) ? preferences.red.strokeWidth * 0.6 : preferences.red.strokeWidth,
+                width: totalSegmentWidth,
                 dash: preferences.red.strokeDashstyle
             });
             myFeatures.push(lineFeature);
+            return myFeatures;
         } else {
             let roadType = attributes.roadType;
-            width = getWidth({
-                segmentWidth: attributes.width,
-                roadType: attributes.roadType,
-                twoWay: isTwoWay
-            });
+
             //consoleDebug(width);
             if (preferences.routingModeEnabled && attributes.routingRoadType !== null) {
                 roadType = attributes.routingRoadType;
@@ -657,17 +760,29 @@
                 //consoleDebug("Road Type: ", roadType);
                 if (attributes.level > 0) { //it is a bridge
                     //consoleDebug("Bridge");
+                    isBridge = true;
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
                         color: "#000000",
                         zIndex: baselevel + 100,
-                        width: width + (speed && preferences.showSLcolor ? 4 : 2),
+                        width: totalSegmentWidth,
                     });
                     myFeatures.push(lineFeature);
                 }
 
-                if (speed && preferences.showSLcolor) { //it has a speed limit
+                hasSpeedLimit = speed && preferences.showSLcolor;
+                //roadWidth: the width of the "inner" segment, without decorations around it
+                if (hasSpeedLimit && isBridge) {
+                    //A bridge with speed limit
+                    roadWidth = totalSegmentWidth * 0.56;
+                } else if (isBridge || hasSpeedLimit) {
+                    //A bridge without speed limit or a non-bridge with SL
+                    roadWidth = totalSegmentWidth * 0.68;
+                }
+
+
+                if (hasSpeedLimit) { //it has a speed limit
                     //consoleDebug("SpeedLimit");
                     speedStrokeStyle = (preferences.showDashedUnverifiedSL && (attributes.fwdMaxSpeedUnverified || attributes.revMaxSpeedUnverified) ? "dash" : "solid");
 
@@ -685,7 +800,8 @@
                             right[0] = pk.clone();
                             left[1] = pk1.clone();
                             right[1] = pk1.clone();
-                            offset = (width / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
+                            offset = isBridge ? ((totalSegmentWidth*0.14)) : totalSegmentWidth*0.17;
+                            //offset = (totalSegmentWidth / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
                             //of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
                             //console.error(of2);
                             //console.log(offset);
@@ -744,7 +860,7 @@
                                 new OpenLayers.Geometry.LineString(left), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(attributes.fwdMaxSpeed),
-                                width: width + 0.5,
+                                width: roadWidth,
                                 dash: speedStrokeStyle,
                                 closeZoomOnly: true,
                                 zIndex: baselevel + 105
@@ -754,7 +870,7 @@
                                 new OpenLayers.Geometry.LineString(right), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(attributes.revMaxSpeed),
-                                width: width + 0.5,
+                                width: roadWidth,
                                 dash: speedStrokeStyle,
                                 closeZoomOnly: true,
                                 zIndex: baselevel + 110
@@ -776,7 +892,7 @@
                                 new OpenLayers.Geometry.LineString(pointList), {
                                 myId: attributes.id,
                                 color: getColorStringFromSpeed(speedValue),
-                                width: width + 2.5,
+                                width: isBridge ? totalSegmentWidth * 0.80 : totalSegmentWidth,
                                 dash: speedStrokeStyle,
                                 closeZoomOnly: true,
                                 zIndex: baselevel + 115
@@ -791,7 +907,7 @@
                     new OpenLayers.Geometry.LineString(pointList), {
                     myId: attributes.id,
                     color: streetStyles[roadType].strokeColor,
-                    width: width,
+                    width: roadWidth,
                     dash: streetStyles[roadType].strokeDashstyle,
                     zIndex: baselevel + 120
                 });
@@ -803,7 +919,7 @@
                         new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
                         color: "#000000",
-                        width: width,
+                        width: roadWidth,
                         opacity: 0.35,
                         zIndex: baselevel + 125
                         //dash:"solid"
@@ -817,7 +933,7 @@
                         new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
                         color: nonEditableStyle.strokeColor,
-                        width: width * 0.15,
+                        width: roadWidth * 0.1,
                         dash: nonEditableStyle.strokeDashstyle,
                         zIndex: baselevel + 147
                     });
@@ -825,290 +941,290 @@
                     myFeatures.push(lineFeature);
                     locked = true;
                 }
-            }
 
-            /*jslint bitwise: true */
-            if (attributes.flags & 16) { //The unpaved flag is enabled
-                /*jslint bitwise: false */
-                //Unpaved
-                lineFeature = new OpenLayers.Feature.Vector(
-                    new OpenLayers.Geometry.LineString(pointList), {
-                    myId: attributes.id,
-                    color: preferences.dirty.strokeColor,
-                    width: width - 2,
-                    opacity: preferences.dirty.strokeOpacity,
-                    dash: preferences.dirty.strokeDashstyle,
-                    zIndex: baselevel + 135
-                });
-                myFeatures.push(lineFeature);
-            }
-        }
-        //Check segment properties
-
-
-        //CLOSE Zoom properties
-        if (attributes.hasClosures) {
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: preferences.closure.strokeColor,
-                width: preferences.closure.strokeWidth,
-                dash: preferences.closure.strokeDashstyle,
-                closeZoomOnly: true,
-                zIndex: baselevel + 140
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if (attributes.fwdToll || attributes.revToll || attributes.restrictions.some(r => r._defaultType === "TOLL")) { //It is a toll road
-            //consoleDebug("Segment is toll");
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: preferences.toll.strokeColor,
-                width: width * 0.2,//TODO preferences.toll.strokeWidth,
-                dash: preferences.toll.strokeDashstyle,
-                opacity: 0.9,
-                zIndex: baselevel + 145
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if (null !== attributes.junctionID) { //It is a roundabout
-            //consoleDebug("Segment is a roundabout");
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: roundaboutStyle.strokeColor,
-                width: roundaboutStyle.strokeWidth,
-                dash: roundaboutStyle.strokeDashstyle,
-                opacity: roundaboutStyle.strokeOpacity,
-                closeZoomOnly: true,
-                zIndex: baselevel + 150
-            });
-            myFeatures.push(lineFeature);
-        }
-
-
-        if (attributes.restrictions.length > 0) {
-            //It has restrictions
-            //consoleDebug("Segment has restrictions");
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: preferences.restriction.strokeColor,
-                width: preferences.restriction.strokeWidth,
-                dash: preferences.restriction.strokeDashstyle,
-                closeZoomOnly: true,
-                zIndex: baselevel + 155
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if (!locked && attributes.validated === false) { //Segments that needs validation
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: validatedStyle.strokeColor,
-                width: validatedStyle.strokeWidth,
-                dash: validatedStyle.strokeDashstyle,
-                closeZoomOnly: true,
-                zIndex: baselevel + 160
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        //Headlights
-        /*jslint bitwise: true */
-        if (attributes.flags & 32) {
-            /*jslint bitwise: false */
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: preferences.headlights.strokeColor,
-                width: preferences.headlights.strokeWidth,
-                dash: preferences.headlights.strokeDashstyle,
-                closeZoomOnly: true,
-                zIndex: baselevel + 165
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if (attributes.fwdLaneCount > 0) {
-            //console.log("LANE fwd");
-            let res = pointList.slice(-2);
-            //if(pointList.length === 2){
-            res[0] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
-            //}
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(res), {
-                myId: attributes.id,
-                color: preferences.lanes.strokeColor,
-                width: preferences.lanes.strokeWidth,
-                dash: preferences.lanes.strokeDashstyle,
-                opacity: 0.9,
-                closeZoomOnly: true,
-                zIndex: baselevel + 170
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if (attributes.revLaneCount > 0) {
-            //console.log("LANE rev");
-            let res = pointList.slice(0, 2);
-            //if(pointList.length === 2){
-            res[1] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
-            //}
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(res), {
-                myId: attributes.id,
-                color: preferences.lanes.strokeColor,
-                width: preferences.lanes.strokeWidth,
-                dash: preferences.lanes.strokeDashstyle,
-                opacity: 0.9,
-                closeZoomOnly: true,
-                zIndex: baselevel + 175
-            });
-            myFeatures.push(lineFeature);
-        }
-
-        if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
-            //consoleDebug("The segment is oneway or has unknown direction");
-            simplifiedPoints = points;
-            if (attributes.junctionID === null && (attributes.length / points.length < arrowDeclutter)) {
-                simplifiedPoints = simplified;
-            }
-
-            /*jslint bitwise: true */
-            if ((attributes.fwdDirection | attributes.revDirection) === 0) {
-                /*jslint bitwise: false */
-                //Unknown direction
-                for (p = 0, len = simplifiedPoints.length - 1; p < len; p += 1) {
-                    //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
-                    arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
+                /*jslint bitwise: true */
+                if (attributes.flags & 16) { //The unpaved flag is enabled
+                    /*jslint bitwise: false */
+                    //Unpaved
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
                         myId: attributes.id,
-                        closeZoomOnly: true,
-                        isArrow: true,
-                        zIndex: baselevel + 180
-                    }, unknownDirStyle);
-                    myFeatures.push(arrowFeature);
+                        color: preferences.dirty.strokeColor,
+                        width: roadWidth * 0.7,
+                        opacity: preferences.dirty.strokeOpacity,
+                        dash: preferences.dirty.strokeDashstyle,
+                        zIndex: baselevel + 135
+                    });
+                    myFeatures.push(lineFeature);
                 }
-            } else {
-                //Draw normal arrows
 
-                step = attributes.junctionID !== null ? 3 : 1; //It is a roundabout
-                for (p = step - 1, len = simplifiedPoints.length - 1; p < len; p += step) {
-                    //it is one way
-                    degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p + 1]);
-                    segmentLenght = simplifiedPoints[p].distanceTo(simplifiedPoints[p + 1]);
-                    minDistance = 15.0 * (11 - OLMap.zoom);
-                    if (segmentLenght < minDistance * 2) {
-                        segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
-                        arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {
-                            myId: attributes.id,
-                            closeZoomOnly: true,
-                            isArrow: true
-                        }, {
-                            graphicName: "myTriangle",
-                            rotation: degrees,
-                            stroke: true,
-                            strokeColor: "#000",
-                            strokeWidth: 1.5,
-                            fill: true,
-                            fillColor: "#fff",
-                            graphicZIndex: 180,
-                            fillOpacity: 0.7,
-                            pointRadius: 5,
-                            pointerEvents: "none"
-                        });
-                        myFeatures.push(arrowFeature);
-                    } else {
-                        dx = simplifiedPoints[p + 1].x - simplifiedPoints[p].x;
-                        dy = simplifiedPoints[p + 1].y - simplifiedPoints[p].y;
+                //Check segment properties
 
-                        numPoints = Math.floor(Math.sqrt(dx * dx + dy * dy) / minDistance) - 1;
 
-                        stepx = dx / numPoints;
-                        stepy = dy / numPoints;
-                        px = simplifiedPoints[p].x + stepx;
-                        py = simplifiedPoints[p].y + stepy;
-                        for (ix = 0; ix < numPoints; ix += 1) {
-                            arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {
+                //CLOSE Zoom properties
+                if (attributes.hasClosures) {
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: preferences.closure.strokeColor,
+                        width: preferences.closure.strokeWidth,
+                        dash: preferences.closure.strokeDashstyle,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 140
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if (attributes.fwdToll || attributes.revToll || attributes.restrictions.some(r => r._defaultType === "TOLL")) { //It is a toll road
+                    //consoleDebug("Segment is toll");
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: preferences.toll.strokeColor,
+                        width: roadWidth * 0.2,//TODO preferences.toll.strokeWidth,
+                        dash: preferences.toll.strokeDashstyle,
+                        opacity: 0.9,
+                        zIndex: baselevel + 145
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if (null !== attributes.junctionID) { //It is a roundabout
+                    //consoleDebug("Segment is a roundabout");
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: roundaboutStyle.strokeColor,
+                        width: roadWidth * 0.15,
+                        dash: roundaboutStyle.strokeDashstyle,
+                        opacity: roundaboutStyle.strokeOpacity,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 150
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+
+                if (attributes.restrictions.length > 0) {
+                    //It has restrictions
+                    //consoleDebug("Segment has restrictions");
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: preferences.restriction.strokeColor,
+                        width: roadWidth * 0.3, //preferences.restriction.strokeWidth,
+                        dash: preferences.restriction.strokeDashstyle,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 155
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if (!locked && attributes.validated === false) { //Segments that needs validation
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: validatedStyle.strokeColor,
+                        width: roadWidth*0.5,//validatedStyle.strokeWidth,
+                        dash: validatedStyle.strokeDashstyle,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 160
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                //Headlights
+                /*jslint bitwise: true */
+                if (attributes.flags & 32) {
+                    /*jslint bitwise: false */
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: preferences.headlights.strokeColor,
+                        width: roadWidth*0.2,//preferences.headlights.strokeWidth,
+                        dash: preferences.headlights.strokeDashstyle,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 165
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if (attributes.fwdLaneCount > 0) {
+                    //console.log("LANE fwd");
+                    let res = pointList.slice(-2);
+                    //if(pointList.length === 2){
+                    res[0] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+                    //}
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(res), {
+                        myId: attributes.id,
+                        color: preferences.lanes.strokeColor,
+                        width: roadWidth*0.3,//preferences.lanes.strokeWidth,
+                        dash: preferences.lanes.strokeDashstyle,
+                        opacity: 0.9,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 170
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if (attributes.revLaneCount > 0) {
+                    //console.log("LANE rev");
+                    let res = pointList.slice(0, 2);
+                    //if(pointList.length === 2){
+                    res[1] = new OpenLayers.Geometry.LineString([res[0], res[1]]).getCentroid(true);
+                    //}
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(res), {
+                        myId: attributes.id,
+                        color: preferences.lanes.strokeColor,
+                        width: roadWidth*0.3,//preferences.lanes.strokeWidth,
+                        dash: preferences.lanes.strokeDashstyle,
+                        opacity: 0.9,
+                        closeZoomOnly: true,
+                        zIndex: baselevel + 175
+                    });
+                    myFeatures.push(lineFeature);
+                }
+
+                if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
+                    //consoleDebug("The segment is oneway or has unknown direction");
+                    simplifiedPoints = points;
+                    if (attributes.junctionID === null && ((attributes.length / points.length) < preferences.arrowDeclutter)) {
+                        simplifiedPoints = simplified;
+                    }
+
+                    /*jslint bitwise: true */
+                    if ((attributes.fwdDirection | attributes.revDirection) === 0) {
+                        /*jslint bitwise: false */
+                        //Unknown direction
+                        for (p = 0, len = simplifiedPoints.length - 1; p < len; p += 1) {
+                            //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
+                            arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]).getCentroid(true), {
                                 myId: attributes.id,
                                 closeZoomOnly: true,
-                                isArrow: true
-                            }, {
-                                graphicName: "myTriangle",
-                                rotation: degrees,
-                                stroke: true,
-                                strokeColor: "#000",
-                                graphiczIndex: baselevel + 180,
-                                strokeWidth: 1.5,
-                                fill: true,
-                                fillColor: "#fff",
-                                fillOpacity: 0.7,
-                                pointRadius: 5,
-                            });
+                                isArrow: true,
+                                zIndex: baselevel + 180
+                            }, unknownDirStyle);
                             myFeatures.push(arrowFeature);
-                            px += stepx;
-                            py += stepy;
+                        }
+                    } else {
+                        //Draw normal arrows
+
+                        step = attributes.junctionID !== null ? 3 : 1; //It is a roundabout
+                        for (p = step - 1, len = simplifiedPoints.length - 1; p < len; p += step) {
+                            //it is one way
+                            degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p + 1]);
+                            segmentLenght = simplifiedPoints[p].distanceTo(simplifiedPoints[p + 1]);
+                            minDistance = 15.0 * (11 - OLMap.zoom);
+                            if (segmentLenght < minDistance * 2) {
+                                segmentLineString = new OpenLayers.Geometry.LineString([simplifiedPoints[p], simplifiedPoints[p + 1]]);
+                                arrowFeature = new OpenLayers.Feature.Vector(segmentLineString.getCentroid(true), {
+                                    myId: attributes.id,
+                                    closeZoomOnly: true,
+                                    isArrow: true
+                                }, {
+                                    graphicName: "myTriangle",
+                                    rotation: degrees,
+                                    stroke: true,
+                                    strokeColor: "#000",
+                                    graphiczIndex: baselevel + 180,
+                                    strokeWidth: 1.5,
+                                    fill: true,
+                                    fillColor: "#fff",
+                                    fillOpacity: 0.7,
+                                    pointRadius: 5,
+                                });
+                                myFeatures.push(arrowFeature);
+                            } else {
+                                dx = simplifiedPoints[p + 1].x - simplifiedPoints[p].x;
+                                dy = simplifiedPoints[p + 1].y - simplifiedPoints[p].y;
+
+                                numPoints = Math.floor(Math.sqrt(dx * dx + dy * dy) / minDistance) - 1;
+
+                                stepx = dx / numPoints;
+                                stepy = dy / numPoints;
+                                px = simplifiedPoints[p].x + stepx;
+                                py = simplifiedPoints[p].y + stepy;
+                                for (ix = 0; ix < numPoints; ix += 1) {
+                                    arrowFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(px, py), {
+                                        myId: attributes.id,
+                                        closeZoomOnly: true,
+                                        isArrow: true
+                                    }, {
+                                        graphicName: "myTriangle",
+                                        rotation: degrees,
+                                        stroke: true,
+                                        strokeColor: "#000",
+                                        graphiczIndex: baselevel + 180,
+                                        strokeWidth: 1.5,
+                                        fill: true,
+                                        fillColor: "#fff",
+                                        fillOpacity: 0.7,
+                                        pointRadius: 5,
+                                    });
+                                    myFeatures.push(arrowFeature);
+                                    px += stepx;
+                                    py += stepy;
+                                }
+                            }
                         }
                     }
                 }
+
+
+                /*jslint bitwise: true */
+                if (attributes.fwdFlags & 0x1) { //check if speed camera
+                    /*jslint bitwise: false */
+                    myFeatures.push(createAverageSpeedCamera(attributes.id, false, attributes.fwdDirection, points[0], points[1]));
+                }
+
+                /*jslint bitwise: true */
+                if (attributes.revFlags & 0x1) { //check if speed camera
+                    /*jslint bitwise: false */
+                    myFeatures.push(createAverageSpeedCamera(attributes.id, true, attributes.fwdDirection, points[points.length - 1], points[points.length - 2]));
+                }
+
+                //Show geometry points
+                if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
+                    for (p = 1, len = points.length - 2; p < len; p += 1) {
+                        //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
+                        arrowFeature = new OpenLayers.Feature.Vector(points[p], {
+                            myId: attributes.id,
+                            closeZoomOnly: true
+                        }, geometryNodeStyle);
+                        myFeatures.push(arrowFeature);
+                    }
+                }
+                //END: show geometry points
+                // End: Close Zoom
+
+                //In any Zoom:
+
+                /*jslint bitwise: true */
+                if (attributes.flags & 1) { //The tunnel flag is enabled
+                    /*jslint bitwise: false */
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: tunnelFlagStyle1.strokeColor,
+                        opacity: tunnelFlagStyle1.strokeOpacity,
+                        width: roadWidth * 0.3,
+                        dash: tunnelFlagStyle1.strokeDashstyle,
+                        zIndex: baselevel + 177
+                    });
+                    myFeatures.push(lineFeature);
+                    lineFeature = new OpenLayers.Feature.Vector(
+                        new OpenLayers.Geometry.LineString(pointList), {
+                        myId: attributes.id,
+                        color: tunnelFlagStyle2.strokeColor,
+                        width: roadWidth * 0.1,
+                        dash: tunnelFlagStyle2.strokeDashstyle,
+                        zIndex: baselevel + 177
+                    });
+                    myFeatures.push(lineFeature);
+                } //else: road type is not supported, just add the label            
             }
-        }
-
-
-        /*jslint bitwise: true */
-        if (attributes.fwdFlags & 0x1) { //check if speed camera
-            /*jslint bitwise: false */
-            myFeatures.push(createAverageSpeedCamera(attributes.id, false, attributes.fwdDirection, points[0], points[1]));
-        }
-
-        /*jslint bitwise: true */
-        if (attributes.revFlags & 0x1) { //check if speed camera
-            /*jslint bitwise: false */
-            myFeatures.push(createAverageSpeedCamera(attributes.id, true, attributes.fwdDirection, points[points.length - 1], points[points.length - 2]));
-        }
-
-        //Show geometry points
-        if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
-            for (p = 1, len = points.length - 2; p < len; p += 1) {
-                //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
-                arrowFeature = new OpenLayers.Feature.Vector(points[p], {
-                    myId: attributes.id,
-                    closeZoomOnly: true
-                }, geometryNodeStyle);
-                myFeatures.push(arrowFeature);
-            }
-        }
-        //END: show geometry points
-        // End: Close Zoom
-
-        //In any Zoom:
-
-        /*jslint bitwise: true */
-        if (attributes.flags & 1) { //The tunnel flag is enabled
-            /*jslint bitwise: false */
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: tunnelFlagStyle1.strokeColor,
-                opacity: tunnelFlagStyle1.strokeOpacity,
-                width: width * 0.3,
-                dash: tunnelFlagStyle1.strokeDashstyle,
-                zIndex: baselevel + 177
-            });
-            myFeatures.push(lineFeature);
-            lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(pointList), {
-                myId: attributes.id,
-                color: tunnelFlagStyle2.strokeColor,
-                width: width * 0.1,
-                dash: tunnelFlagStyle2.strokeDashstyle,
-                zIndex: baselevel + 177
-            });
-            myFeatures.push(lineFeature);
         }
 
 
@@ -1123,7 +1239,7 @@
 
     function redrawAllSegments() {
         consoleDebug("DrawAllSegments");
-        streetVector.destroyFeatures();
+        streetVectorLayer.destroyFeatures();
         labelsVector.destroyFeatures();
         addSegments(Object.values(W.model.segments.objects));
         nodesVector.destroyFeatures();
@@ -1139,33 +1255,10 @@
         return pointFeature;
     }
 
-    /*
-    function drawAllNodes() {
-        //console.debug("Drawing ALL nodes");
-        let node, nodeFeatures, nodes;
-        //nodesVector.destroyFeatures();
-        nodeFeatures = [];
-        nodes = W.model.nodes.objects;
-        addNodes(Object.values(W.model.nodes.objects));
-        return;
-        //consoleDebug("nodes", nodes);
-        for (node in nodes) {
-            if (nodes.hasOwnProperty(node)) {
-                if (nodes[node].state !== "Delete") {
-                    nodeFeatures.push(drawNode(nodes[node]));
-                }
-            }
-        } //End: For all the nodes
-        nodesVector.addFeatures(nodeFeatures);
-    }*/
-
-    //TODO remove
-    // function doDraw() {
-    //     if (OLMap.zoom < 2) {
-    //         console.warn("Tried to draw at bad zoom");
-    //         return;
-    //     }
-    // }
+    function updateComputedValues(preferences) {
+        clutterConstant = preferences.clutterConstant;
+        thresholdDistance = getThreshold();
+    }
 
     function updateStylesFromPreferences(preferences) {
         let i, len;
@@ -1179,25 +1272,7 @@
                 };
             }
         }
-
-
-        //Rendering
-        //Labels
-        clutterConstant = preferences.clutterConstant;
-        thresholdDistance = getThreshold();
-
-        //ArrowDeclutter
-        arrowDeclutter = preferences.arrowDeclutter;
-
-        //labelOutlineWidth = preferences.labelOutlineWidth;
-        //showSLtext = preferences.showSLtext;
-        //showSLcolor = preferences.showSLcolor;
-
-        //Delete all elements
-        //nodesVector.destroyFeatures();
-        //labelsVector.destroyFeatures();
-        //streetVector.destroyFeatures();
-        //doDraw();
+        updateComputedValues(preferences);
         redrawAllSegments();
     }
 
@@ -1232,10 +1307,10 @@
         gps_layer_index = parseInt(W.map.getLayerByUniqueName("gps_points").getZIndex(), 10);
 
         if (preferences.showUnderGPSPoints) {
-            streetVector.setZIndex(gps_layer_index - 2);
+            streetVectorLayer.setZIndex(gps_layer_index - 2);
             nodesVector.setZIndex(gps_layer_index - 1);
         } else {
-            streetVector.setZIndex(gps_layer_index + 1);
+            streetVectorLayer.setZIndex(gps_layer_index + 1);
             nodesVector.setZIndex(gps_layer_index + 2);
         }
     }
@@ -1251,7 +1326,7 @@
             routingModeDiv.addEventListener("mouseenter", () => {
                 //Temporary disable routing mode
                 preferences.routingModeEnabled = false;
-                streetVector.destroyFeatures();
+                streetVectorLayer.destroyFeatures();
                 labelsVector.destroyFeatures();
                 nodesVector.destroyFeatures();
                 redrawAllSegments();
@@ -1260,7 +1335,7 @@
             routingModeDiv.addEventListener("mouseleave", () => {
                 //Enable routing mode again
                 preferences.routingModeEnabled = true;
-                streetVector.destroyFeatures();
+                streetVectorLayer.destroyFeatures();
                 labelsVector.destroyFeatures();
                 nodesVector.destroyFeatures();
                 redrawAllSegments();
@@ -1297,6 +1372,16 @@
         }
 
         preferences.fakelock = document.getElementById("svl_fakelock").value;
+
+        const type = W.prefs.attributes.isImperial ? "imperial" : "metric";
+        const speeds = Object.keys(preferences.speeds[type]);
+        preferences.speeds[type] = {};
+        for (let i = 1; i < speeds.length + 1; i++) {
+            let value = document.getElementById(`svl_slValue_${type}_${i}`).value;
+            preferences.speeds[type][value] = document.getElementById(`svl_slColor_${type}_${i}`).value;
+        }
+
+        preferences.speeds.default = document.getElementById(`svl_slColor_${type}_Default`).value;
 
 
         //Red
@@ -1415,7 +1500,7 @@
         let newSelect = document.createElement("select");
         newSelect.className = "prefElement";
         newSelect.title = "Stroke style";
-        newSelect.id = "svl_"+id;
+        newSelect.id = "svl_" + id;
         newSelect.innerHTML = "<option value=\"solid\">Solid</option><option value=\"dash\">Dashed</option><option value=\"dashdot\">Dash Dot</option><option value=\"longdash\">Long Dash</option><option value=\"longdashdot\">Long Dash Dot</option><option value=\"dot\">Dot</option>";
         return newSelect;
     }
@@ -1437,6 +1522,8 @@
                 return locale?.edit?.segment?.fields?.headlights || i; // jshint ignore:line
             case "lanes":
                 return locale?.objects?.lanes?.title || i; // jshint ignore:line
+            case "speed limit":
+                return locale?.edit?.segment?.fields?.speed_limit || i; // jshint ignore:line
         }
         return locale?.segment?.road_types[i] || i; // jshint ignore:line
 
@@ -1471,7 +1558,7 @@
             const opacity = document.createElement("input");
             opacity.id = "svl_streetOpacity_" + i;
             opacity.className = "form-control prefElement";
-            opacity.style.width = "40pt";
+            opacity.style.width = "45pt";
             opacity.title = "Opacity";
             opacity.type = "number";
             opacity.min = 0;
@@ -1492,6 +1579,49 @@
         const line = document.createElement("div");
         line.className = "prefLineStreets";
         line.appendChild(title);
+        line.appendChild(inputs);
+
+        return line;
+    }
+
+    function createSpeedOtionLine(i, metric = true) {
+        const type = metric ? "metric" : "imperial";
+        //const title = document.createElement("h6");
+        //title.innerText = getLocalisedString("speed limit");
+        //title.inner
+        const label = document.createElement("label");
+        label.innerText = i !== -1 ? i : "Default";
+
+        const inputs = document.createElement("div");
+        inputs.appendChild(label);
+
+        if (typeof i === "number") {
+            const slValue = document.createElement("input");
+            slValue.id = `svl_slValue_${type}_${i}`;
+            slValue.className = "form-control prefElement";
+            slValue.style.width = "50pt";
+            slValue.title = "Speed Limit Value";
+            slValue.type = "number";
+            slValue.min = 0;
+            slValue.max = 150;
+            inputs.appendChild(slValue);
+        }
+
+
+        const color = document.createElement("input");
+        color.id = `svl_slColor_${type}_${i}`;
+        color.className = "prefElement form-control";
+        color.style.width = "55pt";
+        color.title = "Color";
+        color.type = "color";
+
+        inputs.className = "expand";
+
+
+        inputs.appendChild(color);
+
+        const line = document.createElement("div");
+        line.className = "prefLineSL";
         line.appendChild(inputs);
 
         return line;
@@ -1545,7 +1675,7 @@
         document.getElementById("svl_hideMinorRoads").checked = preferences.hideMinorRoads;
         document.getElementById("svl_autoReload_interval").value = preferences.autoReload.interval / 1000;
 
-        document.getElementById("svl_clutterConstant").value = preferences.clutterConstant || 400;
+        document.getElementById("svl_clutterConstant").value = preferences.clutterConstant;
         document.getElementById("svl_closeZoomLabelSize").value = preferences.closeZoomLabelSize;
         document.getElementById("svl_farZoomLabelSize").value = preferences.farZoomLabelSize;
         document.getElementById("svl_arrowDeclutter").value = preferences.arrowDeclutter;
@@ -1565,6 +1695,15 @@
 
         const segmentWidhts = document.querySelectorAll(".segmentsWidth");
         segmentWidhts.forEach(el => { el.disabled = preferences.realsize; });
+        const type = W.prefs.attributes.isImperial ? "imperial" : "metric";
+        const speeds = Object.keys(preferences.speeds[type]);
+        for (let i = 1; i < speeds.length + 1; i++) {
+            document.getElementById(`svl_slValue_${type}_${i}`).value = speeds[i - 1];
+            document.getElementById(`svl_slColor_${type}_${i}`).value = preferences.speeds[type][speeds[i - 1]];
+        }
+
+        document.getElementById(`svl_slColor_${type}_Default`).value = preferences.speeds.default;
+
     }
 
     function createCheckboxOption({ id, title, description }) {
@@ -1576,7 +1715,7 @@
         const input = document.createElement("input");
         input.className = "prefElement";
         input.title = "True or False";
-        input.id = "svl_"+id;
+        input.id = "svl_" + id;
         input.type = "checkbox";
         input.checked = preferences[id];
 
@@ -1646,7 +1785,7 @@
         return line;
     }
 
-    function initPreferences() {
+    function initPreferencePanel() {
         const style = document.createElement("style");
         style.innerHTML = `
         <style>
@@ -1799,17 +1938,6 @@
             min: 10, max: clutterMax, step: 1
         }));
 
-        const closeZoomTitle = document.createElement("h5");
-        closeZoomTitle.innerText = "Close-zoom only";
-
-        labels.appendChild(closeZoomTitle);
-
-        labels.appendChild(createCheckboxOption({
-            id: "renderGeomNodes",
-            title: "Render Geometry Nodes",
-            description: "When enabled, the geometry nodes are drawn, too."
-        }));
-
         labels.appendChild(createCheckboxOption({
             id: "autoReload_enabled",
             title: "Automatically Refresh the Map",
@@ -1821,6 +1949,17 @@
             title: "Auto Reload Time Interval (in Seconds)",
             description: "How often should the WME be refreshed for new edits?",
             min: 20, max: 3600, step: 1
+        }));
+
+        const closeZoomTitle = document.createElement("h5");
+        closeZoomTitle.innerText = "Close-zoom only";
+
+        labels.appendChild(closeZoomTitle);
+
+        labels.appendChild(createCheckboxOption({
+            id: "renderGeomNodes",
+            title: "Render Geometry Nodes",
+            description: "When enabled, the geometry nodes are drawn, too."
         }));
 
         labels.appendChild(createIntegerOption({
@@ -1874,10 +2013,11 @@
 
         speedLimits.appendChild(createCheckboxOption({
             id: "showSLcolor",
-            title: "Show using Color Scale",
+            title: "Show using colors",
             description: "Show the speed limit by coloring the segment's outline."
         }));
 
+        /*
         for (let k = W.prefs.attributes.isImperial ? 9 : 15; k > 1; k -= 1) {
             const span = document.createElement("span");
             if (W.prefs.attributes.isImperial) {
@@ -1889,7 +2029,7 @@
             }
             span.style.marginRight = "1pt";
             speedLimits.appendChild(span);
-        }
+        }*/
 
         speedLimits.appendChild(createCheckboxOption({
             id: "showSLSinglecolor",
@@ -1908,6 +2048,15 @@
             title: "Show unverified Speed Limits with a dashed Line",
             description: "If the speed limit is not verified, it will be shown with a different style."
         }));
+
+        const slTitle = document.createElement("h6");
+        slTitle.innerText = getLocalisedString("speed limit");
+        speedLimits.appendChild(slTitle);
+        const type = W.prefs.attributes.isImperial ? "imperial" : "metric";
+        speedLimits.appendChild(createSpeedOtionLine("Default"));
+        for (let i = 1; i < Object.keys(preferences.speeds[type]).length + 1; i++) {
+            speedLimits.appendChild(createSpeedOtionLine(i, !W.prefs.attributes.isImperial));
+        }
 
         mainDiv.appendChild(speedLimits);
 
@@ -1969,6 +2118,7 @@
         }
         return nodeStyle;
     }
+
     function changeNodes(e) {
         consoleDebug("Change nodes");
         for (let node of e) {
@@ -2004,15 +2154,7 @@
         let myFeatures, i;
         myFeatures = [];
         for (i = 0; i < e.length; i += 1) {
-            //console.error(e[i].state);
-            /*if (e[i].state === "Insert") {
-                //If a new node was inserted, stop here and draw everything again to avoid keeping the one that was deleted
-                //console.debug("SVL: drawing all nodes anew upon insert");
-                drawAllNodes();
-                return;
-            }*/
             if (e[i].attributes.geometry !== undefined) {
-                //TODO: check !== "Delete"?
                 if (e[i].attributes.id > 0) {
                     myFeatures.push(drawNode(e[i]));
                 }
@@ -2030,24 +2172,20 @@
     function updateStatusBasedOnZoom() {
         consoleDebug("updateStatusBasedOnZoom running");
         if (OLMap.zoom < 2) { //There is nothing to draw, enable road layer
-            //consoleDebug("Road layer automatically enabled because of zoom out");
+            consoleDebug("Road layer automatically enabled because of zoom out");
             //consoleDebug("Vector visibility: ", streetVector.visibility);
-            if (streetVector.visibility === true) {
-                //consoleDebug("Setting vector visibility to false");
-                streetVector.setVisibility(false);
-                document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-                document.getElementById("layer-switcher-item_road").checked = true;
+            if (streetVectorLayer.visibility === true) {
                 SVLAutomDisabled = true;
-                WMERoadLayer.setVisibility(true);
+                setLayerVisibility(ROAD_LAYER, true);
+                setLayerVisibility(SVL_LAYER, false);
             }
             return false;
         } else if (SVLAutomDisabled) {
+            //Reenable the SVL
+            consoleDebug("Re-enabling SVL after zoom in");
+            setLayerVisibility(SVL_LAYER, true);
+            setLayerVisibility(ROAD_LAYER, false);
             SVLAutomDisabled = false;
-            streetVector.setVisibility(true);
-            document.getElementById("layer-switcher-item_street_vector_layer").checked = true;
-            document.getElementById("layer-switcher-item_road").checked = false;
-            SVLAutomDisabled = true;
-            WMERoadLayer.setVisibility(false);
             return true;
         }
     }
@@ -2064,22 +2202,22 @@
         //console.debug("SVL: Registering segment events");
         const events = W.model.segments._events;
         events.objectsadded.push({
-            context: streetVector,
+            context: streetVectorLayer,
             callback: addSegments,
             svl: true
         });
         events.objectschanged.push({
-            context: streetVector,
+            context: streetVectorLayer,
             callback: editSegments,
             svl: true
         });
         events.objectsremoved.push({
-            context: streetVector,
+            context: streetVectorLayer,
             callback: removeSegments,
             svl: true
         });
         events['objects-state-deleted'].push({
-            context: streetVector,
+            context: streetVectorLayer,
             callback: segmentsStateDeleted,
             svl: true
         });
@@ -2144,13 +2282,13 @@
             }
         }
         if (myFeatures.length > 0) {
-            streetVector.addFeatures(myFeatures);
+            streetVectorLayer.addFeatures(myFeatures);
         }
     }
 
     function removeSegmentById(id) {
         consoleDebug("RemoveSegmentById", id, typeof (id));
-        streetVector.destroyFeatures(streetVector.getFeaturesByAttribute("myId", id));
+        streetVectorLayer.destroyFeatures(streetVectorLayer.getFeaturesByAttribute("myId", id));
         labelsVector.destroyFeatures(labelsVector.getFeaturesByAttribute("myId", id));
     }
 
@@ -2161,7 +2299,6 @@
         for (i = 0; i < e.length; i += 1) {
             if (e[i]._prevID !== undefined) {
                 removeSegmentById(parseInt(e[i]._prevID, 10));
-
             }
             removeSegmentById(e[i].attributes.id);
             //console.debug(e[i]);
@@ -2169,12 +2306,6 @@
                 addSegments([e[i]]);
             }
         }
-        /* TODO see if this is still needed.
-        if (e.length > 1 || e[0].state !== null) {
-            if (!farZoom) {
-                setTimeout(drawAllNodes, 50); //Without the timeout the last node remains in the model when rolling backs edit.
-            }
-        }*/
     }
 
     function removeSegments(e) {
@@ -2196,9 +2327,9 @@
             registerSegmentsEvents();
             registerNodeEvents();
             let res = updateStatusBasedOnZoom();
-            if(res === false){
+            if (res === false) {
                 alert("Please Zoom-in to enable the Street Vector Layer");
-            }else{
+            } else {
                 redrawAllSegments();
             }
         } else {
@@ -2209,7 +2340,7 @@
 
             nodesVector.destroyFeatures();
             labelsVector.destroyFeatures();
-            streetVector.destroyFeatures();
+            streetVectorLayer.destroyFeatures();
         }
     }
 
@@ -2232,35 +2363,33 @@
         //Adding keyboard shortcut
         try {
             new WazeWrap.Interface.Shortcut('SVLToggleLayer', 'Toggle SVL', 'svl', 'Street Vector Layer', "A+l", function () {
-                streetVector.setVisibility(!streetVector.visibility);
-                document.getElementById("layer-switcher-item_street_vector_layer").checked = streetVector.visibility;
+                setLayerVisibility(SVL_LAYER, !streetVectorLayer.visibility);
             }, null).add();
-            console.log("Keyboard shortcut successfully added.");
+            console.log("SVL: Keyboard shortcut successfully added.");
         }
         catch (e) {
-            console.error("Error while adding the keyboard shortcut:");
+            console.error("SVL: Error while adding the keyboard shortcut:");
             console.error(e);
         }
 
         //Add the layer checkbox
         try {
-            WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked) => { streetVector.setVisibility(checked); }, streetVector);
-            if (preferences.startDisabled) {
-                document.getElementById("layer-switcher-item_street_vector_layer").checked = false;
-                streetVector.setVisibility(false);
-            }
+            WazeWrap.Interface.AddLayerCheckbox("road", "Street Vector Layer", true, (checked) => { streetVectorLayer.setVisibility(checked); }, streetVectorLayer);
         } catch (e) {
             console.error("SVL: could not add layer checkbox");
         }
-        initPreferences();
+        if (preferences.startDisabled) {
+            setLayerVisibility(SVL_LAYER, false);
+        }
+        initPreferencePanel();
         WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", GM_info.script.version,
             `<b>Major update!</b>
-        <br>- Added an option to render the streets based on their width;
-        <br>- NEW: The width in the settings is now expressed in meters
-        <br>- NEW: preference panel in the sidebar (SVL 🗺️)
-        <br>- NEW: road types in the preference panel are now localised
-        <br>- NEW: dead-end nodes are rendered with a different color
         <br>- NEW: Rendering completely rewritten: performance improvements
+        <br>- NEW: You can set what color to use for each speed limit
+        <br>- NEW: Added an option to render the streets based on their width;
+        <br>- NEW: preference panel is now in the sidebar (SVL 🗺️)
+        <br>- NEW: some options are now are now localised using WME's strings
+        <br>- NEW: dead-end nodes are rendered with a different color
         <br>- Removed: the zoom-level indicator while editing the preferences
         <br>- Bug fixes and new bugs :)`);
     }
@@ -2321,7 +2450,7 @@
         });
         layerName = "Street Vector Layer";
 
-        streetVector = new OpenLayers.Layer.Vector(layerName, {
+        streetVectorLayer = new OpenLayers.Layer.Vector(layerName, {
             styleMap: roadStyleMap,
             uniqueName: "vectorStreet",
             accelerator: "toggle" + layerName.replace(/\s+/g, ''),
@@ -2333,7 +2462,7 @@
             }
         });
 
-        streetVector.renderer.drawFeature =
+        streetVectorLayer.renderer.drawFeature =
             function (feature, style) {
                 if (style == null) {
                     style = feature.style;
@@ -2515,8 +2644,6 @@
             }
 
             /*
-
-
             if (style.fontOpacity) {
                 label.setAttributeNS(null, "opacity", style.fontOpacity);
             }
@@ -2582,12 +2709,12 @@
         updateStylesFromPreferences(preferences);
 
         //Add layers to the map
-        OLMap.addLayer(streetVector);
+        OLMap.addLayer(streetVectorLayer);
         OLMap.addLayer(labelsVector);
         OLMap.addLayer(nodesVector);
 
         if (localStorage.getItem("svlDebugOn") === "true") {
-            document.sv = streetVector;
+            document.sv = streetVectorLayer;
             document.nv = nodesVector;
         }
 
@@ -2597,13 +2724,6 @@
         WMERoadLayer = null;
         if (layers.length === 1) {
             WMERoadLayer = layers[0];
-            if (OLMap.zoom <= 1) {
-                WMERoadLayer.setVisibility(true);
-            } else if (WMERoadLayer.getVisibility() && preferences.disableRoadLayers) {
-                WMERoadLayer.setVisibility(false);
-                document.getElementById("layer-switcher-item_road").checked = false;
-                console.log("WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel.");
-            }
         }
         SVLAutomDisabled = false;
 
@@ -2619,10 +2739,17 @@
 
         initWazeWrap();
 
-        streetVector.events.register("visibilitychanged", streetVector, manageVisibilityChanged);
+        if (OLMap.zoom <= 1) {
+            setLayerVisibility(ROAD_LAYER, true);
+        } else if (WMERoadLayer.getVisibility() && preferences.disableRoadLayers) {
+            setLayerVisibility(ROAD_LAYER, false);
+            console.log("SVL: WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel.");
+        }
+
+        streetVectorLayer.events.register("visibilitychanged", streetVectorLayer, manageVisibilityChanged);
         //Trigger the event manually
         manageVisibilityChanged({
-            object: streetVector
+            object: streetVectorLayer
         });
 
         //TODO remove in the next releases
@@ -2635,7 +2762,7 @@
         // Check all requisites for the script
 
         //TODO: to make loading faster, the document.getElementById can run later
-        if (W === undefined || W.map === undefined || document.getElementById("layer-switcher-item_road") === null) {
+        if (W === undefined || W.map === undefined) {
             console.log("SVL not ready to start, retrying in 600ms");
             trials += 1;
             if (trials < 20) {
