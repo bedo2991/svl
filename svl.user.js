@@ -512,11 +512,6 @@
         }
         const type = W.prefs.attributes.isImperial ? "imperial" : "metric";
         return preferences.speeds[type][speed] || preferences.speeds.default;
-        if (W.prefs.attributes.isImperial) { // adjust scale for Imperial
-            // speeds 15 to 75 mph (7 increments) are tuned to HSL 95 to 395 (35) for easy visual speed differentiation at common speeds
-            return `hsl(${((speed / 1.609344 * 5) + 20) % 360}, 100%, 50%)`;
-        } //else
-        return `hsl(${(speed * 3) % 360}, 100%, 50%)`; // :150 * 450
     }
 
     function getAngle(isForward, p0, p1) {
@@ -563,7 +558,7 @@
             }, 500);
         } else {
             let addressAttributes = address.attributes;
-            let streetPart = ((addressAttributes.street !== null && !addressAttributes.street.isEmpty) ? addressAttributes.street.name : (attributes.roadType < 10 && attributes.junctionID === null ? "⚑" : ""));
+            let streetPart = ((addressAttributes.street !== null && !addressAttributes.street.isEmpty) ? addressAttributes.street.name : (attributes.roadType < 10 && !model.isInRoundabout() ? "⚑" : ""));
             //consoleDebug("Streetpart:" +streetPart);
 
             // add alt street names
@@ -719,7 +714,7 @@
             left, right, k, pk, pk1, offset, m, mb, temp,
             step, degrees, segmentLenght, minDistance, segmentLineString,
             numPoints, stepx, stepy, px, py, ix; //dx, dy
-        const attributes = model.attributes;
+        const attributes = model.getAttributes();
         //TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
         const points = attributes.geometry.components;
         const pointList = attributes.geometry.getVertices(); //is an array
@@ -727,6 +722,7 @@
         const myFeatures = [];
         const baselevel = attributes.level * 100;
         const isTwoWay = attributes.fwdDirection && attributes.revDirection;
+        const isInRoundabout = model.isInRoundabout();
         let isBridge = false;
         let hasSpeedLimit = false;
 
@@ -991,7 +987,7 @@
                     myFeatures.push(lineFeature);
                 }
 
-                if (null !== attributes.junctionID) { //It is a roundabout
+                if (isInRoundabout) { //It is a roundabout
                     //consoleDebug("Segment is a roundabout");
                     lineFeature = new OpenLayers.Feature.Vector(
                         new OpenLayers.Geometry.LineString(pointList), {
@@ -1092,7 +1088,7 @@
                 if ((attributes.fwdDirection === false || attributes.revDirection === false)) {
                     //consoleDebug("The segment is oneway or has unknown direction");
                     simplifiedPoints = points;
-                    if (attributes.junctionID === null && ((attributes.length / points.length) < preferences.arrowDeclutter)) {
+                    if (!isInRoundabout && ((attributes.length / points.length) < preferences.arrowDeclutter)) {
                         simplifiedPoints = simplified;
                     }
 
@@ -1113,7 +1109,7 @@
                     } else {
                         //Draw normal arrows
 
-                        step = attributes.junctionID !== null ? 3 : 1; //It is a roundabout
+                        step = isInRoundabout ? 3 : 1; //It is a roundabout
                         for (p = step - 1, len = simplifiedPoints.length - 1; p < len; p += step) {
                             //it is one way
                             degrees = getAngle(attributes.fwdDirection, simplifiedPoints[p], simplifiedPoints[p + 1]);
@@ -1188,7 +1184,7 @@
                 }
 
                 //Show geometry points
-                if (preferences.renderGeomNodes && (attributes.junctionID === null)) { //If it's not a roundabout
+                if (preferences.renderGeomNodes && !isInRoundabout) { //If it's not a roundabout
                     for (p = 1, len = points.length - 2; p < len; p += 1) {
                         //let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
                         arrowFeature = new OpenLayers.Feature.Vector(points[p], {
@@ -1892,7 +1888,13 @@
 
         mainDiv.appendChild(buttons);
 
-        const streets = createPreferencesSection("Road Types", true);
+        const streets = createPreferencesSection("Roads Properties", true);
+
+        streets.appendChild(createCheckboxOption({
+            id: "realsize",
+            title: "Use real-life Width",
+            description: "When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences."
+        }));
 
         for (let i = 0, len = preferences.streets.length; i < len; i++) {
             if (preferences.streets[i]) {
@@ -1923,16 +1925,11 @@
             }
         }
 
+        streets.appendChild(decorations);
         mainDiv.appendChild(streets);
-        mainDiv.appendChild(decorations);
 
-        labels.appendChild(createCheckboxOption({
-            id: "realsize",
-            title: "Use real-life Width",
-            description: "When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences."
-        }));
 
-        labels.appendChild(createCheckboxOption({
+        streets.appendChild(createCheckboxOption({
             id: "showANs",
             title: "Show Alternative Names",
             description: "When enabled, at most 2 ANs that differ from the primary name are shown under the street name."
@@ -1950,7 +1947,7 @@
             description: "When enabled, the GPS layer gets shown above the road layer."
         }));
 
-        labels.appendChild(createRangeOption({
+        streets.appendChild(createRangeOption({
             id: "labelOutlineWidth",
             title: "Labels Outline Width",
             description: "How much border should the labels have?",
@@ -1971,7 +1968,7 @@
             description: "When enabled, the SVL does not get enabled automatically."
         }));
 
-        labels.appendChild(createRangeOption({
+        streets.appendChild(createRangeOption({
             id: "clutterConstant",
             title: "Street Names Density",
             description: "For an higher value, less elements will be shown.",
@@ -1987,22 +1984,9 @@
 
         labels.appendChild(createIntegerOption({
             id: "switchZoom",
-            title: "Close zoom until level",
-            description: "When the zoom is lower then this value, it will switch to far zoom mode (rendering less details)",
+            title: "Close-zoom until level",
+            description: "When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)",
             min: 5, max: 9, step: 1
-        }));
-
-        labels.appendChild(createCheckboxOption({
-            id: "autoReload_enabled",
-            title: "Automatically Refresh the Map",
-            description: "When enabled, SVL refreshes the map automatically after a certain timeout if you're not editing."
-        }));
-
-        labels.appendChild(createIntegerOption({
-            id: "autoReload_interval",
-            title: "Auto Reload Time Interval (in Seconds)",
-            description: "How often should the WME be refreshed for new edits?",
-            min: 20, max: 3600, step: 1
         }));
 
         const closeZoomTitle = document.createElement("h5");
@@ -2025,7 +2009,7 @@
 
         labels.appendChild(createRangeOption({
             id: "closeZoomLabelSize",
-            title: "Font Size",
+            title: "Font Size (at close zoom)",
             description: "Increase this value if you can't read the street names because they are too small.",
             min: 8, max: fontSizeMax, step: 1
         }));
@@ -2045,7 +2029,7 @@
 
         labels.appendChild(createRangeOption({
             id: "farZoomLabelSize",
-            title: "Font Size",
+            title: "Font Size (at far zoom)",
             description: "Increase this value if you can't read the street names because they are too small.",
             min: 8, max: fontSizeMax
         }));
@@ -2058,6 +2042,22 @@
 
 
         mainDiv.appendChild(labels);
+
+        const utilities = createPreferencesSection("Utilities");
+
+        utilities.appendChild(createCheckboxOption({
+            id: "autoReload_enabled",
+            title: "Automatically Refresh the Map",
+            description: "When enabled, SVL refreshes the map automatically after a certain timeout if you're not editing."
+        }));
+
+        utilities.appendChild(createIntegerOption({
+            id: "autoReload_interval",
+            title: "Auto Reload Time Interval (in Seconds)",
+            description: "How often should the WME be refreshed for new edits?",
+            min: 20, max: 3600, step: 1
+        }));
+        mainDiv.appendChild(utilities);
 
         speedLimits.appendChild(createCheckboxOption({
             id: "showSLtext",
