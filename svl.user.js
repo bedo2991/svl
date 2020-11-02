@@ -2539,7 +2539,7 @@
 
                             style.pointerEvents = "none";
                             if (!farZoom) {
-                                if (!feature.attributes.isArrow && preferences.realsize && !isFarZoom) {
+                                if (!feature.attributes.isArrow && preferences.realsize) {
                                     style.strokeWidth = style.strokeWidth / OLMap.resolution;
                                 }
                             }
