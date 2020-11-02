@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4
+// @version    4.9.4.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -56,7 +56,6 @@
         SVL_LAYER: null
     };
 
-    const FARZOOMTHRESHOLD = 5; //To increase performance change this value to 6.
     const clutterMax = 700;
     const fontSizeMax = 32;
     const superScript = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
@@ -136,7 +135,7 @@
 
     //End of global variable declaration
     function isFarZoom(zoom = OLMap.zoom) {
-        return zoom < FARZOOMTHRESHOLD;
+        return zoom < preferences.switchZoom;
     }
 
     function svlGlobals() {
@@ -286,6 +285,8 @@
         preferences.labelOutlineWidth = loadedPreferences?.labelOutlineWidth || 3;
         preferences.closeZoomLabelSize = loadedPreferences?.closeZoomLabelSize || 14;
         preferences.farZoomLabelSize = loadedPreferences?.farZoomLabelSize || 12;
+        preferences.useWMERoadLayerAtZoom = loadedPreferences?.useWMERoadLayerAtZoom || 1;
+        preferences.switchZoom = loadedPreferences?.switchZoom || 5;
 
         preferences.arrowDeclutter = loadedPreferences?.arrowDeclutter || 140;
 
@@ -293,7 +294,7 @@
         preferences.routingModeEnabled = loadedPreferences?.routingModeEnabled || false;
         preferences.realsize = loadedPreferences?.realsize || false;
         preferences.showANs = loadedPreferences?.showANs || false;
-
+        
         preferences.streets = [];
         //Street: 1
         preferences.streets[1] = {
@@ -1470,6 +1471,8 @@
             preferences.routingModeEnabled = document.getElementById("svl_routingModeEnabled").checked;
         }
 
+        preferences.useWMERoadLayerAtZoom = document.getElementById("svl_useWMERoadLayerAtZoom").value;
+        preferences.switchZoom = document.getElementById("svl_switchZoom").value;
         preferences.showANs = document.getElementById("svl_showANs").checked;
         preferences.realsize = document.getElementById("svl_realsize").checked;
 
@@ -1687,12 +1690,14 @@
         document.getElementById("svl_closeZoomLabelSize").value = preferences.closeZoomLabelSize;
         document.getElementById("svl_farZoomLabelSize").value = preferences.farZoomLabelSize;
         document.getElementById("svl_arrowDeclutter").value = preferences.arrowDeclutter;
+        document.getElementById("svl_useWMERoadLayerAtZoom").value = preferences.useWMERoadLayerAtZoom;
+        document.getElementById("svl_switchZoom").value = preferences.switchZoom;
         document.getElementById("svl_disableRoadLayers").checked = preferences.disableRoadLayers;
         document.getElementById("svl_startDisabled").checked = preferences.startDisabled;
         document.getElementById("svl_showUnderGPSPoints").checked = preferences.showUnderGPSPoints;
         document.getElementById("svl_routingModeEnabled").checked = preferences.routingModeEnabled;
         document.getElementById("svl_showANs").checked = preferences.showANs;
-
+        
         //Speed limits
         document.getElementById("svl_showSLtext").checked = preferences.showSLtext;
         document.getElementById("svl_showSLcolor").checked = preferences.showSLcolor;
@@ -1793,6 +1798,15 @@
         return line;
     }
 
+    function createPreferencesSection(name, open = false){
+        const details = document.createElement("details");
+        details.open = open;
+        const summary = document.createElement("summary");
+        summary.innerText = name;
+        details.appendChild(summary);
+        return details;
+    }
+
     function initPreferencePanel() {
         const style = document.createElement("style");
         style.innerHTML = `
@@ -1878,11 +1892,7 @@
 
         mainDiv.appendChild(buttons);
 
-        const streets = document.createElement("details");
-        streets.open = true;
-        const streetsSummary = document.createElement("summary");
-        streetsSummary.innerText = "Road Types";
-        streets.appendChild(streetsSummary);
+        const streets = createPreferencesSection("Road Types", true);
 
         for (let i = 0, len = preferences.streets.length; i < len; i++) {
             if (preferences.streets[i]) {
@@ -1890,20 +1900,11 @@
             }
         }
 
-        const decorations = document.createElement("details");
-        const decorationSummary = document.createElement("summary");
-        decorationSummary.innerText = "Segments Decorations";
-        decorations.appendChild(decorationSummary);
+        const decorations = createPreferencesSection("Segments Decorations");
 
-        const labels = document.createElement("details");
-        const labelsSummary = document.createElement("summary");
-        labelsSummary.innerText = "Rendering Parameters";
-        labels.appendChild(labelsSummary);
+        const labels = createPreferencesSection("Rendering Parameters");
 
-        const speedLimits = document.createElement("details");
-        const speedLimitsSummary = document.createElement("summary");
-        speedLimitsSummary.innerText = "Speed Limits";
-        speedLimits.appendChild(speedLimitsSummary);
+        const speedLimits = createPreferencesSection("Speed Limits");
 
         const options = getOptions();
         for (let o of options.streets) {
@@ -1912,7 +1913,11 @@
 
         for (let o of options.decorations) {
             if (o !== "dirty") {
-                decorations.appendChild(createStreetOptionLine(o));
+                if(o === "red"){
+                    decorations.appendChild(createStreetOptionLine(o, false));
+                }else{
+                    decorations.appendChild(createStreetOptionLine(o));
+                }
             } else {
                 decorations.appendChild(createStreetOptionLine(o, false, true));
             }
@@ -1971,6 +1976,20 @@
             title: "Street Names Density",
             description: "For an higher value, less elements will be shown.",
             min: 10, max: clutterMax, step: 1
+        }));
+
+        labels.appendChild(createIntegerOption({
+            id: "useWMERoadLayerAtZoom",
+            title: "Stop using SVL at zoom level",
+            description: "When you reach this zoom level, the road layer gets automatically enabled.",
+            min: 0, max: 5, step: 1
+        }));
+
+        labels.appendChild(createIntegerOption({
+            id: "switchZoom",
+            title: "Close zoom until level",
+            description: "When the zoom is lower then this value, it will switch to far zoom mode (rendering less details)",
+            min: 5, max: 9, step: 1
         }));
 
         labels.appendChild(createCheckboxOption({
@@ -2206,7 +2225,7 @@
 
     function updateStatusBasedOnZoom() {
         consoleDebug("updateStatusBasedOnZoom running");
-        if (OLMap.zoom < 2) { //There is nothing to draw, enable road layer
+        if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) { //There is nothing to draw, enable road layer
             consoleDebug("Road layer automatically enabled because of zoom out");
             //consoleDebug("Vector visibility: ", streetVector.visibility);
             if (streetVectorLayer.visibility === true) {
@@ -2363,7 +2382,7 @@
             registerNodeEvents();
             let res = updateStatusBasedOnZoom();
             if (res === false) {
-                alert("Please Zoom-in to enable the Street Vector Layer");
+                //alert("Please Zoom-in to enable the Street Vector Layer");
             } else {
                 redrawAllSegments();
             }
@@ -2520,7 +2539,7 @@
 
                             style.pointerEvents = "none";
                             if (!farZoom) {
-                                if (!feature.attributes.isArrow && preferences.realsize) {
+                                if (!feature.attributes.isArrow && preferences.realsize && !isFarZoom) {
                                     style.strokeWidth = style.strokeWidth / OLMap.resolution;
                                 }
                             }
