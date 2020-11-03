@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.4
+// @version    4.9.4.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -270,240 +270,240 @@
     preferences.autoReload = {};
     // jshint ignore: start
     preferences.autoReload.interval =
-      loadedPreferences?.autoReload?.interval || 60000;
+      loadedPreferences?.autoReload?.interval ?? 60000;
     preferences.autoReload.enabled =
-      loadedPreferences?.autoReload?.enabled || false;
+      loadedPreferences?.autoReload?.enabled ?? false;
 
     preferences.showSLSinglecolor =
-      loadedPreferences?.showSLSinglecolor || false;
-    preferences.SLColor = loadedPreferences?.SLColor || '#ffdf00';
+      loadedPreferences?.showSLSinglecolor ?? false;
+    preferences.SLColor = loadedPreferences?.SLColor ?? '#ffdf00';
 
     preferences.fakelock =
-      loadedPreferences?.fakelock || WazeWrap?.User?.Rank() || 6; // jshint ignore:line
-    preferences.hideMinorRoads = loadedPreferences?.hideMinorRoads || true;
+      loadedPreferences?.fakelock ?? WazeWrap?.User?.Rank() ?? 6; // jshint ignore:line
+    preferences.hideMinorRoads = loadedPreferences?.hideMinorRoads ?? true;
     preferences.showDashedUnverifiedSL =
-      loadedPreferences?.showDashedUnverifiedSL || true;
-    preferences.showSLcolor = loadedPreferences?.showSLcolor || true;
-    preferences.showSLtext = loadedPreferences?.showSLtext || true;
+      loadedPreferences?.showDashedUnverifiedSL ?? true;
+    preferences.showSLcolor = loadedPreferences?.showSLcolor ?? true;
+    preferences.showSLtext = loadedPreferences?.showSLtext ?? true;
     // preferences.version = GM_info.script.version; Automatically added by savePreferences
     preferences.disableRoadLayers =
-      loadedPreferences?.disableRoadLayers || true;
-    preferences.startDisabled = loadedPreferences?.startDisabled || false;
-    preferences.clutterConstant = loadedPreferences?.clutterConstant || 200;
-    preferences.labelOutlineWidth = loadedPreferences?.labelOutlineWidth || 3;
+      loadedPreferences?.disableRoadLayers ?? true;
+    preferences.startDisabled = loadedPreferences?.startDisabled ?? false;
+    preferences.clutterConstant = loadedPreferences?.clutterConstant ?? 200;
+    preferences.labelOutlineWidth = loadedPreferences?.labelOutlineWidth ?? 3;
     preferences.closeZoomLabelSize =
-      loadedPreferences?.closeZoomLabelSize || 14;
-    preferences.farZoomLabelSize = loadedPreferences?.farZoomLabelSize || 12;
+      loadedPreferences?.closeZoomLabelSize ?? 14;
+    preferences.farZoomLabelSize = loadedPreferences?.farZoomLabelSize ?? 12;
     preferences.useWMERoadLayerAtZoom =
-      loadedPreferences?.useWMERoadLayerAtZoom || 1;
-    preferences.switchZoom = loadedPreferences?.switchZoom || 5;
+      loadedPreferences?.useWMERoadLayerAtZoom ?? 1;
+    preferences.switchZoom = loadedPreferences?.switchZoom ?? 5;
 
-    preferences.arrowDeclutter = loadedPreferences?.arrowDeclutter || 140;
+    preferences.arrowDeclutter = loadedPreferences?.arrowDeclutter ?? 140;
 
     preferences.showUnderGPSPoints =
-      loadedPreferences?.showUnderGPSPoints || false;
+      loadedPreferences?.showUnderGPSPoints ?? false;
     preferences.routingModeEnabled =
-      loadedPreferences?.routingModeEnabled || false;
-    preferences.realsize = loadedPreferences?.realsize || false;
-    preferences.showANs = loadedPreferences?.showANs || false;
+      loadedPreferences?.routingModeEnabled ?? false;
+    preferences.realsize = loadedPreferences?.realsize ?? false;
+    preferences.showANs = loadedPreferences?.showANs ?? false;
 
     preferences.streets = [];
     // Street: 1
     preferences.streets[1] = {
-      strokeColor: loadedPreferences?.streets[1]?.strokeColor || '#FFFFFF',
-      strokeWidth: loadedPreferences?.streets[1]?.strokeWidth || 10,
+      strokeColor: loadedPreferences?.streets[1]?.strokeColor ?? '#FFFFFF',
+      strokeWidth: loadedPreferences?.streets[1]?.strokeWidth ?? 10,
       strokeDashstyle:
-        loadedPreferences?.streets[1]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[1]?.strokeDashstyle ?? 'solid',
     };
     // Parking: 20
     preferences.streets[20] = {
-      strokeColor: loadedPreferences?.streets[20]?.strokeColor || '#2282ab',
-      strokeWidth: loadedPreferences?.streets[20]?.strokeWidth || 9,
+      strokeColor: loadedPreferences?.streets[20]?.strokeColor ?? '#2282ab',
+      strokeWidth: loadedPreferences?.streets[20]?.strokeWidth ?? 9,
       strokeDashstyle:
-        loadedPreferences?.streets[20]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[20]?.strokeDashstyle ?? 'solid',
     };
     // Ramp: 4
     preferences.streets[4] = {
-      strokeColor: loadedPreferences?.streets[4]?.strokeColor || '#3FC91C',
-      strokeWidth: loadedPreferences?.streets[4]?.strokeWidth || 11,
+      strokeColor: loadedPreferences?.streets[4]?.strokeColor ?? '#3FC91C',
+      strokeWidth: loadedPreferences?.streets[4]?.strokeWidth ?? 11,
       strokeDashstyle:
-        loadedPreferences?.streets[4]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[4]?.strokeDashstyle ?? 'solid',
     };
     // Freeway: 3
     preferences.streets[3] = {
-      strokeColor: loadedPreferences?.streets[3]?.strokeColor || '#387FB8',
-      strokeWidth: loadedPreferences?.streets[3]?.strokeWidth || 18,
+      strokeColor: loadedPreferences?.streets[3]?.strokeColor ?? '#387FB8',
+      strokeWidth: loadedPreferences?.streets[3]?.strokeWidth ?? 18,
       strokeDashstyle:
-        loadedPreferences?.streets[3]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[3]?.strokeDashstyle ?? 'solid',
     };
     // Minor: 7
     preferences.streets[7] = {
-      strokeColor: loadedPreferences?.streets[7]?.strokeColor || '#ECE589',
-      strokeWidth: loadedPreferences?.streets[7]?.strokeWidth || 14,
+      strokeColor: loadedPreferences?.streets[7]?.strokeColor ?? '#ECE589',
+      strokeWidth: loadedPreferences?.streets[7]?.strokeWidth ?? 14,
       strokeDashstyle:
-        loadedPreferences?.streets[7]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[7]?.strokeDashstyle ?? 'solid',
     };
     // Major: 6
     preferences.streets[6] = {
-      strokeColor: loadedPreferences?.streets[6]?.strokeColor || '#C13040',
-      strokeWidth: loadedPreferences?.streets[6]?.strokeWidth || 16,
+      strokeColor: loadedPreferences?.streets[6]?.strokeColor ?? '#C13040',
+      strokeWidth: loadedPreferences?.streets[6]?.strokeWidth ?? 16,
       strokeDashstyle:
-        loadedPreferences?.streets[6]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[6]?.strokeDashstyle ?? 'solid',
     };
     // Stairway: 16
     preferences.streets[16] = {
-      strokeColor: loadedPreferences?.streets[16]?.strokeColor || '#B700FF',
-      strokeWidth: loadedPreferences?.streets[16]?.strokeWidth || 5,
+      strokeColor: loadedPreferences?.streets[16]?.strokeColor ?? '#B700FF',
+      strokeWidth: loadedPreferences?.streets[16]?.strokeWidth ?? 5,
       strokeDashstyle:
-        loadedPreferences?.streets[16]?.strokeDashstyle || 'dash',
+        loadedPreferences?.streets[16]?.strokeDashstyle ?? 'dash',
     };
     // Walking: 5
     preferences.streets[5] = {
-      strokeColor: loadedPreferences?.streets[5]?.strokeColor || '#00FF00',
-      strokeWidth: loadedPreferences?.streets[5]?.strokeWidth || 5,
-      strokeDashstyle: loadedPreferences?.streets[5]?.strokeDashstyle || 'dash',
+      strokeColor: loadedPreferences?.streets[5]?.strokeColor ?? '#00FF00',
+      strokeWidth: loadedPreferences?.streets[5]?.strokeWidth ?? 5,
+      strokeDashstyle: loadedPreferences?.streets[5]?.strokeDashstyle ?? 'dash',
     };
     // Dirty: 8
     preferences.streets[8] = {
-      strokeColor: loadedPreferences?.streets[8]?.strokeColor || '#82614A',
-      strokeWidth: loadedPreferences?.streets[8]?.strokeWidth || 7,
+      strokeColor: loadedPreferences?.streets[8]?.strokeColor ?? '#82614A',
+      strokeWidth: loadedPreferences?.streets[8]?.strokeWidth ?? 7,
       strokeDashstyle:
-        loadedPreferences?.streets[8]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[8]?.strokeDashstyle ?? 'solid',
     };
     // Ferry: 15
     preferences.streets[15] = {
-      strokeColor: loadedPreferences?.streets[15]?.strokeColor || '#FF8000',
-      strokeWidth: loadedPreferences?.streets[15]?.strokeWidth || 5,
+      strokeColor: loadedPreferences?.streets[15]?.strokeColor ?? '#FF8000',
+      strokeWidth: loadedPreferences?.streets[15]?.strokeWidth ?? 5,
       strokeDashstyle:
-        loadedPreferences?.streets[15]?.strokeDashstyle || 'dashdot',
+        loadedPreferences?.streets[15]?.strokeDashstyle ?? 'dashdot',
     };
     // Railroad: 18
     preferences.streets[18] = {
-      strokeColor: loadedPreferences?.streets[18]?.strokeColor || '#FFFFFF',
-      strokeWidth: loadedPreferences?.streets[18]?.strokeWidth || 8,
+      strokeColor: loadedPreferences?.streets[18]?.strokeColor ?? '#FFFFFF',
+      strokeWidth: loadedPreferences?.streets[18]?.strokeWidth ?? 8,
       strokeDashstyle:
-        loadedPreferences?.streets[18]?.strokeDashstyle || 'dash',
+        loadedPreferences?.streets[18]?.strokeDashstyle ?? 'dash',
     };
     // Private: 17
     preferences.streets[17] = {
-      strokeColor: loadedPreferences?.streets[17]?.strokeColor || '#00FFB3',
-      strokeWidth: loadedPreferences?.streets[17]?.strokeWidth || 7,
+      strokeColor: loadedPreferences?.streets[17]?.strokeColor ?? '#00FFB3',
+      strokeWidth: loadedPreferences?.streets[17]?.strokeWidth ?? 7,
       strokeDashstyle:
-        loadedPreferences?.streets[17]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[17]?.strokeDashstyle ?? 'solid',
     };
     // Alley: 22
     preferences.streets[22] = {
-      strokeColor: loadedPreferences?.streets[22]?.strokeColor || '#C6C7FF',
-      strokeWidth: loadedPreferences?.streets[22]?.strokeWidth || 6,
+      strokeColor: loadedPreferences?.streets[22]?.strokeColor ?? '#C6C7FF',
+      strokeWidth: loadedPreferences?.streets[22]?.strokeWidth ?? 6,
       strokeDashstyle:
-        loadedPreferences?.streets[22]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[22]?.strokeDashstyle ?? 'solid',
     };
     // Runway: 19
     preferences.streets[19] = {
-      strokeColor: loadedPreferences?.streets[19]?.strokeColor || '#00FF00',
-      strokeWidth: loadedPreferences?.streets[19]?.strokeWidth || 5,
+      strokeColor: loadedPreferences?.streets[19]?.strokeColor ?? '#00FF00',
+      strokeWidth: loadedPreferences?.streets[19]?.strokeWidth ?? 5,
       strokeDashstyle:
-        loadedPreferences?.streets[19]?.strokeDashstyle || 'dashdot',
+        loadedPreferences?.streets[19]?.strokeDashstyle ?? 'dashdot',
     };
     // Primary: 2
     preferences.streets[2] = {
-      strokeColor: loadedPreferences?.streets[2]?.strokeColor || '#CBA12E',
-      strokeWidth: loadedPreferences?.streets[2]?.strokeWidth || 12,
+      strokeColor: loadedPreferences?.streets[2]?.strokeColor ?? '#CBA12E',
+      strokeWidth: loadedPreferences?.streets[2]?.strokeWidth ?? 12,
       strokeDashstyle:
-        loadedPreferences?.streets[2]?.strokeDashstyle || 'solid',
+        loadedPreferences?.streets[2]?.strokeDashstyle ?? 'solid',
     };
     // Pedestrian: 10
     preferences.streets[10] = {
-      strokeColor: loadedPreferences?.streets[10]?.strokeColor || '#0000FF',
-      strokeWidth: loadedPreferences?.streets[10]?.strokeWidth || 5,
+      strokeColor: loadedPreferences?.streets[10]?.strokeColor ?? '#0000FF',
+      strokeWidth: loadedPreferences?.streets[10]?.strokeWidth ?? 5,
       strokeDashstyle:
-        loadedPreferences?.streets[10]?.strokeDashstyle || 'dash',
+        loadedPreferences?.streets[10]?.strokeDashstyle ?? 'dash',
     };
     // Red segments (without names)
     preferences.red = {
-      strokeColor: loadedPreferences?.red?.strokeColor || '#FF0000',
-      strokeWidth: loadedPreferences?.red?.strokeWidth || 6,
-      strokeDashstyle: loadedPreferences?.red?.strokeDashstyle || 'solid',
+      strokeColor: loadedPreferences?.red?.strokeColor ?? '#FF0000',
+      strokeWidth: loadedPreferences?.red?.strokeWidth ?? 6,
+      strokeDashstyle: loadedPreferences?.red?.strokeDashstyle ?? 'solid',
     };
 
     preferences.roundabout = {
-      strokeColor: loadedPreferences?.roundabout?.strokeColor || '#111',
-      strokeWidth: loadedPreferences?.roundabout?.strokeWidth || 1,
-      strokeDashstyle: loadedPreferences?.roundabout?.strokeDashstyle || 'dash',
+      strokeColor: loadedPreferences?.roundabout?.strokeColor ?? '#111',
+      strokeWidth: loadedPreferences?.roundabout?.strokeWidth ?? 1,
+      strokeDashstyle: loadedPreferences?.roundabout?.strokeDashstyle ?? 'dash',
     };
     preferences.lanes = {
-      strokeColor: loadedPreferences?.lanes?.strokeColor || '#454443',
-      strokeWidth: loadedPreferences?.lanes?.strokeWidth || 3,
-      strokeDashstyle: loadedPreferences?.lanes?.strokeDashstyle || 'dash',
+      strokeColor: loadedPreferences?.lanes?.strokeColor ?? '#454443',
+      strokeWidth: loadedPreferences?.lanes?.strokeWidth ?? 3,
+      strokeDashstyle: loadedPreferences?.lanes?.strokeDashstyle ?? 'dash',
     };
     preferences.toll = {
-      strokeColor: loadedPreferences?.toll?.strokeColor || '#00E1FF',
-      strokeWidth: loadedPreferences?.toll?.strokeWidth || 2,
-      strokeDashstyle: loadedPreferences?.toll?.strokeDashstyle || 'solid',
+      strokeColor: loadedPreferences?.toll?.strokeColor ?? '#00E1FF',
+      strokeWidth: loadedPreferences?.toll?.strokeWidth ?? 2,
+      strokeDashstyle: loadedPreferences?.toll?.strokeDashstyle ?? 'solid',
     };
     preferences.closure = {
-      strokeColor: loadedPreferences?.closure?.strokeColor || '#FF00FF',
-      strokeWidth: loadedPreferences?.closure?.strokeWidth || 4,
-      strokeDashstyle: loadedPreferences?.closure?.strokeDashstyle || 'dash',
+      strokeColor: loadedPreferences?.closure?.strokeColor ?? '#FF00FF',
+      strokeWidth: loadedPreferences?.closure?.strokeWidth ?? 4,
+      strokeDashstyle: loadedPreferences?.closure?.strokeDashstyle ?? 'dash',
     };
     preferences.headlights = {
-      strokeColor: loadedPreferences?.headlights?.strokeColor || '#bfff00',
-      strokeWidth: loadedPreferences?.headlights?.strokeWidth || 3,
-      strokeDashstyle: loadedPreferences?.headlights?.strokeDashstyle || 'dot',
+      strokeColor: loadedPreferences?.headlights?.strokeColor ?? '#bfff00',
+      strokeWidth: loadedPreferences?.headlights?.strokeWidth ?? 3,
+      strokeDashstyle: loadedPreferences?.headlights?.strokeDashstyle ?? 'dot',
     };
     preferences.restriction = {
-      strokeColor: loadedPreferences?.restriction?.strokeColor || '#F2FF00',
-      strokeWidth: loadedPreferences?.restriction?.strokeWidth || 2,
+      strokeColor: loadedPreferences?.restriction?.strokeColor ?? '#F2FF00',
+      strokeWidth: loadedPreferences?.restriction?.strokeWidth ?? 2,
       strokeDashstyle:
-        loadedPreferences?.restriction?.strokeDashstyle || 'dash',
+        loadedPreferences?.restriction?.strokeDashstyle ?? 'dash',
     };
     preferences.dirty = {
-      strokeColor: loadedPreferences?.dirty?.strokeColor || '#82614A',
-      strokeOpacity: loadedPreferences?.dirty?.strokeOpacity || 0.6,
-      strokeDashstyle: loadedPreferences?.dirty?.strokeDashstyle || 'longdash',
+      strokeColor: loadedPreferences?.dirty?.strokeColor ?? '#82614A',
+      strokeOpacity: loadedPreferences?.dirty?.strokeOpacity ?? 0.6,
+      strokeDashstyle: loadedPreferences?.dirty?.strokeDashstyle ?? 'longdash',
     };
 
     preferences.speeds = {};
-    preferences.speeds.default = loadedPreferences?.speed?.default || '#cc0000';
+    preferences.speeds.default = loadedPreferences?.speed?.default ?? '#cc0000';
 
     if (loadedPreferences?.speeds?.metric) {
       preferences.speeds.metric = loadedPreferences.speeds.metric;
     } else {
       preferences.speeds.metric = {};
       preferences.speeds.metric[5] =
-        loadedPreferences?.speeds?.metric[5] || '#542344';
+        loadedPreferences?.speeds?.metric[5] ?? '#542344';
       preferences.speeds.metric[7] =
-        loadedPreferences?.speeds?.metric[7] || '#ff5714';
+        loadedPreferences?.speeds?.metric[7] ?? '#ff5714';
       preferences.speeds.metric[10] =
-        loadedPreferences?.speeds?.metric[10] || '#ffbf00';
+        loadedPreferences?.speeds?.metric[10] ?? '#ffbf00';
       preferences.speeds.metric[20] =
-        loadedPreferences?.speeds?.metric[20] || '#ee0000';
+        loadedPreferences?.speeds?.metric[20] ?? '#ee0000';
       preferences.speeds.metric[30] =
-        loadedPreferences?.speeds?.metric[30] || '#e4ff1a';
+        loadedPreferences?.speeds?.metric[30] ?? '#e4ff1a';
       preferences.speeds.metric[40] =
-        loadedPreferences?.speeds?.metric[40] || '#993300';
+        loadedPreferences?.speeds?.metric[40] ?? '#993300';
       preferences.speeds.metric[50] =
-        loadedPreferences?.speeds?.metric[50] || '#33ff33';
+        loadedPreferences?.speeds?.metric[50] ?? '#33ff33';
       preferences.speeds.metric[60] =
-        loadedPreferences?.speeds?.metric[60] || '#639fab';
+        loadedPreferences?.speeds?.metric[60] ?? '#639fab';
       preferences.speeds.metric[70] =
-        loadedPreferences?.speeds?.metric[70] || '#00ffff';
+        loadedPreferences?.speeds?.metric[70] ?? '#00ffff';
       preferences.speeds.metric[80] =
-        loadedPreferences?.speeds?.metric[80] || '#00bfff';
+        loadedPreferences?.speeds?.metric[80] ?? '#00bfff';
       preferences.speeds.metric[90] =
-        loadedPreferences?.speeds?.metric[90] || '#0066ff';
+        loadedPreferences?.speeds?.metric[90] ?? '#0066ff';
       preferences.speeds.metric[100] =
-        loadedPreferences?.speeds?.metric[100] || '#ff00ff';
+        loadedPreferences?.speeds?.metric[100] ?? '#ff00ff';
       preferences.speeds.metric[110] =
-        loadedPreferences?.speeds?.metric[110] || '#ff0080';
+        loadedPreferences?.speeds?.metric[110] ?? '#ff0080';
       preferences.speeds.metric[120] =
-        loadedPreferences?.speeds?.metric[120] || '#ff0000';
+        loadedPreferences?.speeds?.metric[120] ?? '#ff0000';
       preferences.speeds.metric[130] =
-        loadedPreferences?.speeds?.metric[130] || '#ff9000';
+        loadedPreferences?.speeds?.metric[130] ?? '#ff9000';
       preferences.speeds.metric[140] =
-        loadedPreferences?.speeds?.metric[140] || '#ff4000';
+        loadedPreferences?.speeds?.metric[140] ?? '#ff4000';
       preferences.speeds.metric[150] =
-        loadedPreferences?.speeds?.metric[150] || '#0040ff';
+        loadedPreferences?.speeds?.metric[150] ?? '#0040ff';
     }
 
     if (loadedPreferences?.speeds?.imperial) {
@@ -511,39 +511,39 @@
     } else {
       preferences.speeds.imperial = {};
       preferences.speeds.imperial[5] =
-        loadedPreferences?.speeds?.imperial[5] || '#ff0000';
+        loadedPreferences?.speeds?.imperial[5] ?? '#ff0000';
       preferences.speeds.imperial[10] =
-        loadedPreferences?.speeds?.imperial[10] || '#ff8000';
+        loadedPreferences?.speeds?.imperial[10] ?? '#ff8000';
       preferences.speeds.imperial[15] =
-        loadedPreferences?.speeds?.imperial[15] || '#ffb000';
+        loadedPreferences?.speeds?.imperial[15] ?? '#ffb000';
       preferences.speeds.imperial[20] =
-        loadedPreferences?.speeds?.imperial[20] || '#bfff00';
+        loadedPreferences?.speeds?.imperial[20] ?? '#bfff00';
       preferences.speeds.imperial[25] =
-        loadedPreferences?.speeds?.imperial[25] || '#993300';
+        loadedPreferences?.speeds?.imperial[25] ?? '#993300';
       preferences.speeds.imperial[30] =
-        loadedPreferences?.speeds?.imperial[30] || '#33ff33';
+        loadedPreferences?.speeds?.imperial[30] ?? '#33ff33';
       preferences.speeds.imperial[35] =
-        loadedPreferences?.speeds?.imperial[35] || '#00ff90';
+        loadedPreferences?.speeds?.imperial[35] ?? '#00ff90';
       preferences.speeds.imperial[40] =
-        loadedPreferences?.speeds?.imperial[40] || '#00ffff';
+        loadedPreferences?.speeds?.imperial[40] ?? '#00ffff';
       preferences.speeds.imperial[45] =
-        loadedPreferences?.speeds?.imperial[45] || '#00bfff';
+        loadedPreferences?.speeds?.imperial[45] ?? '#00bfff';
       preferences.speeds.imperial[50] =
-        loadedPreferences?.speeds?.imperial[50] || '#0066ff';
+        loadedPreferences?.speeds?.imperial[50] ?? '#0066ff';
       preferences.speeds.imperial[55] =
-        loadedPreferences?.speeds?.imperial[55] || '#ff00ff';
+        loadedPreferences?.speeds?.imperial[55] ?? '#ff00ff';
       preferences.speeds.imperial[60] =
-        loadedPreferences?.speeds?.imperial[60] || '#ff0050';
+        loadedPreferences?.speeds?.imperial[60] ?? '#ff0050';
       preferences.speeds.imperial[65] =
-        loadedPreferences?.speeds?.imperial[65] || '#ff9010';
+        loadedPreferences?.speeds?.imperial[65] ?? '#ff9010';
       preferences.speeds.imperial[70] =
-        loadedPreferences?.speeds?.imperial[70] || '#0040ff';
+        loadedPreferences?.speeds?.imperial[70] ?? '#0040ff';
       preferences.speeds.imperial[75] =
-        loadedPreferences?.speeds?.imperial[75] || '#10ff10';
+        loadedPreferences?.speeds?.imperial[75] ?? '#10ff10';
       preferences.speeds.imperial[80] =
-        loadedPreferences?.speeds?.imperial[80] || '#ff4000';
+        loadedPreferences?.speeds?.imperial[80] ?? '#ff4000';
       preferences.speeds.imperial[85] =
-        loadedPreferences?.speeds?.imperial[85] || '#ff0000';
+        loadedPreferences?.speeds?.imperial[85] ?? '#ff0000';
     }
     // jshint ignore: end
     savePreferences(preferences);
@@ -576,7 +576,7 @@
       return preferences.SLColor;
     }
     const type = W.prefs.attributes.isImperial ? 'imperial' : 'metric';
-    return preferences.speeds[type][speed] || preferences.speeds.default;
+    return preferences.speeds[type][speed] ?? preferences.speeds.default;
   }
 
   function getAngle(isForward, p0, p1) {
@@ -673,7 +673,7 @@
         streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
       }
       let speedPart = '';
-      const speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed;
+      const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
       if (speed && preferences.showSLtext) {
         if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
           speedPart = getSuperScript(attributes.fwdMaxSpeed);
@@ -861,7 +861,7 @@
     }
 
     if (streetStyles[roadType] !== undefined) {
-      const speed = attributes.fwdMaxSpeed || attributes.revMaxSpeed; // If it remains null it does not have a speed limit
+      const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed; // If it remains null it does not have a speed limit
       // consoleDebug("Road Type: ", roadType);
       if (attributes.level > 0) {
         // it is a bridge
@@ -1803,12 +1803,14 @@
   }
 
   function rollbackDefault(dontask) {
+    consoleDebug('rollbackDefault');
     if (
-      dontask === true ||
+      dontask ??
       confirm(
         'Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!'
       )
     ) {
+      consoleDebug('rollbacking preferences');
       saveDefaultPreferences();
       updateStylesFromPreferences(preferences);
       updatePreferenceValues();
@@ -1829,24 +1831,24 @@
     const locale = I18n.translations[I18n.locale];
     switch (i) {
       case 'red':
-        return locale?.segment?.address?.none || i; // jshint ignore:line
+        return locale?.segment?.address?.none ?? i; // jshint ignore:line
       case 'toll':
-        return locale?.edit?.segment?.fields?.toll_road || i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.toll_road ?? i; // jshint ignore:line
       case 'restriction':
-        return locale?.restrictions?.modal_headers?.restriction_summary || i; // jshint ignore:line
+        return locale?.restrictions?.modal_headers?.restriction_summary ?? i; // jshint ignore:line
       case 'dirty':
-        return locale?.edit?.segment?.fields?.unpaved || i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.unpaved ?? i; // jshint ignore:line
       case 'closure':
-        return locale?.objects?.roadClosure?.name || i; // jshint ignore:line
+        return locale?.objects?.roadClosure?.name ?? i; // jshint ignore:line
       case 'headlights':
-        return locale?.edit?.segment?.fields?.headlights || i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.headlights ?? i; // jshint ignore:line
       case 'lanes':
-        return locale?.objects?.lanes?.title || i; // jshint ignore:line
+        return locale?.objects?.lanes?.title ?? i; // jshint ignore:line
       case 'speed limit':
-        return locale?.edit?.segment?.fields?.speed_limit || i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.speed_limit ?? i; // jshint ignore:line
       default:
     }
-    return locale?.segment?.road_types[i] || i; // jshint ignore:line
+    return locale?.segment?.road_types[i] ?? i; // jshint ignore:line
   }
 
   function createStreetOptionLine(i, showWidth = true, showOpacity = false) {
@@ -2007,7 +2009,7 @@
         preferences[o].strokeDashstyle;
     });
 
-    document.getElementById('svl_fakelock').value = WazeWrap?.User?.Rank() || 7;
+    document.getElementById('svl_fakelock').value = WazeWrap?.User?.Rank() ?? 7;
     document.getElementById('svl_autoReload_enabled').checked =
       preferences.autoReload.enabled;
     document.getElementById('svl_renderGeomNodes').checked =
@@ -2983,7 +2985,7 @@
       labelOutlineColor: '${outlinecolor}',
       labelOutlineWidth: '${outlinewidth}',
       label: '${label}',
-      visibility: preferences.startDisabled || true,
+      visibility: !preferences.startDisabled,
       angle: '${angle}',
       pointerEvents: 'none',
       labelAlign: 'cm', // set to center middle
@@ -2995,7 +2997,7 @@
       styleMap: roadStyleMap,
       uniqueName: 'vectorStreet',
       accelerator: `toggle${layerName.replace(/\s+/g, '')}`,
-      visibility: preferences.startDisabled || true,
+      visibility: !preferences.startDisabled,
       isVector: true,
       attribution: `SVL v. ${GM_info.script.version}`,
       rendererOptions: {
@@ -3044,7 +3046,7 @@
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
       uniqueName: 'vectorNodes',
-      visibility: preferences.startDisabled || true,
+      visibility: preferences.startDisabled ?? true,
     });
 
     nodesVector.renderer.drawFeature = function drawFeature(feature, style) {
@@ -3218,18 +3220,18 @@
       label.setAttributeNS(null, 'pointer-events', 'none');
 
       const align =
-        style.labelAlign || OpenLayers.Renderer.defaultSymbolizer.labelAlign;
+        style.labelAlign ?? OpenLayers.Renderer.defaultSymbolizer.labelAlign;
       label.setAttributeNS(
         null,
         'text-anchor',
-        OpenLayers.Renderer.SVG.LABEL_ALIGN[align[0]] || 'middle'
+        OpenLayers.Renderer.SVG.LABEL_ALIGN[align[0]] ?? 'middle'
       );
 
       if (OpenLayers.IS_GECKO === true) {
         label.setAttributeNS(
           null,
           'dominant-baseline',
-          OpenLayers.Renderer.SVG.LABEL_ALIGN[align[1]] || 'central'
+          OpenLayers.Renderer.SVG.LABEL_ALIGN[align[1]] ?? 'central'
         );
       }
 
@@ -3254,7 +3256,7 @@
           tspan.setAttributeNS(
             null,
             'baseline-shift',
-            OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] || '-35%'
+            OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
           );
         }
         tspan.setAttribute('x', x);
