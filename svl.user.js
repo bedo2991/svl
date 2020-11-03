@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.3
+// @version    4.9.4.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -1183,20 +1183,36 @@
         myFeatures.push(lineFeature);
       }
 
-      // Headlights
       if (flags.headlights) {
-        lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
-          {
-            myId: attributes.id,
-            color: preferences.headlights.strokeColor,
-            width: roadWidth * 0.2, // preferences.headlights.strokeWidth,
-            dash: preferences.headlights.strokeDashstyle,
-            closeZoomOnly: true,
-            zIndex: baselevel + 165,
-          }
+        myFeatures.push(
+          new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.LineString(pointList),
+            {
+              myId: attributes.id,
+              color: preferences.headlights.strokeColor,
+              width: roadWidth * 0.2, // preferences.headlights.strokeWidth,
+              dash: preferences.headlights.strokeDashstyle,
+              closeZoomOnly: true,
+              zIndex: baselevel + 165,
+            }
+          )
         );
-        myFeatures.push(lineFeature);
+      }
+      if (flags.nearbyHOV) {
+        //TODO: add preferences
+        myFeatures.push(
+          new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.LineString(pointList),
+            {
+              myId: attributes.id,
+              color: '#ff66ff', //preferences.nearbyHOV.strokeColor,
+              width: roadWidth * 0.2, // preferences.headlights.strokeWidth,
+              dash: 'dash', //preferences.nearbyHOV.strokeDashstyle,
+              closeZoomOnly: true,
+              zIndex: baselevel + 165,
+            }
+          )
+        );
       }
 
       if (attributes.fwdLaneCount > 0) {
@@ -2906,6 +2922,7 @@
         <br>- NEW: Some options are now are now localised using WME's strings
         <br>- NEW: Dead-end nodes are rendered with a different color
         <br>- NEW: The Preference panel changes color when you have unsaved changes
+        <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown
         <br>- Removed: the zoom-level indicator while editing the preferences
         <br>- Bug fixes and new bugs :)`
     );
