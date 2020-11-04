@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.6
+// @version    4.9.4.7
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -304,7 +304,7 @@
       loadedPreferences?.showUnderGPSPoints ?? false;
     preferences.routingModeEnabled =
       loadedPreferences?.routingModeEnabled ?? false;
-    preferences.realsize = loadedPreferences?.realsize ?? false;
+    preferences.realsize = loadedPreferences?.realsize ?? true;
     preferences.showANs = loadedPreferences?.showANs ?? false;
     preferences.renderGeomNodes = loadedPreferences?.renderGeomNodes ?? false;
 
@@ -423,7 +423,6 @@
     // Red segments (without names)
     preferences.red = {
       strokeColor: loadedPreferences?.red?.strokeColor ?? '#FF0000',
-      strokeWidth: loadedPreferences?.red?.strokeWidth ?? 6,
       strokeDashstyle: loadedPreferences?.red?.strokeDashstyle ?? 'solid',
     };
 
@@ -434,27 +433,32 @@
     };
     preferences.lanes = {
       strokeColor: loadedPreferences?.lanes?.strokeColor ?? '#454443',
-      strokeWidth: loadedPreferences?.lanes?.strokeWidth ?? 3,
       strokeDashstyle: loadedPreferences?.lanes?.strokeDashstyle ?? 'dash',
+      strokeOpacity: loadPreferences?.lanes?.strokeOpacity ?? 0.9,
     };
     preferences.toll = {
       strokeColor: loadedPreferences?.toll?.strokeColor ?? '#00E1FF',
-      strokeWidth: loadedPreferences?.toll?.strokeWidth ?? 2,
       strokeDashstyle: loadedPreferences?.toll?.strokeDashstyle ?? 'solid',
+      strokeOpacity: loadedPreferences?.toll?.strokeOpacity ?? 1.0,
     };
     preferences.closure = {
       strokeColor: loadedPreferences?.closure?.strokeColor ?? '#FF00FF',
-      strokeWidth: loadedPreferences?.closure?.strokeWidth ?? 4,
+      strokeOpacity: loadedPreferences?.closure?.strokeOpacity ?? 1.0,
       strokeDashstyle: loadedPreferences?.closure?.strokeDashstyle ?? 'dash',
     };
     preferences.headlights = {
       strokeColor: loadedPreferences?.headlights?.strokeColor ?? '#bfff00',
-      strokeWidth: loadedPreferences?.headlights?.strokeWidth ?? 3,
+      strokeOpacity: loadedPreferences?.headlights?.strokeOpacity ?? 0.9,
       strokeDashstyle: loadedPreferences?.headlights?.strokeDashstyle ?? 'dot',
+    };
+    preferences.nearbyHOV = {
+      strokeColor: loadedPreferences?.nearbyHOV?.strokeColor ?? '#ff66ff',
+      strokeOpacity: loadedPreferences?.nearbyHOV?.strokeOpacity ?? 1.0,
+      strokeDashstyle: loadedPreferences?.nearbyHOV?.strokeDashstyle ?? 'dash',
     };
     preferences.restriction = {
       strokeColor: loadedPreferences?.restriction?.strokeColor ?? '#F2FF00',
-      strokeWidth: loadedPreferences?.restriction?.strokeWidth ?? 2,
+      strokeOpacity: loadedPreferences?.restriction?.strokeOpacity ?? 1.0,
       strokeDashstyle:
         loadedPreferences?.restriction?.strokeDashstyle ?? 'dash',
     };
@@ -1103,8 +1107,9 @@
           {
             myId: attributes.id,
             color: preferences.closure.strokeColor,
-            width: preferences.closure.strokeWidth,
+            width: roadWidth * 0.6,
             dash: preferences.closure.strokeDashstyle,
+            opacity: preferences.closure.strokeOpacity,
             closeZoomOnly: true,
             zIndex: baselevel + 140,
           }
@@ -1124,9 +1129,9 @@
           {
             myId: attributes.id,
             color: preferences.toll.strokeColor,
-            width: roadWidth * 0.2, // TODO preferences.toll.strokeWidth,
+            width: roadWidth * 0.3, // TODO preferences.toll.strokeWidth,
             dash: preferences.toll.strokeDashstyle,
-            opacity: 0.9,
+            opacity: preferences.toll.strokeOpacity,
             zIndex: baselevel + 145,
           }
         );
@@ -1159,8 +1164,9 @@
           {
             myId: attributes.id,
             color: preferences.restriction.strokeColor,
-            width: roadWidth * 0.3, // preferences.restriction.strokeWidth,
+            width: roadWidth * 0.4, // preferences.restriction.strokeWidth,
             dash: preferences.restriction.strokeDashstyle,
+            opacity: preferences.restriction.strokeOpacity,
             closeZoomOnly: true,
             zIndex: baselevel + 155,
           }
@@ -1193,6 +1199,7 @@
               color: preferences.headlights.strokeColor,
               width: roadWidth * 0.2, // preferences.headlights.strokeWidth,
               dash: preferences.headlights.strokeDashstyle,
+              opacity: preferences.headlights.strokeOpacity,
               closeZoomOnly: true,
               zIndex: baselevel + 165,
             }
@@ -1200,17 +1207,17 @@
         );
       }
       if (flags.nearbyHOV) {
-        //TODO: add preferences
         myFeatures.push(
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
             {
               myId: attributes.id,
-              color: '#ff66ff', //preferences.nearbyHOV.strokeColor,
-              width: roadWidth * 0.2, // preferences.headlights.strokeWidth,
-              dash: 'dash', //preferences.nearbyHOV.strokeDashstyle,
+              color: preferences.nearbyHOV.strokeColor,
+              width: roadWidth * 0.25,
+              dash: preferences.nearbyHOV.strokeDashstyle,
+              opacity: preferences.nearbyHOV.strokeOpacity,
               closeZoomOnly: true,
-              zIndex: baselevel + 165,
+              zIndex: baselevel + 166,
             }
           )
         );
@@ -1230,9 +1237,9 @@
           {
             myId: attributes.id,
             color: preferences.lanes.strokeColor,
-            width: roadWidth * 0.3, // preferences.lanes.strokeWidth,
+            width: roadWidth * 0.3,
             dash: preferences.lanes.strokeDashstyle,
-            opacity: 0.9,
+            opacity: preferences.lanes.strokeOpacity,
             closeZoomOnly: true,
             zIndex: baselevel + 170,
           }
@@ -1254,9 +1261,9 @@
           {
             myId: attributes.id,
             color: preferences.lanes.strokeColor,
-            width: roadWidth * 0.3, // preferences.lanes.strokeWidth,
+            width: roadWidth * 0.3,
             dash: preferences.lanes.strokeDashstyle,
-            opacity: 0.9,
+            opacity: preferences.lanes.strokeOpacity,
             closeZoomOnly: true,
             zIndex: baselevel + 175,
           }
@@ -1618,9 +1625,6 @@
     preferences.red.strokeColor = document.getElementById(
       'svl_streetColor_red'
     ).value;
-    preferences.red.strokeWidth = document.getElementById(
-      'svl_streetWidth_red'
-    ).value;
     preferences.red.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_red option:checked'
     ).value;
@@ -1641,9 +1645,8 @@
     preferences.lanes.strokeColor = document.getElementById(
       'svl_streetColor_lanes'
     ).value;
-    preferences.lanes.strokeWidth = document.getElementById(
-      'svl_streetWidth_lanes'
-    ).value;
+    preferences.lanes.strokeOpacity =
+      document.getElementById('svl_streetOpacity_lanes').value / 100.0;
     preferences.lanes.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_lanes option:checked'
     ).value;
@@ -1653,9 +1656,8 @@
     preferences.toll.strokeColor = document.getElementById(
       'svl_streetColor_toll'
     ).value;
-    preferences.toll.strokeWidth = document.getElementById(
-      'svl_streetWidth_toll'
-    ).value;
+    preferences.toll.strokeOpacity =
+      document.getElementById('svl_streetOpacity_toll').value / 100.0;
     preferences.toll.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_toll option:checked'
     ).value;
@@ -1665,9 +1667,8 @@
     preferences.restriction.strokeColor = document.getElementById(
       'svl_streetColor_restriction'
     ).value;
-    preferences.restriction.strokeWidth = document.getElementById(
-      'svl_streetWidth_restriction'
-    ).value;
+    preferences.restriction.strokeOpacity =
+      document.getElementById('svl_streetOpacity_restriction').value / 100.0;
     preferences.restriction.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_restriction option:checked'
     ).value;
@@ -1677,9 +1678,8 @@
     preferences.closure.strokeColor = document.getElementById(
       'svl_streetColor_closure'
     ).value;
-    preferences.closure.strokeWidth = document.getElementById(
-      'svl_streetWidth_closure'
-    ).value;
+    preferences.closure.strokeOpacity =
+      document.getElementById('svl_streetOpacity_closure').value / 100.0;
     preferences.closure.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_closure option:checked'
     ).value;
@@ -1689,11 +1689,21 @@
     preferences.headlights.strokeColor = document.getElementById(
       'svl_streetColor_headlights'
     ).value;
-    preferences.headlights.strokeWidth = document.getElementById(
-      'svl_streetWidth_headlights'
-    ).value;
+    preferences.headlights.strokeOpacity =
+      document.getElementById('svl_streetOpacity_headlights').value / 100.0;
     preferences.headlights.strokeDashstyle = document.querySelector(
       '#svl_strokeDashstyle_headlights option:checked'
+    ).value;
+
+    // HeadlightsRequired
+    preferences.nearbyHOV = {};
+    preferences.nearbyHOV.strokeColor = document.getElementById(
+      'svl_streetColor_nearbyHOV'
+    ).value;
+    preferences.nearbyHOV.strokeOpacity =
+      document.getElementById('svl_streetOpacity_nearbyHOV').value / 100.0;
+    preferences.nearbyHOV.strokeDashstyle = document.querySelector(
+      '#svl_strokeDashstyle_nearbyHOV option:checked'
     ).value;
 
     // AutoReload
@@ -1832,27 +1842,33 @@
     const locale = I18n.translations[I18n.locale];
     switch (i) {
       case 'red':
-        return locale?.segment?.address?.none ?? i; // jshint ignore:line
+        return locale?.segment?.address?.none ?? i;
       case 'toll':
-        return locale?.edit?.segment?.fields?.toll_road ?? i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.toll_road ?? i;
       case 'restriction':
-        return locale?.restrictions?.modal_headers?.restriction_summary ?? i; // jshint ignore:line
+        return locale?.restrictions?.modal_headers?.restriction_summary ?? i;
       case 'dirty':
-        return locale?.edit?.segment?.fields?.unpaved ?? i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.unpaved ?? i;
       case 'closure':
-        return locale?.objects?.roadClosure?.name ?? i; // jshint ignore:line
+        return locale?.objects?.roadClosure?.name ?? i;
       case 'headlights':
-        return locale?.edit?.segment?.fields?.headlights ?? i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.headlights ?? i;
       case 'lanes':
-        return locale?.objects?.lanes?.title ?? i; // jshint ignore:line
+        return locale?.objects?.lanes?.title ?? i;
       case 'speed limit':
-        return locale?.edit?.segment?.fields?.speed_limit ?? i; // jshint ignore:line
+        return locale?.edit?.segment?.fields?.speed_limit ?? i;
+      case 'nearbyHOV':
+        return locale?.edit?.segment?.fields?.nearbyHOV ?? i;
       default:
     }
     return locale?.segment?.road_types[i] ?? i; // jshint ignore:line
   }
 
-  function createStreetOptionLine(i, showWidth = true, showOpacity = false) {
+  function createStreetOptionLine({
+    i,
+    showWidth = true,
+    showOpacity = false,
+  }) {
     const title = document.createElement('h5');
     title.innerText = getLocalisedString(i);
 
@@ -1962,6 +1978,7 @@
         'closure',
         'headlights',
         'dirty',
+        'nearbyHOV',
       ],
     };
   }
@@ -1988,8 +2005,10 @@
 
     const options = getOptions();
     options.streets.forEach((o) => {
-      document.getElementById(`svl_streetWidth_${o}`).value =
-        preferences[o].strokeWidth;
+      if (o !== 'red') {
+        document.getElementById(`svl_streetWidth_${o}`).value =
+          preferences[o].strokeWidth;
+      }
       document.getElementById(`svl_streetColor_${o}`).value =
         preferences[o].strokeColor;
       document.getElementById(`svl_strokeDashstyle_${o}`).value =
@@ -1997,7 +2016,17 @@
     });
 
     options.decorations.forEach((o) => {
-      if (o === 'dirty') {
+      if (
+        [
+          'dirty',
+          'lanes',
+          'toll',
+          'restriction',
+          'closure',
+          'headlights',
+          'nearbyHOV',
+        ].includes(o)
+      ) {
         document.getElementById(`svl_streetOpacity_${o}`).value =
           preferences[o].strokeOpacity * 100.0;
       } else {
@@ -2253,7 +2282,9 @@
 
     for (let i = 0; i < preferences.streets.length; i += 1) {
       if (preferences.streets[i]) {
-        streets.appendChild(createStreetOptionLine(i));
+        streets.appendChild(
+          createStreetOptionLine({ i, showWidth: true, showOpacity: false })
+        );
       }
     }
 
@@ -2265,10 +2296,64 @@
 
     const options = getOptions();
     options.streets.forEach((o) => {
-      streets.appendChild(createStreetOptionLine(o));
+      if (o !== 'red') {
+        streets.appendChild(
+          createStreetOptionLine({ i: o, showWidth: true, showOpacity: false })
+        );
+      } else {
+        streets.appendChild(
+          createStreetOptionLine({ i: o, showWidth: false, showOpacity: false })
+        );
+      }
     });
 
-    options.decorations.forEach((o) => {
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'lanes',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({ i: 'toll', showWidth: false, showOpacity: true })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'restriction',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'closure',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'headlights',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'dirty',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+    decorations.appendChild(
+      createStreetOptionLine({
+        i: 'nearbyHOV',
+        showWidth: false,
+        showOpacity: true,
+      })
+    );
+
+    /* options.decorations.forEach((o) => {
       if (o !== 'dirty') {
         if (o === 'red') {
           decorations.appendChild(createStreetOptionLine(o, false));
@@ -2278,7 +2363,7 @@
       } else {
         decorations.appendChild(createStreetOptionLine(o, false, true));
       }
-    });
+    }); */
 
     streets.appendChild(decorations);
     mainDiv.appendChild(streets);
