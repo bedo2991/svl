@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.7
+// @version    4.9.4.8
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -824,6 +824,7 @@
   function drawSegment(model) {
     // consoleDebug("DrawSegment");
     const attributes = model.getAttributes();
+    consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
     const points = attributes.geometry.components;
     const pointList = attributes.geometry.getVertices(); // is an array
@@ -1888,7 +1889,7 @@
         ? 'form-control prefElement segmentsWidth'
         : 'form-control prefElement';
       width.style.width = '40pt';
-      width.title = 'Width (in meters)';
+      width.title = 'Width (disabled if using real-size width)';
       width.type = 'number';
       width.min = 1;
       width.max = 20;
@@ -2684,13 +2685,17 @@
     nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute('myid', id));
   }
 
-  function removeNodes(e) {
-    // console.debug("Remove nodes");
-    let i;
-    for (i = 0; i < e.length; i += 1) {
-      removeNodeById(e[i].attributes.id);
+  function removeNodes(nodes) {
+    consoleDebug(`Removing ${nodes.length} nodes`);
+    if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) {
+      consoleDebug('Destroy all nodes');
+      nodesVector.destroyFeatures();
+      return;
     }
-    return true;
+    let i;
+    for (i = 0; i < nodes.length; i += 1) {
+      removeNodeById(nodes[i].attributes.id);
+    }
   }
 
   function getNodeStyle(attributes) {
@@ -2734,14 +2739,21 @@
     }
   }
 
-  function addNodes(e) {
-    consoleDebug('Add Nodes');
+  function addNodes(nodes) {
+    consoleDebug(`Adding ${nodes.length} nodes`);
+    if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) {
+      consoleDebug('Not adding them because of the zoom');
+      return;
+    }
     const myFeatures = [];
-    for (let i = 0; i < e.length; i += 1) {
-      if (e[i].attributes.geometry !== undefined) {
-        if (e[i].attributes.id > 0) {
-          myFeatures.push(drawNode(e[i]));
+    for (let i = 0; i < nodes.length; i += 1) {
+      if (nodes[i].attributes.geometry !== undefined) {
+        if (nodes[i].attributes.id > 0) {
+          myFeatures.push(drawNode(nodes[i]));
         }
+      } else {
+        console.warn('[SVL] Geometry of node is undefined');
+        //debugger
       }
     }
 
@@ -2782,7 +2794,7 @@
     // Event deferring
     clearTimeout(timer);
     consoleDebug('manageZoom clearing timer');
-    timer = setTimeout(updateStatusBasedOnZoom, 600);
+    timer = setTimeout(updateStatusBasedOnZoom, 800);
   }
 
   function registerSegmentsEvents() {
@@ -2867,7 +2879,14 @@
    * @param {[]} segments
    */
   function addSegments(segments) {
-    consoleDebug('Add Segments');
+    consoleDebug(`Adding ${segments.length} segments`);
+
+    if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) {
+      consoleDebug('Not adding them because of the zoom');
+      return;
+    }
+
+    console.group();
     let myFeatures = [];
     // console.log("Size: " + e.length);
     segments.forEach((el) => {
@@ -2879,10 +2898,11 @@
     if (myFeatures.length > 0) {
       streetVectorLayer.addFeatures(myFeatures);
     }
+    console.groupEnd();
   }
 
   function removeSegmentById(id) {
-    consoleDebug('RemoveSegmentById', id, typeof id);
+    consoleDebug(`RemoveSegmentById: ${id}`);
     streetVectorLayer.destroyFeatures(
       streetVectorLayer.getFeaturesByAttribute('myId', id)
     );
@@ -2893,7 +2913,7 @@
 
   function editSegments(segments) {
     // console.debug("Changed Segment");
-    // consoleDebug("Segments modifed", e);
+    consoleDebug(`Edit ${segments.length} segments`);
     segments.forEach((s) => {
       const oldID = s.getOldID();
       if (oldID) {
@@ -2907,12 +2927,19 @@
     });
   }
 
-  function removeSegments(e) {
-    let i;
-    // consoleDebug("Segments removed from model");
-    for (i = 0; i < e.length; i += 1) {
-      removeSegmentById(e[i].attributes.id);
+  function removeSegments(segments) {
+    consoleDebug(`Removing ${segments.length} segments`);
+    if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) {
+      consoleDebug('Destroy all segments and labels because of zoom out');
+      streetVectorLayer.destroyFeatures();
+      labelsVector.destroyFeatures();
+      return;
     }
+    console.group();
+    segments.forEach((s) => {
+      removeSegmentById(s.attributes.id);
+    });
+    console.groupEnd();
   }
 
   function manageVisibilityChanged(e) {
