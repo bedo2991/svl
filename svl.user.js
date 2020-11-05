@@ -3425,7 +3425,7 @@
 
     initWazeWrap();
 
-    if (OLMap.zoom <= 1) {
+    if (OLMap.zoom <= preferences.useWMERoadLayerAtZoom) {
       setLayerVisibility(ROAD_LAYER, true);
     } else if (WMERoadLayer.getVisibility() && preferences.disableRoadLayers) {
       setLayerVisibility(ROAD_LAYER, false);
