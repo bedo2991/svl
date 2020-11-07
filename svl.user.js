@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.8
+// @version    4.9.4.9
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -67,7 +67,7 @@
   };
 
   /** @type{number} */
-  const clutterMax = 700;
+  const clutterMax = 20;
   /** @type{number} */
   const fontSizeMax = 32;
   /** @type{Array<string>} */
@@ -84,16 +84,16 @@
 
   // Styles that are not changeable in the 'preferences':
   const validatedStyle = {
-    'strokeColor': '#F53BFF',
-    'strokeWidth': 3,
-    'strokeDashstyle': 'solid',
+    strokeColor: '#F53BFF',
+    strokeWidth: 3,
+    strokeDashstyle: 'solid',
   };
 
   const roundaboutStyle = {
-    'strokeColor': '#111111',
-    'strokeWidth': 1,
-    'strokeDashstyle': 'dash',
-    'strokeOpacity': 0.6,
+    strokeColor: '#111111',
+    strokeWidth: 1,
+    strokeDashstyle: 'dash',
+    strokeOpacity: 0.6,
   };
 
   const nodeStyle = {
@@ -137,8 +137,8 @@
     'strokeDashstyle': 'solid',
   };
   const tunnelFlagStyle2 = {
-    'strokeColor': '#C90',
-    'strokeDashstyle': 'longdash',
+    strokeColor: '#C90',
+    strokeDashstyle: 'longdash',
   };
   const tunnelFlagStyle1 = {
     strokeColor: '#fff',
@@ -204,7 +204,7 @@
         return;
       }
     }
-    console.dir(layerCheckboxes[layer]);
+    //console.dir(layerCheckboxes[layer]);
     layerCheckboxes[layer].checked = visibility;
   }
 
@@ -313,7 +313,7 @@
     preferences['startDisabled'] =
       loadedPreferences?.['startDisabled'] ?? false;
     preferences['clutterConstant'] =
-      loadedPreferences?.['clutterConstant'] ?? 200;
+      loadedPreferences?.['clutterConstant'] ?? 10;
     preferences['labelOutlineWidth'] =
       loadedPreferences?.['labelOutlineWidth'] ?? 3;
     preferences['closeZoomLabelSize'] =
@@ -616,16 +616,8 @@
     // jshint ignore: end
     savePreferences(preferences);
     // Compute properties that need to be computed
-    updateComputedValues(preferences);
 
     return oldUser;
-  }
-
-  function getThreshold() {
-    if (clutterConstant === clutterMax) {
-      return 0;
-    }
-    return clutterConstant / OLMap.zoom;
   }
 
   function bestBackground(color) {
@@ -693,10 +685,10 @@
     /** @type {OpenLayers.Geometry.Point} */
     let centroid;
     let directionArrow;
-    let streetNameThresholdDistance;
+    // let streetNameThresholdDistance;
     let p0;
     let p1;
-    let doubleLabelDistance;
+    //let doubleLabelDistance;
     const labels = [];
     labelFeature = null;
     const attributes = segmentModel.getAttributes();
@@ -783,9 +775,9 @@
       if (labelText === ' ') {
         return [];
       }
-      streetNameThresholdDistance =
+      /* streetNameThresholdDistance =
         labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
-      doubleLabelDistance = 4 * streetNameThresholdDistance;
+      doubleLabelDistance = 4 * streetNameThresholdDistance; */
 
       const roadTypeID = attributes['roadType'];
       const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
@@ -799,42 +791,57 @@
         'outlinewidth': preferences['labelOutlineWidth'],
       });
 
+      const distances = [];
+      // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
       for (let p = 0; p < simplified.length - 1; p += 1) {
         const distance = simplified[p].distanceTo(simplified[p + 1]);
-        console.log(`Distance: ${distance} - Threshold: ${thresholdDistance}`);
+        distances.push({ index: p, distance });
+      }
+      // sort them by distance, descending
+      distances.sort((a, b) =>
+        a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
+      );
+      let labelsToInsert = distances.length;
+      const minimumDistance = clutterConstant * streetPart.length;
+      for (let i = 0; i < distances.length && labelsToInsert > 1; i += 1) {
+        if (distances[i].distance < minimumDistance) {
+          break;
+        }
+        const p = distances[i].index;
         // consoleDebug('Label can be inserted:');
         // console.dir(address);
         let dx = 0;
         let dy = 0;
-        if (distance > streetNameThresholdDistance) {
-          // consoleDebug('Label inserted');
-          // p = maxDistanceIndex;
-          if (distance < doubleLabelDistance) {
-            // || farzoom
-            p0 = simplified[p];
-            p1 = simplified[p + 1];
-          } else {
-            p0 = simplified[p];
-            p1 = new OpenLayers.Geometry.LineString([
-              p0,
-              simplified[p + 1],
-            ]).getCentroid(true);
-          }
-          centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
-            true
-          ); /* Important: pass true parameter otherwise it will return start point as centroid */
-          // Clone the label
-          labelFeature = sampleLabel.clone();
-          labelFeature.geometry = centroid;
-          if (attributes['fwdDirection']) {
-            dx = p1.x - p0.x;
-            dy = p1.y - p0.y;
-          } else {
-            dx = p0.x - p1.x;
-            dy = p0.y - p1.y;
-          }
-          const angle = Math.atan2(dx, dy);
-          let degrees = 90 + (angle * 180) / Math.PI;
+        // if (distance > streetNameThresholdDistance) {
+        // consoleDebug('Label inserted');
+        // p = maxDistanceIndex;
+        // if (distance < doubleLabelDistance) {
+        // || farzoom
+        // p0 = simplified[p];
+        // p1 = simplified[p + 1];
+        // } else {
+        p0 = simplified[p];
+        p1 = new OpenLayers.Geometry.LineString([
+          p0,
+          simplified[p + 1],
+        ]).getCentroid(true);
+        // }
+        centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
+          true
+        ); /* Important: pass true parameter otherwise it will return start point as centroid */
+        // Clone the label
+        labelFeature = sampleLabel.clone();
+        labelFeature.geometry = centroid;
+        if (attributes['fwdDirection']) {
+          dx = p1.x - p0.x;
+          dy = p1.y - p0.y;
+        } else {
+          dx = p0.x - p1.x;
+          dy = p0.y - p1.y;
+        }
+        const angle = Math.atan2(dx, dy);
+        let degrees = 90 + (angle * 180) / Math.PI;
+        if (streetPart !== '') {
           directionArrow = ' ▶ ';
           if (degrees > 90 && degrees < 270) {
             degrees -= 180;
@@ -842,29 +849,39 @@
           } else {
             directionArrow = ' ◀ ';
           }
-          if (!segmentModel.isOneWay()) {
-            directionArrow = ''; // The degree has to be computed anyway
-          }
-          labelFeature.attributes.label =
-            directionArrow + labelText + directionArrow + altStreetPart;
+        } else {
+          directionArrow = '';
+        }
+        if (!segmentModel.isOneWay()) {
+          directionArrow = ''; // The degree has to be computed anyway
+        }
+        labelFeature.attributes.label =
+          directionArrow + labelText + directionArrow + altStreetPart;
 
-          labelFeature.attributes['angle'] = degrees;
-          labelFeature.attributes.closeZoomOnly = p % 2 === 1;
+        labelFeature.attributes['angle'] = degrees;
+        labelFeature.attributes.closeZoomOnly = p % 2 === 1;
+        labelFeature.attributes.showAtzoom = labelsToInsert;
+        labelsToInsert -= 1;
+        labels.push(labelFeature);
+        if (labelsToInsert > 0) {
+          // Create the second label on a long segment //!farZoom &&
+          p0 = p1;
+          p1 = simplified[p + 1];
+          centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
+            true
+          );
+          labelFeature = labelFeature.clone();
+          labelFeature.geometry = centroid;
+          labelFeature.attributes.closeZoomOnly = true;
+          labelFeature.attributes.showAtzoom = labelsToInsert;
+          labelsToInsert -= 1;
           labels.push(labelFeature);
-          if (distance >= doubleLabelDistance) {
-            // Create the second label on a long segment //!farZoom &&
-            p0 = p1;
-            p1 = simplified[p + 1];
-            centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
-              true
-            );
-            labelFeature = labelFeature.clone();
-            labelFeature.geometry = centroid;
-            labelFeature.attributes.closeZoomOnly = true;
-            labels.push(labelFeature);
-          }
         }
       }
+      // console.dir(distances);
+      /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
+
+      } */
     }
     if (delayed && labelFeature) {
       // Add the labels directly
@@ -1530,11 +1547,6 @@
       getNodeStyle(attributes)
     );
     return pointFeature;
-  }
-
-  function updateComputedValues(pref) {
-    clutterConstant = pref['clutterConstant'];
-    thresholdDistance = getThreshold();
   }
 
   function rollbackPreferences() {
@@ -2498,7 +2510,7 @@
         id: 'clutterConstant',
         title: 'Street Names Density',
         description: 'For an higher value, less elements will be shown.',
-        min: 10,
+        min: 1,
         max: clutterMax,
         step: 1,
       })
@@ -3361,7 +3373,8 @@
     });
 
     labelsVector.renderer.drawFeature = function drawFeature(feature, style) {
-      if (OLMap.zoom < 2) {
+      const { zoom } = OLMap;
+      if (zoom < 2) {
         return false;
       }
       if (style == null) {
@@ -3372,6 +3385,7 @@
         // if (bounds) {
         const farZoom = isFarZoom();
         if (
+          7 - feature.attributes.showAtzoom > zoom ||
           (feature.attributes.closeZoomOnly && farZoom) ||
           (feature.attributes.farZoomOnly && !farZoom)
         ) {
@@ -3634,8 +3648,8 @@
     consoleDebug('DrawAllSegments');
     streetVectorLayer.destroyFeatures();
     labelsVector.destroyFeatures();
-    addSegments(Object.values(W.model.segments.objects));
     nodesVector.destroyFeatures();
+    addSegments(Object.values(W.model.segments.objects));
     addNodes(Object.values(W.model.nodes.objects));
   }
 
@@ -3650,7 +3664,7 @@
         };
       }
     }
-    updateComputedValues(pref);
+    clutterConstant = pref['clutterConstant'];
     redrawAllSegments();
   }
 
