@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.4.9
+// @version    4.9.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -19,18 +19,21 @@
 
 // debugger;
 (function svl() {
-  const consoleDebug =
-    window.localStorage.getItem('svlDebugOn') === 'true'
-      ? (...args) => {
-          for (let i = 0; i < args.length; i += 1) {
-            if (typeof args[i] === 'string') {
-              console.log(`[SVL] ${GM_info.script.version}: ${args[i]}`);
-            } else {
-              console.dir(args[i]);
-            }
+  const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
+  const consoleDebug = DEBUG
+    ? (...args) => {
+        for (let i = 0; i < args.length; i += 1) {
+          if (typeof args[i] === 'string') {
+            console.log(`[SVL] ${GM_info.script.version}: ${args[i]}`);
+          } else {
+            console.dir(args[i]);
           }
         }
-      : () => {};
+      }
+    : () => {};
+
+  const consoleGroup = DEBUG ? console.group : () => {};
+  const consoleGroupEnd = DEBUG ? console.groupEnd : () => {};
 
   /** @type{number} */
   const MAX_SEGMENTS = 1700;
@@ -126,7 +129,7 @@
     'stroke': false,
     'fillColor': '#000',
     'fillOpacity': 0.5,
-    'pointRadius': 3.3,
+    'pointRadius': 3.5,
     'graphicZIndex': 179,
     'pointerEvents': 'none',
   };
@@ -313,7 +316,7 @@
     preferences['startDisabled'] =
       loadedPreferences?.['startDisabled'] ?? false;
     preferences['clutterConstant'] =
-      loadedPreferences?.['clutterConstant'] ?? 10;
+      loadedPreferences?.['clutterConstant'] ?? 7;
     preferences['labelOutlineWidth'] =
       loadedPreferences?.['labelOutlineWidth'] ?? 3;
     preferences['closeZoomLabelSize'] =
@@ -679,16 +682,16 @@
    * @param {boolean} [delayed=false]
    */
   function drawLabels(segmentModel, simplified, delayed = false) {
-    //consoleDebug('drawLabels');
+    // consoleDebug('drawLabels');
     let labelFeature;
     let labelText;
     /** @type {OpenLayers.Geometry.Point} */
-    let centroid;
+    // let centroid;
     let directionArrow;
     // let streetNameThresholdDistance;
     let p0;
     let p1;
-    //let doubleLabelDistance;
+    // let doubleLabelDistance;
     const labels = [];
     labelFeature = null;
     const attributes = segmentModel.getAttributes();
@@ -713,7 +716,7 @@
       ) {
         streetPart = '⚑';
       }
-      consoleDebug(`Streetpart: ${streetPart}`);
+      //consoleDebug(`Streetpart: ${streetPart}`);
 
       // add alt street names
       let altStreetPart = '';
@@ -801,10 +804,17 @@
       distances.sort((a, b) =>
         a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
       );
-      let labelsToInsert = distances.length;
-      const minimumDistance = clutterConstant * streetPart.length;
-      for (let i = 0; i < distances.length && labelsToInsert > 1; i += 1) {
-        if (distances[i].distance < minimumDistance) {
+      let labelsToInsert = streetPart === '' ? 1 : distances.length;
+      const requiredSpace = clutterConstant * labelText.length;
+      //console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
+
+      //console.debug(segmentModel.getID(), distances);
+      for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
+        //console.log(`LabelsToInsert: ${labelsToInsert}`);
+        if (
+          distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
+        ) {
+          //console.log(`Breaking at index ${i}`);
           break;
         }
         const p = distances[i].index;
@@ -824,14 +834,14 @@
         p1 = new OpenLayers.Geometry.LineString([
           p0,
           simplified[p + 1],
-        ]).getCentroid(true);
-        // }
-        centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
+        ]).getCentroid(
           true
-        ); /* Important: pass true parameter otherwise it will return start point as centroid */
-        // Clone the label
-        labelFeature = sampleLabel.clone();
-        labelFeature.geometry = centroid;
+        ); /* Important: pass true parameter otherwise it will return start point as centroid */ // Clone the label
+        // }
+        /* centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
+          true
+        ); */ labelFeature = sampleLabel.clone();
+        labelFeature.geometry = p1;
         if (attributes['fwdDirection']) {
           dx = p1.x - p0.x;
           dy = p1.y - p0.y;
@@ -856,14 +866,15 @@
           directionArrow = ''; // The degree has to be computed anyway
         }
         labelFeature.attributes.label =
-          directionArrow + labelText + directionArrow + altStreetPart;
+          directionArrow + labelText + directionArrow + altStreetPart; // +
+        // labelsToInsert; //TODO remove
 
         labelFeature.attributes['angle'] = degrees;
         labelFeature.attributes.closeZoomOnly = p % 2 === 1;
         labelFeature.attributes.showAtzoom = labelsToInsert;
         labelsToInsert -= 1;
         labels.push(labelFeature);
-        if (labelsToInsert > 0) {
+        if (false && labelsToInsert > 0) {
           // Create the second label on a long segment //!farZoom &&
           p0 = p1;
           p1 = simplified[p + 1];
@@ -1401,7 +1412,7 @@
                 {
                   'myId': attributes['id'],
                   closeZoomOnly: true,
-                  'isArrow': true,
+                  isArrow: true,
                   'zIndex': baselevel + 180,
                 },
                 unknownDirStyle
@@ -1428,7 +1439,7 @@
                 {
                   'myId': attributes['id'],
                   closeZoomOnly: true,
-                  'isArrow': true,
+                  isArrow: true,
                 },
                 {
                   'graphicName': 'myTriangle',
@@ -1482,7 +1493,9 @@
               points[p],
               {
                 'myId': attributes['id'],
+                'zIndex': baselevel + 200,
                 closeZoomOnly: true,
+                isArrow: true,
               },
               geometryNodeStyle
             )
@@ -1612,18 +1625,12 @@
       routingModeDiv.addEventListener('mouseenter', () => {
         // Temporary disable routing mode
         preferences['routingModeEnabled'] = false;
-        streetVectorLayer.destroyFeatures();
-        labelsVector.destroyFeatures();
-        nodesVector.destroyFeatures();
         redrawAllSegments();
         // doDraw();
       });
       routingModeDiv.addEventListener('mouseleave', () => {
         // Enable routing mode again
         preferences['routingModeEnabled'] = true;
-        streetVectorLayer.destroyFeatures();
-        labelsVector.destroyFeatures();
-        nodesVector.destroyFeatures();
         redrawAllSegments();
         //                doDraw();
       });
@@ -2991,14 +2998,22 @@
     });
   }
 
+  /**
+   * Destroys all elements of all layers.
+   */
+  const destroyAllFeatures = () => {
+    consoleDebug('Destroy all features');
+    streetVectorLayer.destroyFeatures();
+    labelsVector.destroyFeatures();
+    nodesVector.destroyFeatures();
+  };
+
   function abortDrawing() {
     console.warn('Abort drawing');
     drawingAborted = true;
     setLayerVisibility(ROAD_LAYER, true);
     setLayerVisibility(SVL_LAYER, false);
-    streetVectorLayer.destroyFeatures();
-    labelsVector.destroyFeatures();
-    nodesVector.destroyFeatures();
+    destroyAllFeatures();
   }
 
   /**
@@ -3018,7 +3033,7 @@
       return;
     }
 
-    console.group();
+    consoleGroup();
     let myFeatures = [];
     // console.log("Size: " + e.length);
     segments.forEach((el) => {
@@ -3033,7 +3048,7 @@
     } else {
       console.warn('[SVL] no features drawn');
     }
-    console.groupEnd();
+    consoleGroupEnd();
   }
 
   /**
@@ -3085,11 +3100,11 @@
       abortDrawing();
       return;
     }
-    console.group();
+    consoleGroup();
     segments.forEach((s) => {
       removeSegmentById(s.attributes['id']);
     });
-    console.groupEnd();
+    consoleGroupEnd();
   }
 
   function manageVisibilityChanged(event) {
@@ -3114,9 +3129,7 @@
       removeSegmentsEvents();
       removeNodeEvents();
 
-      nodesVector.destroyFeatures();
-      labelsVector.destroyFeatures();
-      streetVectorLayer.destroyFeatures();
+      destroyAllFeatures();
     }
   }
 
@@ -3302,7 +3315,7 @@
 
             style['pointerEvents'] = 'none';
             if (!farZoom) {
-              if (!feature.attributes['isArrow'] && preferences['realsize']) {
+              if (!feature.attributes.isArrow && preferences['realsize']) {
                 style['strokeWidth'] /= OLMap.resolution;
               }
             }
@@ -3646,9 +3659,7 @@
 
   function redrawAllSegments() {
     consoleDebug('DrawAllSegments');
-    streetVectorLayer.destroyFeatures();
-    labelsVector.destroyFeatures();
-    nodesVector.destroyFeatures();
+    destroyAllFeatures();
     addSegments(Object.values(W.model.segments.objects));
     addNodes(Object.values(W.model.nodes.objects));
   }
