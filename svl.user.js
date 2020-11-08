@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.5
+// @version    4.9.5.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -36,9 +36,9 @@
   const consoleGroupEnd = DEBUG ? console.groupEnd : () => {};
 
   /** @type{number} */
-  const MAX_SEGMENTS = 1700;
+  const MAX_SEGMENTS = 3000;
   /** @type{number} */
-  const MAX_NODES = 2000;
+  const MAX_NODES = 4000;
   let autoLoadInterval = null;
   let clutterConstant;
   let thresholdDistance;
@@ -2784,7 +2784,9 @@
       return;
     }
     if (drawingAborted || nodes.length > MAX_NODES) {
-      abortDrawing();
+      if (!drawingAborted) {
+        abortDrawing();
+      }
       return;
     }
     let i;
@@ -2852,7 +2854,9 @@
   function addNodes(nodes) {
     consoleDebug(`Adding ${nodes.length} nodes`);
     if (drawingAborted || nodes.length > MAX_NODES) {
-      abortDrawing();
+      if (!drawingAborted) {
+        abortDrawing();
+      }
       return;
     }
     if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
@@ -2892,6 +2896,15 @@
         drawingAborted = false;
         setLayerVisibility(SVL_LAYER, true);
         setLayerVisibility(ROAD_LAYER, false);
+        redrawAllSegments();
+      } else {
+        console.warn(
+          `[SVL] Still too many elements to draw: Segments: ${
+            Object.keys(W.model.segments.objects).length
+          }/${MAX_SEGMENTS}, Nodes: ${
+            Object.keys(W.model.nodes.objects).length
+          }/${MAX_NODES}`
+        );
       }
     }
     if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
@@ -3009,7 +3022,7 @@
   };
 
   function abortDrawing() {
-    console.warn('Abort drawing');
+    console.warn('[SVL] Abort drawing, too many elements');
     drawingAborted = true;
     setLayerVisibility(ROAD_LAYER, true);
     setLayerVisibility(SVL_LAYER, false);
@@ -3024,7 +3037,9 @@
     consoleDebug(`Adding ${segments.length} segments`);
 
     if (drawingAborted || segments.length > MAX_SEGMENTS) {
-      abortDrawing();
+      if (!drawingAborted) {
+        abortDrawing();
+      }
       return;
     }
 
@@ -3096,8 +3111,10 @@
       labelsVector.destroyFeatures();
       return;
     }
-    if (segments.length > MAX_SEGMENTS) {
-      abortDrawing();
+    if (drawingAborted || segments.length > MAX_SEGMENTS) {
+      if (!drawingAborted) {
+        abortDrawing();
+      }
       return;
     }
     consoleGroup();
