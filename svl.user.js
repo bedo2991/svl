@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.5.2
+// @version    4.9.5.3
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -20,7 +20,7 @@
 // debugger;
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '4.9.5.1';
+  const SVL_VERSION = '4.9.5.3';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -159,6 +159,16 @@
   };
 
   // End of global variable declaration
+
+  const safeAlert = (level, message) => {
+    try {
+      WazeWrap.Alerts[level](GM_info.script.name, message);
+    } catch (e) {
+      console.error(e);
+      alert(message);
+    }
+  };
+
   function isFarZoom(zoom = OLMap.zoom) {
     return zoom < preferences['switchZoom'];
   }
@@ -229,10 +239,21 @@
     );
   }
 
-  function savePreferences(pref) {
+  function savePreferences(pref, silent = true) {
     consoleDebug('savePreferences');
     pref.version = SVL_VERSION;
-    window.localStorage.setItem('svl', JSON.stringify(pref));
+    try {
+      window.localStorage.setItem('svl', JSON.stringify(pref));
+      if (!silent) {
+        safeAlert('success', 'Preferences saved!');
+      }
+    } catch (e) {
+      console.error(e);
+      safeAlert(
+        'error',
+        'Could not save the preferences, your browser local storage seems to be full.'
+      );
+    }
   }
 
   function saveDefaultPreferences() {
@@ -1562,25 +1583,28 @@
     loadPreferences();
     updateStylesFromPreferences(preferences);
     updatePreferenceValues();
+    safeAlert(
+      'info',
+      "All's well that ends well! Now it's everything as it was before."
+    );
   }
 
   function exportPreferences() {
     GM_setClipboard(JSON.stringify(preferences));
-    alert(
+    safeAlert(
+      'info',
       'The configuration has been copied to your clipboard. Please paste it in a file (CTRL+V) to store it.'
     );
   }
 
-  function importPreferences() {
-    const pastedText = prompt(
-      'N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!\n\nPaste your string here:'
-    );
+  function importPreferences(e, pastedText) {
     if (pastedText !== null && pastedText !== '') {
       try {
         preferences = JSON.parse(pastedText);
       } catch (ex) {
-        alert(
-          'Your string seems to be somehow wrong. Place check that is a valid JSON string'
+        safeAlert(
+          'error',
+          'Your string seems to be somehow wrong. Please check that is a valid JSON string'
         );
         return;
       }
@@ -1588,11 +1612,22 @@
         updateStylesFromPreferences(preferences);
         savePreferences(preferences);
         updatePreferenceValues();
+        safeAlert('success', 'Done, preferences imported!');
       } else {
-        alert('Something went wrong. Is your string correct?');
+        safeAlert('error', 'Something went wrong. Is your string correct?');
       }
     }
   }
+
+  const importPreferencesCallback = () => {
+    WazeWrap.Alerts.prompt(
+      GM_info.script.name,
+      'N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!\n\nPaste your string here:',
+      '',
+      importPreferences,
+      null
+    );
+  };
 
   function updateLayerPosition() {
     const gpsLayerIndex = parseInt(
@@ -1876,23 +1911,28 @@
 
   function saveNewPref() {
     updateValuesFromPreferences();
-    savePreferences(preferences);
+    savePreferences(preferences, false);
     updatePreferenceValues();
   }
 
-  function rollbackDefault(dontask) {
+  const resetPreferences = () => {
+    consoleDebug('resetting preferences');
+    saveDefaultPreferences();
+    updateStylesFromPreferences(preferences);
+    updatePreferenceValues();
+    safeAlert('success', 'Preferences have been reset to the default values');
+  };
+
+  function resetPreferencesCallback() {
     consoleDebug('rollbackDefault');
-    if (
-      dontask ??
-      confirm(
-        'Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!'
-      )
-    ) {
-      consoleDebug('rollbacking preferences');
-      saveDefaultPreferences();
-      updateStylesFromPreferences(preferences);
-      updatePreferenceValues();
-    }
+    WazeWrap.Alerts.confirm(
+      GM_info.script.name,
+      'Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!',
+      resetPreferences,
+      null,
+      'Yes, I want to reset',
+      'Cancel'
+    );
   }
 
   function createDashStyleDropdown(id) {
@@ -1994,7 +2034,7 @@
     return line;
   }
 
-  function createSpeedOtionLine(i, metric = true) {
+  function createSpeedOptionLine(i, metric = true) {
     const type = metric ? 'metric' : 'imperial';
     // const title = document.createElement("h6");
     // title.innerText = getLocalisedString("speed limit");
@@ -2033,7 +2073,7 @@
     inputs.appendChild(color);
 
     const line = document.createElement('div');
-    line.className = 'prefLineSL';
+    line.className = `svl_${type} prefLineSL`;
     line.appendChild(inputs);
 
     return line;
@@ -2155,12 +2195,25 @@
     document.getElementById('svl_SLColor').value = preferences['SLColor'];
     document.getElementById('svl_realsize').checked = preferences['realsize'];
 
-    const segmentWidhts = document.querySelectorAll('.segmentsWidth');
-    segmentWidhts.forEach((el) => {
+    const segmentWidths = document.querySelectorAll('.segmentsWidth');
+    segmentWidths.forEach((el) => {
       el.disabled = preferences['realsize'];
     });
-    const type = W.prefs.attributes['isImperial'] ? 'imperial' : 'metric';
+
+    // Toggle metric/decimal
+    const WMEUsesImperial = W.prefs.attributes['isImperial'];
+    const type = WMEUsesImperial ? 'imperial' : 'metric';
     const speeds = Object.keys(preferences['speeds'][type]);
+    const slLinesToHide = document.querySelectorAll(
+      WMEUsesImperial ? '.svl_metric' : '.svl_imperial'
+    );
+    slLinesToHide.forEach((el) => {
+      el.style.display = 'none';
+    });
+    const slLinesToShow = document.querySelectorAll(`.svl_${type}`);
+    slLinesToShow.forEach((el) => {
+      el.style.display = 'block';
+    });
     for (let i = 1; i < speeds.length + 1; i += 1) {
       document.getElementById(`svl_slValue_${type}_${i}`).value = speeds[i - 1];
       document.getElementById(`svl_slColor_${type}_${i}`).value =
@@ -2699,16 +2752,26 @@
     const slTitle = document.createElement('h6');
     slTitle.innerText = getLocalisedString('speed limit');
     speedLimits.appendChild(slTitle);
-    const type = W.prefs.attributes['isImperial'] ? 'imperial' : 'metric';
-    speedLimits.appendChild(createSpeedOtionLine('Default'));
+
+    //Metric
+    let type = 'metric';
+    speedLimits.appendChild(createSpeedOptionLine('Default', true));
     for (
       let i = 1;
       i < Object.keys(preferences['speeds'][type]).length + 1;
       i += 1
     ) {
-      speedLimits.appendChild(
-        createSpeedOtionLine(i, !W.prefs.attributes['isImperial'])
-      );
+      speedLimits.appendChild(createSpeedOptionLine(i, true));
+    }
+
+    type = 'imperial';
+    speedLimits.appendChild(createSpeedOptionLine('Default', false));
+    for (
+      let i = 1;
+      i < Object.keys(preferences['speeds'][type]).length + 1;
+      i += 1
+    ) {
+      speedLimits.appendChild(createSpeedOptionLine(i, false));
     }
 
     mainDiv.appendChild(speedLimits);
@@ -2755,10 +2818,10 @@
       .addEventListener('click', rollbackPreferences);
     document
       .getElementById('svl_resetButton')
-      .addEventListener('click', rollbackDefault);
+      .addEventListener('click', resetPreferencesCallback);
     document
       .getElementById('svl_importButton')
-      .addEventListener('click', importPreferences);
+      .addEventListener('click', importPreferencesCallback);
     document
       .getElementById('svl_exportButton')
       .addEventListener('click', exportPreferences);
@@ -3156,7 +3219,12 @@
       return;
     }
 
-    if (!WazeWrap || !WazeWrap.Ready || !WazeWrap.Interface) {
+    if (
+      !WazeWrap ||
+      !WazeWrap.Ready ||
+      !WazeWrap.Interface ||
+      !WazeWrap.Alerts
+    ) {
       console.log('SVL: WazeWrap not ready, retrying in 800ms');
       setTimeout(() => {
         initWazeWrap(trial + 1);
@@ -3219,7 +3287,9 @@
         <br>- NEW: The Preference panel changes color when you have unsaved changes
         <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown
         <br>- Removed: the zoom-level indicator while editing the preferences
-        <br>- Bug fixes and new bugs :)`
+        <br>- Bug fixes and new bugs :)`,
+      '',
+      GM_info.script.supportURL
     );
   }
 
@@ -3244,7 +3314,8 @@
         return;
       }
       console.error(e);
-      alert(
+      safeAlert(
+        'error',
         'Street Vector Layer failed to inizialize. Maybe the Editor has been updated or your connection/pc is really slow.'
       );
       return;
@@ -3254,7 +3325,8 @@
 
     if (loadPreferences() === false) {
       // First run, or new broswer
-      alert(
+      safeAlert(
+        'info',
         'This is the first time that you run Street Vector Layer in this browser.\n' +
           'Some info about it:\n' +
           'By default, use ALT+L to toggle the layer.\n' +
@@ -3662,7 +3734,8 @@
 
     // TODO remove in the next releases
     $('.olControlAttribution').click(() => {
-      alert(
+      safeAlert(
+        'info',
         'The preferences have been moved to the sidebar on the left. Please look for the "SVL 🗺️" tab.'
       );
     });
@@ -3708,7 +3781,8 @@
           bootstrapSVL(attempts);
         }, 600);
       } else {
-        alert(
+        safeAlert(
+          'error',
           'Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!'
         );
       }

@@ -529,7 +529,7 @@ const WazeWrap = {
      * @param {Function} okCallback
      * @param {Function} cancelCalback
      * @param {?string} [okButtonText="Ok"]
-     * @param {?string} cancelButtonText
+     * @param {?string} [cancelButtonText="Cancel"]
      */
     'confirm': function (
       name,
@@ -539,12 +539,6 @@ const WazeWrap = {
       okButtonText,
       cancelButtonText
     ) {},
-    /**
-     *
-     * @param {string} name
-     * @param {string} message
-     */
-    'info': function (name, message) {},
   },
   /** @type {boolean} */
   'Ready': true,
@@ -586,8 +580,16 @@ const WazeWrap = {
      * @param {string} name
      * @param {string} version
      * @param {string} html
+     * @param {string} greasemonkeyURL
+     * @param {string} forumURL
      */
-    'ShowScriptUpdate': function (name, version, html) {},
+    'ShowScriptUpdate': function (
+      name,
+      version,
+      html,
+      greasemonkeyURL,
+      forumURL
+    ) {},
 
     /**
      * Creates a checkbox in the layer menu
