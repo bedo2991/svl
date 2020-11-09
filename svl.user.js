@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    4.9.5.1
+// @version    4.9.5.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
@@ -19,12 +19,16 @@
 
 // debugger;
 (function svl() {
+  /** @type {string} */
+  const SVL_VERSION = '4.9.5.1';
+  /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
+  /** @type {Function} */
   const consoleDebug = DEBUG
     ? (...args) => {
         for (let i = 0; i < args.length; i += 1) {
           if (typeof args[i] === 'string') {
-            console.log(`[SVL] ${GM_info.script.version}: ${args[i]}`);
+            console.log(`[SVL] ${SVL_VERSION}: ${args[i]}`);
           } else {
             console.dir(args[i]);
           }
@@ -32,16 +36,20 @@
       }
     : () => {};
 
+  /** @type {Function} */
   const consoleGroup = DEBUG ? console.group : () => {};
+  /** @type {Function} */
   const consoleGroupEnd = DEBUG ? console.groupEnd : () => {};
 
   /** @type{number} */
   const MAX_SEGMENTS = 3000;
   /** @type{number} */
   const MAX_NODES = 4000;
+
   let autoLoadInterval = null;
+
   let clutterConstant;
-  let thresholdDistance;
+
   const streetStyles = [];
   /** @type {OpenLayers.Layer.Vector} */
   let streetVectorLayer;
@@ -51,6 +59,7 @@
   let labelsVector;
   /** @type {boolean} */
   let drawingAborted = false;
+
   let preferences;
   /** @type {OpenLayers.Layer.Vector} */
   let WMERoadLayer;
@@ -222,7 +231,7 @@
 
   function savePreferences(pref) {
     consoleDebug('savePreferences');
-    pref.version = GM_info.script.version;
+    pref.version = SVL_VERSION;
     window.localStorage.setItem('svl', JSON.stringify(pref));
   }
 
@@ -310,7 +319,7 @@
       loadedPreferences?.['showDashedUnverifiedSL'] ?? true;
     preferences['showSLcolor'] = loadedPreferences?.['showSLcolor'] ?? true;
     preferences['showSLtext'] = loadedPreferences?.['showSLtext'] ?? true;
-    // preferences['version'] = GM_info.script.version; Automatically added by savePreferences
+    // preferences['version'] = SVL_VERSION; Automatically added by savePreferences
     preferences['disableRoadLayers'] =
       loadedPreferences?.['disableRoadLayers'] ?? true;
     preferences['startDisabled'] =
@@ -685,8 +694,9 @@
     // consoleDebug('drawLabels');
     let labelFeature;
     let labelText;
-    /** @type {OpenLayers.Geometry.Point} */
+
     // let centroid;
+    /** @type {string} */
     let directionArrow;
     // let streetNameThresholdDistance;
     let p0;
@@ -874,20 +884,6 @@
         labelFeature.attributes.showAtzoom = labelsToInsert;
         labelsToInsert -= 1;
         labels.push(labelFeature);
-        if (false && labelsToInsert > 0) {
-          // Create the second label on a long segment //!farZoom &&
-          p0 = p1;
-          p1 = simplified[p + 1];
-          centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
-            true
-          );
-          labelFeature = labelFeature.clone();
-          labelFeature.geometry = centroid;
-          labelFeature.attributes.closeZoomOnly = true;
-          labelFeature.attributes.showAtzoom = labelsToInsert;
-          labelsToInsert -= 1;
-          labels.push(labelFeature);
-        }
       }
       // console.dir(distances);
       /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
@@ -1165,7 +1161,7 @@
             'myId': attributes['id'],
             'color': '#000000',
             'width': roadWidth,
-            'opacity': 0.35,
+            'opacity': 0.3,
             'zIndex': baselevel + 125,
             // dash:"solid"
           }
@@ -2304,7 +2300,7 @@
     mainDiv.appendChild(svlTitle);
 
     const spanVersion = document.createElement('span');
-    spanVersion.innerText = `Version ${GM_info.script.version}`;
+    spanVersion.innerText = `Version ${SVL_VERSION}`;
     mainDiv.appendChild(spanVersion);
 
     const supportForum = document.createElement('a');
@@ -3211,7 +3207,7 @@
     initPreferencePanel();
     WazeWrap.Interface.ShowScriptUpdate(
       'Street Vector Layer',
-      GM_info.script.version,
+      SVL_VERSION,
       `<b>Major update!</b>
             <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
         <br>- NEW: Rendering completely rewritten: performance improvements
@@ -3300,7 +3296,7 @@
       'accelerator': `toggle${layerName.replace(/\s+/g, '')}`,
       'visibility': !preferences['startDisabled'],
       'isVector': true,
-      'attribution': `SVL v. ${GM_info.script.version}`,
+      'attribution': `SVL v. ${SVL_VERSION}`,
       'rendererOptions': {
         'zIndexing': true,
       },
@@ -3671,7 +3667,7 @@
       );
     });
 
-    console.log(`[SVL] v. ${GM_info.script.version} initialized correctly.`);
+    console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
   }
 
   function redrawAllSegments() {
