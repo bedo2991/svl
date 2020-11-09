@@ -202,6 +202,8 @@ const GM_info = {
     'version': '',
     /** @type {string} */
     'supportURL': '',
+    /** @type {string} */
+    'name': '',
   },
 };
 
@@ -473,6 +475,76 @@ const WazeWrap = {
   'User': {
     /** @return {number} */
     'Rank': function () {},
+  },
+  'Alerts': {
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'info': function (name, message) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'warning': function (name, message) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'error': function (name, message) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'success': function (name, message) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'debug': function (name, message) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     * @param {?string} defaultText
+     * @param {Function} okCallback
+     * @param {Function} cancelCalback
+     */
+    'prompt': function (
+      name,
+      message,
+      defaultText,
+      okCallback,
+      cancelCalback
+    ) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     * @param {Function} okCallback
+     * @param {Function} cancelCalback
+     * @param {?string} [okButtonText="Ok"]
+     * @param {?string} cancelButtonText
+     */
+    'confirm': function (
+      name,
+      message,
+      okCallback,
+      cancelCalback,
+      okButtonText,
+      cancelButtonText
+    ) {},
+    /**
+     *
+     * @param {string} name
+     * @param {string} message
+     */
+    'info': function (name, message) {},
   },
   /** @type {boolean} */
   'Ready': true,
