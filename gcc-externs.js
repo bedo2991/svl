@@ -15,7 +15,7 @@ const Restriction = class {
  * @property {number} id - the segments ID
  * @property {number} roadType - the ID of the roads' type
  * @property {?number} routingRoadType
- * @property {Array<number>} virtualNodeIDs
+ * @property {Array.<number>} virtualNodeIDs
  * @property {boolean} separator
  * @property {number} lockRank
  * @property {boolean} validated
@@ -33,20 +33,20 @@ const Restriction = class {
  * @property {number}  revMaxSpeed
  * @property {boolean}  fwdMaxSpeedUnverified
  * @property {boolean}  revMaxSpeedUnverified
- * @property {Array<number>}  streetIDs
+ * @property {Array.<number>}  streetIDs
  * @property {?number}  junctionID
  * @property {boolean}  hasHNs
  * @property {boolean}  hasClosures
  * @property {number}  length
  * @property {boolean}  fwdToll
  * @property {boolean}  revToll
- * @property {Array<Restriction>}  restrictions
- * @property {Array<*>}  parkingRestrictions
- * @property {Array<*>}  pickupRestrictions
+ * @property {Array.<Restriction>}  restrictions
+ * @property {Array}  parkingRestrictions
+ * @property {Array}  pickupRestrictions
  * @property {number}  permissions
  * @property {?number}  crossroadID
- * @property {Array<*>}  fromCrossroads
- * @property {Array<*>}  toCrossroads
+ * @property {Array}  fromCrossroads
+ * @property {Array}  toCrossroads
  * @property {boolean}  allowNoDirection
  * @property {boolean}  fwdTurnsLocked
  * @property {boolean}  revTurnsLocked
@@ -66,7 +66,7 @@ let SegmentAttributes;
  * @property {OpenLayers.Geometry.Point} geometry
  * @property {number} permissions
  * @property {?number} rank
- * @property {Array<number>} segIDs
+ * @property {Array.<number>} segIDs
  * @property {boolean} partial
  */
 let NodeAttributes;
@@ -229,6 +229,14 @@ const OpenLayers = {
      */
     constructor(lon, lat) {}
   },
+  'Pixel': class {
+    /**
+     *
+     * @param {number} x
+     * @param {number} y
+     */
+    constructor(x, y) {}
+  },
   'Map': class {
     constructor() {
       /** @type {number} */
@@ -257,7 +265,7 @@ const OpenLayers = {
      *
      * @param {string} attr
      * @param {string} value
-     * @return {Array<OpenLayers.Layer.Vector>}
+     * @return {Array.<OpenLayers.Layer.Vector>}
      */
     getLayersBy(attr, value) {}
   },
@@ -292,10 +300,10 @@ const OpenLayers = {
     },
     'LineString': class LineString {
       constructor(pointArray) {
-        /** @type {Array<OpenLayers.Geometry.Point>} */
+        /** @type {Array.<OpenLayers.Geometry.Point>} */
         this.components;
       }
-      /**@return Array<*> */
+      /**@return Array */
       getVertices() {}
       /**
        *
@@ -375,10 +383,16 @@ const OpenLayers = {
         this.attributes;
         /** @type{Waze.Feature.Vector.Segment|Waze.Feature.Vector.Node} */
         this.model;
+        this.style;
       }
 
       /** @return {OpenLayers.Feature.Vector} */
       clone() {}
+      /**
+       *
+       * @param {OpenLayers.LonLat|OpenLayers.Pixel} lonLat
+       */
+      move(lonLat) {}
     },
   },
   /** @typedef Layer
@@ -436,22 +450,25 @@ const OpenLayers = {
 
       /**
        *
-       * @param {OpenLayers.Feature.Vector=} p
+       * @param {Array.<OpenLayers.Feature.Vector>=} array
+       * @param {Object=} options
        */
-      destroyFeatures(p) {}
+      destroyFeatures(array, options) {}
 
       /**
        *
        * @param {string} featureName
        * @param {*} id
+       * @return {Array.<OpenLayers.Feature.Vector>}
        */
       getFeaturesByAttribute(featureName, id) {}
 
       /**
        *
-       * @param {Array<OpenLayers.Feature.Vector>} features
+       * @param {Array.<OpenLayers.Feature.Vector>} features
+       * @param {Object=} options
        */
-      addFeatures(features) {}
+      addFeatures(features, options) {}
     },
   },
 };

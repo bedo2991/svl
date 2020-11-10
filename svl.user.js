@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.0
+// @version    5.0.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
-// @downloadURL  https://github.com/bedo2991/svl/raw/develop/svl.user.js
+// @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
 // @supportURL https://www.waze.com/forum/viewtopic.php?f=819&t=149535
 // @require    https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
 // @icon       https://raw.githubusercontent.com/bedo2991/svl/master/logo_noText.png
@@ -13,14 +13,11 @@
 // @copyright  2015+, bedo2991
 // ==/UserScript==
 
-// @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
-
 // Code minifier: https://closure-compiler.appspot.com/home
 
-// debugger;
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.0';
+  const SVL_VERSION = '5.0.1';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -2941,7 +2938,7 @@
 
   function removeSVLEvents(event) {
     // Keep all the events that don't have the svl flag enabled.
-    return !event.svl;
+    return !event['svl'];
   }
 
   function updateStatusBasedOnZoom() {
@@ -3282,7 +3279,7 @@
         <br>- NEW: The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
         <br>- NEW: You can set what color to use for each speed limit (User request)
         <br>- NEW: Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
-        <br>- NEW: Some options are now are now localised using WME's strings
+        <br>- NEW: Some options are now localised using WME's strings
         <br>- NEW: Dead-end nodes are rendered with a different color
         <br>- NEW: The Preference panel changes color when you have unsaved changes
         <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown
