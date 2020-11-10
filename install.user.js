@@ -200,7 +200,7 @@ Q("Object.values", function(k) {
   function ya(b, c) {
     c = void 0 === c ? !0 : c;
     x("savePreferences");
-    b.version = "4.9.5.3";
+    b.version = "5.0.0";
     try {
       window.localStorage.setItem("svl", JSON.stringify(b)), c || w("success", "Preferences saved!");
     } catch (a) {
@@ -968,7 +968,7 @@ Q("Object.values", function(k) {
     c.innerText = "Street Vector Layer";
     b.appendChild(c);
     c = document.createElement("span");
-    c.innerText = "Version 4.9.5.3";
+    c.innerText = "Version 5.0.0";
     b.appendChild(c);
     c = document.createElement("a");
     c.innerText = "Something not working? Report it here.";
@@ -1242,7 +1242,7 @@ Q("Object.values", function(k) {
     }
     d.startDisabled && M(1, !1);
     Zh();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "4.9.5.3", '<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n        <br>- NEW: Rendering completely rewritten: performance improvements\n        <br>- NEW: The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- NEW: You can set what color to use for each speed limit (User request)\n        <br>- NEW: Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- NEW: Some options are now are now localised using WME\'s strings\n        <br>- NEW: Dead-end nodes are rendered with a different color\n        <br>- NEW: The Preference panel changes color when you have unsaved changes\n        <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown\n        <br>- Removed: the zoom-level indicator while editing the preferences\n        <br>- Bug fixes and new bugs :)', 
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.0", '<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n        <br>- NEW: Rendering completely rewritten: performance improvements\n        <br>- NEW: The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- NEW: You can set what color to use for each speed limit (User request)\n        <br>- NEW: Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- NEW: Some options are now are now localised using WME\'s strings\n        <br>- NEW: Dead-end nodes are rendered with a different color\n        <br>- NEW: The Preference panel changes color when you have unsaved changes\n        <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown\n        <br>- Removed: the zoom-level indicator while editing the preferences\n        <br>- Bug fixes and new bugs :)', 
     "", GM_info.script.supportURL);
   }
   function Jh(b) {
@@ -1271,7 +1271,7 @@ Q("Object.values", function(k) {
     !1 === V() && w("info", "This is the first time that you run Street Vector Layer in this browser.\nSome info about it:\nBy default, use ALT+L to toggle the layer.\nYou can change the streets color, thickness and style using the panel on the left sidebar.\nYour preferences will be saved for the next time in your browser.\nThe other road layers will be automatically hidden (you can change this behaviour in the preference panel).\nHave fun and tell us on the Waze forum if you liked the script!");
     b = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var a = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    C = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:b, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 4.9.5.3", rendererOptions:{zIndexing:!0, }, });
+    C = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:b, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.0", rendererOptions:{zIndexing:!0, }, });
     C.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
@@ -1378,7 +1378,7 @@ Q("Object.values", function(k) {
     $(".olControlAttribution").click(function() {
       w("info", 'The preferences have been moved to the sidebar on the left. Please look for the "SVL \ud83d\uddfa\ufe0f" tab.');
     });
-    console.log("[SVL] v. 4.9.5.3 initialized correctly.");
+    console.log("[SVL] v. 5.0.0 initialized correctly.");
   }
   function oa() {
     x("DrawAllSegments");
@@ -1413,7 +1413,7 @@ Q("Object.values", function(k) {
       c[a] = arguments[a];
     }
     for (a = 0; a < c.length; a += 1) {
-      "string" === typeof c[a] ? console.log("[SVL] 4.9.5.3: " + c[a]) : console.dir(c[a]);
+      "string" === typeof c[a] ? console.log("[SVL] 5.0.0: " + c[a]) : console.dir(c[a]);
     }
   } : function() {
   }, Fh = Ea ? console.group : function() {
