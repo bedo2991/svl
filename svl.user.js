@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.1
+// @version    5.0.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.1';
+  const SVL_VERSION = '5.0.2';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -223,7 +223,7 @@
         return;
       }
     }
-    //console.dir(layerCheckboxes[layer]);
+    // console.dir(layerCheckboxes[layer]);
     layerCheckboxes[layer].checked = visibility;
   }
 
@@ -271,7 +271,7 @@
     '15': 8.0, // "Ferry",
     '16': 2.0, // "Stairway",
     '17': 5.0, // "Private Road",
-    '18': 10.0, // "Railroad",
+    '18': 6.0, // "Railroad",
     '19': 5.0, // "Runway",
     '20': 5.0, // "Parking Lot Road",
     '22': 3.0, // "Alley"
@@ -744,7 +744,7 @@
       ) {
         streetPart = '⚑';
       }
-      //consoleDebug(`Streetpart: ${streetPart}`);
+      // consoleDebug(`Streetpart: ${streetPart}`);
 
       // add alt street names
       let altStreetPart = '';
@@ -834,15 +834,15 @@
       );
       let labelsToInsert = streetPart === '' ? 1 : distances.length;
       const requiredSpace = clutterConstant * labelText.length;
-      //console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
+      // console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
 
-      //console.debug(segmentModel.getID(), distances);
+      // console.debug(segmentModel.getID(), distances);
       for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
-        //console.log(`LabelsToInsert: ${labelsToInsert}`);
+        // console.log(`LabelsToInsert: ${labelsToInsert}`);
         if (
           distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
         ) {
-          //console.log(`Breaking at index ${i}`);
+          // console.log(`Breaking at index ${i}`);
           break;
         }
         const p = distances[i].index;
@@ -910,7 +910,7 @@
     }
     if (delayed && labelFeature) {
       // Add the labels directly
-      labelsVector.addFeatures(labels);
+      labelsVector.addFeatures(labels, { 'silent': true });
     }
     return labels;
   }
@@ -957,6 +957,7 @@
     const isInRoundabout = model.isInRoundabout();
     let isBridge = false;
     let hasSpeedLimitDrawn = false;
+    // eslint-disable-next-line prefer-destructuring
     let roadType = attributes['roadType'];
 
     const totalSegmentWidth = getWidth({
@@ -1550,7 +1551,7 @@
     // Add Label
     const labels = drawLabels(model, simplified);
     if (labels.length > 0) {
-      labelsVector.addFeatures(labels);
+      labelsVector.addFeatures(labels, { 'silent': true });
       // myFeatures = myFeatures.concat(labels);
     }
     return myFeatures;
@@ -2825,7 +2826,10 @@
   }
 
   function removeNodeById(id) {
-    nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute('myid', id));
+    nodesVector.destroyFeatures(
+      nodesVector.getFeaturesByAttribute('myid', id),
+      { 'silent': true }
+    );
   }
 
   /**
@@ -2836,7 +2840,7 @@
     consoleDebug(`Removing ${nodes.length} nodes`);
     if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Destroy all nodes');
-      nodesVector.destroyFeatures();
+      nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
       return;
     }
     if (drawingAborted || nodes.length > MAX_NODES) {
@@ -2877,7 +2881,7 @@
         );
       } else if (attributes['id'] > 0) {
         // The node has just been saved
-        nodesVector.addFeatures(Array.of(drawNode(node)));
+        nodesVector.addFeatures(Array.of(drawNode(node)), { 'silent': true });
       } // Else it is a temporary node, we won't draw it.});
     });
   }
@@ -2932,7 +2936,7 @@
       }
     }
 
-    nodesVector.addFeatures(myFeatures);
+    nodesVector.addFeatures(myFeatures, { 'silent': true });
     return true;
   }
 
@@ -3072,9 +3076,11 @@
    */
   const destroyAllFeatures = () => {
     consoleDebug('Destroy all features');
-    streetVectorLayer.destroyFeatures();
-    labelsVector.destroyFeatures();
-    nodesVector.destroyFeatures();
+    streetVectorLayer.destroyFeatures(streetVectorLayer.features, {
+      'silent': true,
+    });
+    labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
+    nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
   };
 
   function abortDrawing() {
@@ -3115,7 +3121,7 @@
     });
     if (myFeatures.length > 0) {
       consoleDebug(`${myFeatures.length} features added to the street layer`);
-      streetVectorLayer.addFeatures(myFeatures);
+      streetVectorLayer.addFeatures(myFeatures, { 'silent': true });
     } else {
       console.warn('[SVL] no features drawn');
     }
@@ -3129,10 +3135,12 @@
   function removeSegmentById(id) {
     consoleDebug(`RemoveSegmentById: ${id}`);
     streetVectorLayer.destroyFeatures(
-      streetVectorLayer.getFeaturesByAttribute('myId', id)
+      streetVectorLayer.getFeaturesByAttribute('myId', id),
+      { 'silent': true }
     );
     labelsVector.destroyFeatures(
-      labelsVector.getFeaturesByAttribute('myId', id)
+      labelsVector.getFeaturesByAttribute('myId', id),
+      { 'silent': true }
     );
   }
 
@@ -3163,8 +3171,10 @@
     consoleDebug(`Removing ${segments.length} segments`);
     if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Destroy all segments and labels because of zoom out');
-      streetVectorLayer.destroyFeatures();
-      labelsVector.destroyFeatures();
+      streetVectorLayer.destroyFeatures(streetVectorLayer.features, {
+        'silent': true,
+      });
+      labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
       return;
     }
     if (drawingAborted || segments.length > MAX_SEGMENTS) {

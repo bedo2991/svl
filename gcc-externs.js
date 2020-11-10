@@ -423,6 +423,8 @@ const OpenLayers = {
         this.renderer;
         /** @type {boolean} */
         this.visibility = true;
+        /** @type {Array.<OpenLayers.Feature.Vector>} */
+        this.features;
       }
 
       /**
