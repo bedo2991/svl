@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.2
+// @version    5.0.4
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.2';
+  const SVL_VERSION = '5.0.4';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -356,6 +356,11 @@
 
     preferences['arrowDeclutter'] =
       loadedPreferences?.['arrowDeclutter'] ?? 140;
+
+    preferences['segmentsThreshold'] =
+      loadedPreferences?.['segmentsThreshold'] ?? 3000;
+    preferences['nodesThreshold'] =
+      loadedPreferences?.['nodesThreshold'] ?? 4000;
 
     preferences['showUnderGPSPoints'] =
       loadedPreferences?.['showUnderGPSPoints'] ?? false;
@@ -726,7 +731,7 @@
     const address = segmentModel.getAddress();
     const hasStreetName = segmentModel.hasNonEmptyStreet();
     if (
-      attributes['primaryStreetID'] !== null &&
+      attributes.primaryStreetID !== null &&
       address.attributes['state'] === undefined
     ) {
       consoleDebug('Address not ready', address, attributes);
@@ -738,10 +743,7 @@
       let streetPart = '';
       if (hasStreetName) {
         streetPart = addressAttributes['street']['name'];
-      } else if (
-        attributes['roadType'] < 10 &&
-        !segmentModel.isInRoundabout()
-      ) {
+      } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
         streetPart = '⚑';
       }
       // consoleDebug(`Streetpart: ${streetPart}`);
@@ -750,8 +752,8 @@
       let altStreetPart = '';
       if (preferences['showANs']) {
         let ANsShown = 0;
-        for (let i = 0; i < attributes['streetIDs'].length; i += 1) {
-          const streetID = attributes['streetIDs'][i];
+        for (let i = 0; i < attributes.streetIDs.length; i += 1) {
+          const streetID = attributes.streetIDs[i];
           if (ANsShown === 2) {
             // Show maximum 2 alternative names
             altStreetPart += ' …';
@@ -773,7 +775,7 @@
         }
       }
 
-      if (!streetStyles[attributes['roadType']]) {
+      if (!streetStyles[attributes.roadType]) {
         streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
       }
 
@@ -1209,7 +1211,7 @@
 
       const flags = model.getFlagAttributes();
 
-      if (flags['unpaved']) {
+      if (flags.unpaved) {
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
@@ -1316,7 +1318,7 @@
         myFeatures.push(lineFeature);
       }
 
-      if (flags['headlights']) {
+      if (flags.headlights) {
         myFeatures.push(
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
@@ -1332,7 +1334,7 @@
           )
         );
       }
-      if (flags['nearbyHOV']) {
+      if (flags.nearbyHOV) {
         myFeatures.push(
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
@@ -1474,7 +1476,7 @@
         }
       }
 
-      if (flags['fwdSpeedCamera']) {
+      if (flags.fwdSpeedCamera) {
         myFeatures.push(
           createAverageSpeedCamera({
             id: attributes['id'],
@@ -1486,7 +1488,7 @@
         );
       }
 
-      if (flags['revSpeedCamera']) {
+      if (flags.revSpeedCamera) {
         myFeatures.push(
           createAverageSpeedCamera({
             id: attributes['id'],
@@ -1521,7 +1523,7 @@
       // 'End': Close Zoom
 
       // In any 'Zoom':
-      if (flags['tunnel']) {
+      if (flags.tunnel) {
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
@@ -1564,13 +1566,13 @@
   function drawNode(model) {
     const attributes = model.getAttributes();
     const point = new OpenLayers.Geometry.Point(
-      attributes['geometry'].x,
-      attributes['geometry'].y
+      attributes.geometry.x,
+      attributes.geometry.y
     );
     const pointFeature = new OpenLayers.Feature.Vector(
       point,
       {
-        'myid': attributes['id'],
+        'myid': attributes.id,
       },
       getNodeStyle(attributes)
     );
@@ -1856,6 +1858,13 @@
     preferences['renderGeomNodes'] = document.getElementById(
       'svl_renderGeomNodes'
     ).checked;
+
+    preferences['nodesThreshold'] = document.getElementById(
+      'svl_nodesThreshold'
+    ).value;
+    preferences['segmentsThreshold'] = document.getElementById(
+      'svl_segmentsThreshold'
+    ).value;
 
     // Check if showUnderGPSPoints has been toggled
     if (
@@ -2171,6 +2180,11 @@
     document.getElementById('svl_useWMERoadLayerAtZoom').value =
       preferences['useWMERoadLayerAtZoom'];
     document.getElementById('svl_switchZoom').value = preferences['switchZoom'];
+    document.getElementById('svl_nodesThreshold').value =
+      preferences['nodesThreshold'];
+    document.getElementById('svl_segmentsThreshold').value =
+      preferences['segmentsThreshold'];
+
     document.getElementById('svl_disableRoadLayers').checked =
       preferences['disableRoadLayers'];
     document.getElementById('svl_startDisabled').checked =
@@ -2413,7 +2427,11 @@
 
     const decorations = createPreferencesSection('Segments Decorations');
 
-    const labels = createPreferencesSection('Rendering Parameters');
+    const renderingParameters = createPreferencesSection(
+      'Rendering Parameters'
+    );
+
+    const performance = createPreferencesSection('Performance Tuning');
 
     const speedLimits = createPreferencesSection('Speed Limits');
 
@@ -2512,7 +2530,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'routingModeEnabled',
         title: 'Enable Routing Mode',
@@ -2521,7 +2539,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'showUnderGPSPoints',
         title: 'GPS Layer above Roads',
@@ -2541,7 +2559,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'disableRoadLayers',
         title: 'Hide WME Road Layer',
@@ -2550,7 +2568,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'startDisabled',
         title: 'SVL Initially Disabled',
@@ -2559,7 +2577,7 @@
       })
     );
 
-    streets.appendChild(
+    renderingParameters.appendChild(
       createRangeOption({
         id: 'clutterConstant',
         title: 'Street Names Density',
@@ -2570,36 +2588,12 @@
       })
     );
 
-    labels.appendChild(
-      createIntegerOption({
-        id: 'useWMERoadLayerAtZoom',
-        title: 'Stop using SVL at zoom level',
-        description:
-          'When you reach this zoom level, the road layer gets automatically enabled.',
-        min: 0,
-        max: 5,
-        step: 1,
-      })
-    );
-
-    labels.appendChild(
-      createIntegerOption({
-        id: 'switchZoom',
-        title: 'Close-zoom until level',
-        description:
-          'When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)',
-        min: 5,
-        max: 9,
-        step: 1,
-      })
-    );
-
     const closeZoomTitle = document.createElement('h5');
     closeZoomTitle.innerText = 'Close-zoom only';
 
-    labels.appendChild(closeZoomTitle);
+    renderingParameters.appendChild(closeZoomTitle);
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'renderGeomNodes',
         title: 'Render Geometry Nodes',
@@ -2607,7 +2601,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createIntegerOption({
         id: 'fakelock',
         title: 'Render Map as Level',
@@ -2619,7 +2613,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createRangeOption({
         id: 'closeZoomLabelSize',
         title: 'Font Size (at close zoom)',
@@ -2631,7 +2625,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createRangeOption({
         id: 'arrowDeclutter',
         title: 'Limit Arrows',
@@ -2645,9 +2639,9 @@
 
     const farZoomTitle = document.createElement('h5');
     farZoomTitle.innerText = 'Far-zoom only';
-    labels.appendChild(farZoomTitle);
+    renderingParameters.appendChild(farZoomTitle);
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createRangeOption({
         id: 'farZoomLabelSize',
         title: 'Font Size (at far zoom)',
@@ -2658,7 +2652,7 @@
       })
     );
 
-    labels.appendChild(
+    renderingParameters.appendChild(
       createCheckboxOption({
         id: 'hideMinorRoads',
         title: 'Hide minor roads at zoom 3',
@@ -2667,7 +2661,7 @@
       })
     );
 
-    mainDiv.appendChild(labels);
+    mainDiv.appendChild(renderingParameters);
 
     const utilities = createPreferencesSection('Utilities');
 
@@ -2691,6 +2685,57 @@
       })
     );
     mainDiv.appendChild(utilities);
+
+    // Performance settings
+
+    performance.appendChild(
+      createIntegerOption({
+        id: 'useWMERoadLayerAtZoom',
+        title: 'Stop using SVL at zoom level',
+        description:
+          'When you reach this zoom level, the road layer gets automatically enabled.',
+        min: 0,
+        max: 5,
+        step: 1,
+      })
+    );
+
+    performance.appendChild(
+      createIntegerOption({
+        id: 'switchZoom',
+        title: 'Close-zoom until level',
+        description:
+          'When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)',
+        min: 5,
+        max: 9,
+        step: 1,
+      })
+    );
+
+    performance.appendChild(
+      createIntegerOption({
+        id: 'segmentsThreshold',
+        title: 'Segments threshold',
+        description:
+          'When the WME wants to draw more than this amount of segments, switch to the road layer',
+        min: 1000,
+        max: 10000,
+        step: 100,
+      })
+    );
+
+    performance.appendChild(
+      createIntegerOption({
+        id: 'nodesThreshold',
+        title: 'Nodes threshold',
+        description:
+          'When the WME wants to draw more than this amount of nodes, switch to the road layer',
+        min: 1000,
+        max: 10000,
+        step: 100,
+      })
+    );
+    mainDiv.appendChild(performance);
 
     speedLimits.appendChild(
       createCheckboxOption({
@@ -2797,7 +2842,7 @@
     utilityButtons.appendChild(exportButton);
     mainDiv.appendChild(utilityButtons);
 
-    new WazeWrap.Interface.Tab(
+    const ignored = new WazeWrap.Interface.Tab(
       'SVL 🗺️',
       mainDiv.innerHTML,
       updatePreferenceValues
@@ -2843,7 +2888,7 @@
       nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
       return;
     }
-    if (drawingAborted || nodes.length > MAX_NODES) {
+    if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
@@ -2913,7 +2958,7 @@
    */
   function addNodes(nodes) {
     consoleDebug(`Adding ${nodes.length} nodes`);
-    if (drawingAborted || nodes.length > MAX_NODES) {
+    if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
@@ -2950,8 +2995,10 @@
     let mustRefresh = true;
     if (drawingAborted) {
       if (
-        Object.keys(W.model.segments.objects).length < MAX_SEGMENTS &&
-        Object.keys(W.model.nodes.objects).length < MAX_NODES
+        Object.keys(W.model.segments.objects).length <
+          preferences['segmentsThreshold'] &&
+        Object.keys(W.model.nodes.objects).length <
+          preferences['nodesThreshold']
       ) {
         drawingAborted = false;
         setLayerVisibility(SVL_LAYER, true);
@@ -2961,9 +3008,11 @@
         console.warn(
           `[SVL] Still too many elements to draw: Segments: ${
             Object.keys(W.model.segments.objects).length
-          }/${MAX_SEGMENTS}, Nodes: ${
+          }/${preferences['segmentsThreshold']}, Nodes: ${
             Object.keys(W.model.nodes.objects).length
-          }/${MAX_NODES}`
+          }/${
+            preferences['nodesThreshold']
+          } - You can change these thresholds in the preference panel.`
         );
       }
     }
@@ -3098,7 +3147,7 @@
   function addSegments(segments) {
     consoleDebug(`Adding ${segments.length} segments`);
 
-    if (drawingAborted || segments.length > MAX_SEGMENTS) {
+    if (drawingAborted || segments.length > preferences['segmentsThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
@@ -3177,7 +3226,7 @@
       labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
       return;
     }
-    if (drawingAborted || segments.length > MAX_SEGMENTS) {
+    if (drawingAborted || segments.length > preferences['segmentsThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
