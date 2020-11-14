@@ -780,25 +780,25 @@
       }
 
       let speedPart = '';
-      const speed = attributes['fwdMaxSpeed'] ?? attributes['revMaxSpeed'];
+      const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
       if (speed && preferences['showSLtext']) {
-        if (attributes['fwdMaxSpeed'] === attributes['revMaxSpeed']) {
-          speedPart = getSuperScript(attributes['fwdMaxSpeed']);
-        } else if (attributes['fwdMaxSpeed']) {
-          speedPart = getSuperScript(attributes['fwdMaxSpeed']);
-          if (attributes['revMaxSpeed']) {
-            speedPart += `'${getSuperScript(attributes['revMaxSpeed'])}`;
+        if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
+          speedPart = getSuperScript(attributes.fwdMaxSpeed);
+        } else if (attributes.fwdMaxSpeed) {
+          speedPart = getSuperScript(attributes.fwdMaxSpeed);
+          if (attributes.revMaxSpeed) {
+            speedPart += `'${getSuperScript(attributes.revMaxSpeed)}`;
           }
         } else {
-          speedPart = getSuperScript(attributes['revMaxSpeed']);
-          if (attributes['fwdMaxSpeed']) {
-            speedPart += `'${getSuperScript(attributes['fwdMaxSpeed'])}`;
+          speedPart = getSuperScript(attributes.revMaxSpeed);
+          if (attributes.fwdMaxSpeed) {
+            speedPart += `'${getSuperScript(attributes.fwdMaxSpeed)}`;
           }
         }
         /* jslint bitwise: true */
         if (
-          attributes['fwdMaxSpeedUnverified'] ||
-          attributes['revMaxSpeedisVerified']
+          attributes.fwdMaxSpeedUnverified ||
+          attributes.revMaxSpeedUnverified
         ) {
           /* jslint bitwise: false */
           speedPart += '?';
@@ -812,9 +812,9 @@
         labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
       doubleLabelDistance = 4 * streetNameThresholdDistance; */
 
-      const roadTypeID = attributes['roadType'];
+      const roadTypeID = attributes.roadType;
       const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
-        'myId': attributes['id'],
+        'myId': attributes.id,
         'color': streetStyles[roadTypeID]
           ? streetStyles[roadTypeID]['strokeColor']
           : '#f00',
@@ -872,7 +872,7 @@
           true
         ); */ labelFeature = sampleLabel.clone();
         labelFeature.geometry = p1;
-        if (attributes['fwdDirection']) {
+        if (attributes.fwdDirection) {
           dx = p1.x - p0.x;
           dy = p1.y - p0.y;
         } else {
@@ -946,35 +946,35 @@
   function drawSegment(model) {
     // consoleDebug("DrawSegment");
     const attributes = model.getAttributes();
-    consoleDebug(`Drawing segment: ${attributes['id']}`);
+    consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
-    const points = attributes['geometry'].components;
-    const pointList = attributes['geometry'].getVertices(); // is an array
+    const points = attributes.geometry.components;
+    const pointList = attributes.geometry.getVertices(); // is an array
     const simplified = new OpenLayers.Geometry.LineString(pointList).simplify(
       1.5
     ).components;
     const myFeatures = [];
-    const baselevel = attributes['level'] * 100;
-    const isTwoWay = attributes['fwdDirection'] && attributes['revDirection'];
+    const baselevel = attributes.level * 100;
+    const isTwoWay = attributes.fwdDirection && attributes.revDirection;
     const isInRoundabout = model.isInRoundabout();
     let isBridge = false;
     let hasSpeedLimitDrawn = false;
     // eslint-disable-next-line prefer-destructuring
-    let roadType = attributes['roadType'];
+    let roadType = attributes.roadType;
 
     const totalSegmentWidth = getWidth({
-      segmentWidth: attributes['width'],
+      segmentWidth: attributes.width,
       roadType,
       twoWay: isTwoWay,
     });
     let roadWidth = totalSegmentWidth;
     let lineFeature = null;
-    if (attributes['primaryStreetID'] === null) {
+    if (attributes.primaryStreetID === null) {
       // consoleDebug("RED segment", model);
       lineFeature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.LineString(pointList),
         {
-          'myId': attributes['id'],
+          'myId': attributes.id,
           'color': preferences['red']['strokeColor'],
           'width': totalSegmentWidth,
           'dash': preferences['red']['strokeDashstyle'],
@@ -987,22 +987,22 @@
     // consoleDebug(width);
     if (
       preferences['routingModeEnabled'] &&
-      attributes['routingRoadType'] !== null
+      attributes.routingRoadType !== null
     ) {
-      roadType = attributes['routingRoadType'];
+      roadType = attributes.routingRoadType;
     }
 
     if (streetStyles[roadType] !== undefined) {
-      const speed = attributes['fwdMaxSpeed'] ?? attributes['revMaxSpeed']; // If it remains null it does not have a speed limit
+      const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed; // If it remains null it does not have a speed limit
       // consoleDebug("Road Type: ", roadType);
-      if (attributes['level'] > 0) {
+      if (attributes.level > 0) {
         // it is a bridge
         // consoleDebug("Bridge");
         isBridge = true;
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': '#000000',
             'zIndex': baselevel + 100,
             'width': totalSegmentWidth,
@@ -1027,15 +1027,14 @@
 
         const speedStrokeStyle =
           preferences['showDashedUnverifiedSL'] &&
-          (attributes['fwdMaxSpeedUnverified'] ||
-            attributes['revMaxSpeedUnverified'])
+          (attributes.fwdMaxSpeedUnverified || attributes.revMaxSpeedUnverified)
             ? 'dash'
             : 'solid';
 
         if (
           !preferences['showSLSinglecolor'] &&
-          (attributes['fwdMaxSpeed'] || attributes['revMaxSpeed']) &&
-          attributes['fwdMaxSpeed'] !== attributes['revMaxSpeed'] &&
+          (attributes.fwdMaxSpeed || attributes.revMaxSpeed) &&
+          attributes.fwdMaxSpeed !== attributes.revMaxSpeed &&
           !model.isOneWay()
         ) {
           // consoleDebug("The segment has 2 different speed limits");
@@ -1114,8 +1113,8 @@
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(left),
               {
-                'myId': attributes['id'],
-                'color': getColorStringFromSpeed(attributes['fwdMaxSpeed']),
+                'myId': attributes.id,
+                'color': getColorStringFromSpeed(attributes.fwdMaxSpeed),
                 'width': roadWidth,
                 'dash': speedStrokeStyle,
                 closeZoomOnly: true,
@@ -1126,8 +1125,8 @@
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(right),
               {
-                'myId': attributes['id'],
-                'color': getColorStringFromSpeed(attributes['revMaxSpeed']),
+                'myId': attributes.id,
+                'color': getColorStringFromSpeed(attributes.revMaxSpeed),
                 'width': roadWidth,
                 'dash': speedStrokeStyle,
                 closeZoomOnly: true,
@@ -1138,17 +1137,17 @@
           }
         } else {
           // The segment is two way street with the same speed limit on both sides or one way street
-          let speedValue = attributes['fwdMaxSpeed']; // If the segment is two way, take any speed, they are equal.
+          let speedValue = attributes.fwdMaxSpeed; // If the segment is two way, take any speed, they are equal.
 
           // If it is one way and the direction is the reverse one, take the other speed
-          if (model.isOneWay() && attributes['revDirection']) {
-            speedValue = attributes['revMaxSpeed'];
+          if (model.isOneWay() && attributes.revDirection) {
+            speedValue = attributes.revMaxSpeed;
           }
           if (speedValue) {
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(pointList),
               {
-                'myId': attributes['id'],
+                'myId': attributes.id,
                 'color': getColorStringFromSpeed(speedValue),
                 'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
                 'dash': speedStrokeStyle,
@@ -1165,7 +1164,7 @@
       lineFeature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.LineString(pointList),
         {
-          'myId': attributes['id'],
+          'myId': attributes.id,
           'color': streetStyles[roadType]['strokeColor'],
           'width': roadWidth,
           'dash': streetStyles[roadType]['strokeDashstyle'],
@@ -1174,12 +1173,12 @@
       );
       myFeatures.push(lineFeature);
 
-      if (attributes['level'] < 0) {
+      if (attributes.level < 0) {
         // Tunnel
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': '#000000',
             'width': roadWidth,
             'opacity': 0.3,
@@ -1198,7 +1197,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': nonEditableStyle.strokeColor,
             'width': roadWidth * 0.1,
             'dash': nonEditableStyle.strokeDashstyle,
@@ -1215,7 +1214,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['dirty']['strokeColor'],
             'width': roadWidth * 0.7,
             'opacity': preferences['dirty']['strokeOpacity'],
@@ -1229,11 +1228,11 @@
       // Check segment properties
 
       // CLOSE Zoom properties
-      if (attributes['hasClosures']) {
+      if (attributes.hasClosures) {
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['closure']['strokeColor'],
             'width': roadWidth * 0.6,
             'dash': preferences['closure']['strokeDashstyle'],
@@ -1246,16 +1245,16 @@
       }
 
       if (
-        attributes['fwdToll'] ||
-        attributes['revToll'] ||
-        attributes['restrictions'].some((r) => r.getDefaultType() === 'TOLL')
+        attributes.fwdToll ||
+        attributes.revToll ||
+        attributes.restrictions.some((r) => r.getDefaultType() === 'TOLL')
       ) {
         // It is a toll road
         // consoleDebug("Segment is toll");
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['toll']['strokeColor'],
             'width': roadWidth * 0.3, // TODO preferences['toll']['strokeWidth'],
             'dash': preferences['toll']['strokeDashstyle'],
@@ -1272,7 +1271,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': roundaboutStyle.strokeColor,
             'width': roadWidth * 0.15,
             'dash': roundaboutStyle.strokeDashstyle,
@@ -1284,13 +1283,13 @@
         myFeatures.push(lineFeature);
       }
 
-      if (attributes['restrictions'].length > 0) {
+      if (attributes.restrictions.length > 0) {
         // It has restrictions
         // consoleDebug("Segment has restrictions");
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['restriction']['strokeColor'],
             'width': roadWidth * 0.4, // preferences['restriction']['strokeWidth'],
             'dash': preferences['restriction']['strokeDashstyle'],
@@ -1302,12 +1301,12 @@
         myFeatures.push(lineFeature);
       }
 
-      if (attributes['validated'] === false) {
+      if (attributes.validated === false) {
         // Segments that needs validation
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': validatedStyle.strokeColor,
             'width': roadWidth * 0.5, // validatedStyle.strokeWidth,
             'dash': validatedStyle.strokeDashstyle,
@@ -1323,7 +1322,7 @@
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
             {
-              'myId': attributes['id'],
+              'myId': attributes.id,
               'color': preferences['headlights']['strokeColor'],
               'width': roadWidth * 0.2, // preferences['headlights']['strokeWidth'],
               'dash': preferences['headlights']['strokeDashstyle'],
@@ -1339,7 +1338,7 @@
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
             {
-              'myId': attributes['id'],
+              'myId': attributes.id,
               'color': preferences['nearbyHOV']['strokeColor'],
               'width': roadWidth * 0.25,
               'dash': preferences['nearbyHOV']['strokeDashstyle'],
@@ -1351,7 +1350,7 @@
         );
       }
 
-      if (attributes['fwdLaneCount'] > 0) {
+      if (attributes.fwdLaneCount > 0) {
         // console.log("LANE fwd");
         const res = pointList.slice(-2);
         // if(pointList.length === 2){
@@ -1363,7 +1362,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(res),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['lanes']['strokeColor'],
             'width': roadWidth * 0.3,
             'dash': preferences['lanes']['strokeDashstyle'],
@@ -1375,7 +1374,7 @@
         myFeatures.push(lineFeature);
       }
 
-      if (attributes['revLaneCount'] > 0) {
+      if (attributes.revLaneCount > 0) {
         // console.log("LANE rev");
         const res = pointList.slice(0, 2);
         // if(pointList.length === 2){
@@ -1387,7 +1386,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(res),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': preferences['lanes']['strokeColor'],
             'width': roadWidth * 0.3,
             'dash': preferences['lanes']['strokeDashstyle'],
@@ -1400,22 +1399,20 @@
       }
 
       if (
-        attributes['fwdDirection'] === false ||
-        attributes['revDirection'] === false
+        attributes.fwdDirection === false ||
+        attributes.revDirection === false
       ) {
         // consoleDebug("The segment is oneway or has unknown direction");
         let simplifiedPoints = points;
         // N.B. attributes.length is the length in meters, not the items in the array (it's an object)
         if (
           !isInRoundabout &&
-          attributes['length'] / points.length < preferences['arrowDeclutter']
+          attributes.length / points.length < preferences['arrowDeclutter']
         ) {
           simplifiedPoints = simplified;
         }
 
-        if (
-          (attributes['fwdDirection'] || attributes['revDirection']) === false
-        ) {
+        if ((attributes.fwdDirection || attributes.revDirection) === false) {
           // Unknown direction
           for (let p = 0; p < simplifiedPoints.length - 1; p += 1) {
             // let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
@@ -1427,7 +1424,7 @@
                   simplifiedPoints[p + 1],
                 ]).getCentroid(true),
                 {
-                  'myId': attributes['id'],
+                  'myId': attributes.id,
                   closeZoomOnly: true,
                   isArrow: true,
                   'zIndex': baselevel + 180,
@@ -1442,7 +1439,7 @@
           const step = isInRoundabout ? 3 : 1;
           for (let p = step - 1; p < simplifiedPoints.length - 1; p += step) {
             const degrees = getAngle(
-              attributes['fwdDirection'],
+              attributes.fwdDirection,
               simplifiedPoints[p],
               simplifiedPoints[p + 1]
             );
@@ -1454,7 +1451,7 @@
               new OpenLayers.Feature.Vector(
                 segmentLineString.getCentroid(true),
                 {
-                  'myId': attributes['id'],
+                  'myId': attributes.id,
                   closeZoomOnly: true,
                   isArrow: true,
                 },
@@ -1479,9 +1476,9 @@
       if (flags.fwdSpeedCamera) {
         myFeatures.push(
           createAverageSpeedCamera({
-            id: attributes['id'],
+            id: attributes.id,
             rev: false,
-            isForward: attributes['fwdDirection'],
+            isForward: attributes.fwdDirection,
             p0: points[0],
             p1: points[1],
           })
@@ -1491,9 +1488,9 @@
       if (flags.revSpeedCamera) {
         myFeatures.push(
           createAverageSpeedCamera({
-            id: attributes['id'],
+            id: attributes.id,
             rev: true,
-            isForward: attributes['fwdDirection'],
+            isForward: attributes.fwdDirection,
             p0: points[points.length - 1],
             p1: points[points.length - 2],
           })
@@ -1509,7 +1506,7 @@
             new OpenLayers.Feature.Vector(
               points[p],
               {
-                'myId': attributes['id'],
+                'myId': attributes.id,
                 'zIndex': baselevel + 200,
                 closeZoomOnly: true,
                 isArrow: true,
@@ -1527,7 +1524,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': tunnelFlagStyle1.strokeColor,
             'opacity': tunnelFlagStyle1.strokeOpacity,
             'width': roadWidth * 0.3,
@@ -1539,7 +1536,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes['id'],
+            'myId': attributes.id,
             'color': tunnelFlagStyle2.strokeColor,
             'width': roadWidth * 0.1,
             'dash': tunnelFlagStyle2.strokeDashstyle,
@@ -2896,12 +2893,12 @@
     }
     let i;
     for (i = 0; i < nodes.length; i += 1) {
-      removeNodeById(nodes[i].attributes['id']);
+      removeNodeById(nodes[i].attributes.id);
     }
   }
 
   function getNodeStyle(attributes) {
-    if (attributes['segIDs']?.length === 1) {
+    if (attributes.segIDs?.length === 1) {
       // jshint ignore:line
       return nodeStyleDeadEnd;
     }
@@ -2914,17 +2911,14 @@
       const { attributes } = node;
       const nodeFeature = nodesVector.getFeaturesByAttribute(
         'myid',
-        attributes['id']
+        attributes.id
       )[0];
       if (nodeFeature) {
         nodeFeature.style = getNodeStyle(attributes);
         nodeFeature.move(
-          new OpenLayers.LonLat(
-            attributes['geometry'].x,
-            attributes['geometry'].y
-          )
+          new OpenLayers.LonLat(attributes.geometry.x, attributes.geometry.y)
         );
-      } else if (attributes['id'] > 0) {
+      } else if (attributes.id > 0) {
         // The node has just been saved
         nodesVector.addFeatures(Array.of(drawNode(node)), { 'silent': true });
       } // Else it is a temporary node, we won't draw it.});
@@ -2971,8 +2965,8 @@
 
     const myFeatures = [];
     for (let i = 0; i < nodes.length; i += 1) {
-      if (nodes[i].attributes['geometry'] !== undefined) {
-        if (nodes[i].attributes['id'] > 0) {
+      if (nodes[i].attributes.geometry !== undefined) {
+        if (nodes[i].attributes.id > 0) {
           myFeatures.push(drawNode(nodes[i]));
         }
       } else {
@@ -3234,7 +3228,7 @@
     }
     consoleGroup();
     segments.forEach((s) => {
-      removeSegmentById(s.attributes['id']);
+      removeSegmentById(s.attributes.id);
     });
     consoleGroupEnd();
   }

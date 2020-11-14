@@ -459,7 +459,7 @@ Q("Object.values", function(k) {
       }
       O[l.roadType] || (q += "\n!! UNSUPPORTED ROAD TYPE !!");
       p = "";
-      (null != (e = l.fwdMaxSpeed) ? e : l.revMaxSpeed) && d.showSLtext && (l.fwdMaxSpeed === l.revMaxSpeed ? p = pa(l.fwdMaxSpeed) : l.fwdMaxSpeed ? (p = pa(l.fwdMaxSpeed), l.revMaxSpeed && (p += "'" + pa(l.revMaxSpeed))) : (p = pa(l.revMaxSpeed), l.fwdMaxSpeed && (p += "'" + pa(l.fwdMaxSpeed))), l.fwdMaxSpeedUnverified || l.revMaxSpeedisVerified) && (p += "?");
+      (null != (e = l.fwdMaxSpeed) ? e : l.revMaxSpeed) && d.showSLtext && (l.fwdMaxSpeed === l.revMaxSpeed ? p = pa(l.fwdMaxSpeed) : l.fwdMaxSpeed ? (p = pa(l.fwdMaxSpeed), l.revMaxSpeed && (p += "'" + pa(l.revMaxSpeed))) : (p = pa(l.revMaxSpeed), l.fwdMaxSpeed && (p += "'" + pa(l.fwdMaxSpeed))), l.fwdMaxSpeedUnverified || l.revMaxSpeedUnverified) && (p += "?");
       e = q + " " + p;
       if (" " === e) {
         return [];
