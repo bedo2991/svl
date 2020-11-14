@@ -11,127 +11,133 @@ const Restriction = class {
 };
 
 /**
- * @typedef {Object} SegmentAttributes
- * @property {number} id - the segments ID
- * @property {number} roadType - the ID of the roads' type
- * @property {?number} routingRoadType
- * @property {Array.<number>} virtualNodeIDs
- * @property {boolean} separator
- * @property {number} lockRank
- * @property {boolean} validated
- * @property {number} createdBy
- * @property {number} createdOn
- * @property {number} updatedBy
- * @property {number}  updatedOn
- * @property {boolean}  fwdDirection
- * @property {boolean}  revDirection
- * @property {number}  fromNodeID
- * @property {number}  toNodeID
- * @property {number}  primaryStreetID
- * @property {OpenLayers.Geometry.LineString}  geometry
- * @property {number}  fwdMaxSpeed
- * @property {number}  revMaxSpeed
- * @property {boolean}  fwdMaxSpeedUnverified
- * @property {boolean}  revMaxSpeedUnverified
- * @property {Array.<number>}  streetIDs
- * @property {?number}  junctionID
- * @property {boolean}  hasHNs
- * @property {boolean}  hasClosures
- * @property {number}  length
- * @property {boolean}  fwdToll
- * @property {boolean}  revToll
- * @property {Array.<Restriction>}  restrictions
- * @property {Array}  parkingRestrictions
- * @property {Array}  pickupRestrictions
- * @property {number}  permissions
- * @property {?number}  crossroadID
- * @property {Array}  fromCrossroads
- * @property {Array}  toCrossroads
- * @property {boolean}  allowNoDirection
- * @property {boolean}  fwdTurnsLocked
- * @property {boolean}  revTurnsLocked
- * @property {number}  flags
- * @property {number}  fwdFlags
- * @property {number}  revFlags
- * @property {number}  level
- * @property {number}  rank
- * @property {number}  fwdLaneCount
- * @property {number}  revLaneCount
+ * @typedef {{
+ * id:number,
+ * roadType:number,
+ * routingRoadType:(number|null),
+ * virtualNodeIDs:Array.<number>,
+ * separator:boolean,
+ * lockRank:number,
+ * validated:boolean,
+ * createdBy:number,
+ * createdOn:number,
+ * updatedBy:number,
+ * updatedOn:number,
+ * fwdDirection:boolean,
+ * revDirection:boolean,
+ * fromNodeID:number,
+ * toNodeID:number,
+ * primaryStreetID:(number|null),
+ * geometry:OpenLayers.Geometry.LineString,
+ * fwdMaxSpeed:number,
+ * revMaxSpeed:number,
+ * fwdMaxSpeedUnverified:boolean,
+ * revMaxSpeedUnverified:boolean,
+ * streetIDs:Array.<number>,
+ * junctionID:(number|null),
+ * hasHNs:boolean,
+ * hasClosures:boolean,
+ * length:number,
+ * fwdToll:boolean,
+ * revToll:boolean,
+ * restrictions:Array.<Restriction>,
+ * parkingRestrictions:Array,
+ * pickupRestrictions:Array,
+ * permissions:number,
+ * crossroadID:(number|null),
+ * fromCrossroads:Array.<number>,
+ * toCrossroads:Array.<number>,
+ * allowNoDirection:boolean,
+ * fwdTurnsLocked:boolean,
+ * revTurnsLocked:boolean,
+ * flags:number,
+ * fwdFlags:number,
+ * revFlags:number,
+ * level:number,
+ * rank:number,
+ * fwdLaneCount:number,
+ * revLaneCount:number,
+ * }}
  */
 let SegmentAttributes;
 
 /**
- * @typedef {Object} NodeAttributes
- * @property {number} id
- * @property {OpenLayers.Geometry.Point} geometry
- * @property {number} permissions
- * @property {?number} rank
- * @property {Array.<number>} segIDs
- * @property {boolean} partial
+ * @typedef {{
+ * id:number,
+ * geometry:OpenLayers.Geometry.Point,
+ * permissions:number,
+ * rank:(number|null) ,
+ * segIDs:Array.<number>,
+ * partial:boolean
+ * }}
  */
 let NodeAttributes;
 
 /**
- * @typedef {Object} StyleMapContent
- * @property {string} strokeColor
- * @property {string} strokeWidth
- * @property {string} strokeOpacity
- * @property {string} strokeDashstyle
- * @property {string} graphicZIndex
- * @property {string} fontFamily
- * @property {string} fontWeight
- * @property {string} fontColor
- * @property {string} labelOutlineColor
- * @property {string} labelOutlineWidth
- * @property {string} label
- * @property {string} angle
- * @property {string} pointerEvents
- * @property {boolean} visibility
+ * @typedef {{
+ * strokeColor:(string|undefined),
+ * strokeWidth:(string|undefined),
+ * strokeOpacity:(string|undefined),
+ * strokeDashstyle:(string|undefined),
+ * graphicZIndex:(string|undefined),
+ * fontFamily:(string|undefined),
+ * fontWeight:(string|undefined),
+ * fontColor:(string|undefined),
+ * labelOutlineColor:(string|undefined),
+ * labelOutlineWidth:(string|undefined),
+ * label:(string|undefined),
+ * angle:(string|undefined),
+ * pointerEvents:(string|undefined),
+ * visibility:(boolean|undefined),
+ * }}
  */
 let StyleMapContent;
 
 /**
- * @typedef {Object} StreetAttributes
- * @property {number} id
- * @property {?number} cityID
- * @property {?string} englishName
- * @property {?string} name
- * @property {boolean} isEmpty
- * @property {boolean} outOfScope
- * @property {boolean} persistent
- * @property {boolean} selected
- * @property {?string} signText
- * @property {?string} signType
- * @property {?number} state
+ * @typedef {{
+ * id:number,
+ * cityID:(number|null),
+ * englishName:(string|null),
+ * name:(string|null),
+ * isEmpty:boolean,
+ * outOfScope:boolean,
+ * persistent:boolean,
+ * selected:boolean,
+ * signText:(string|null),
+ * signType:(string|null),
+ * state:(number|null),
+ * }}
  */
 let StreetAttributes;
 
 /**
- * @typedef {Object} AddressAttributes
- * @property {Object} state
- * @property {StreetAttributes} street
+ * @typedef {{
+ * state:Object,
+ * street:StreetAttributes,
+ * }}
  */
 
 let AddressAttributes;
 
 /**
- * @typedef {Object} AddressObject
- * @property {AddressAttributes} attributes
+ * @typedef {{
+ * attributes:AddressAttributes,
+ * }}
  */
-
 let AddressObject;
 
 /**
- * @typedef {Object} FlagAttributes
- * @property {boolean} tunnel
- * @property {boolean} unpaved
- * @property {boolean} headlights
- * @property {boolean} beacons
- * @property {boolean} nearbyHOV
- * @property {boolean} fwdSpeedCamera
- * @property {boolean} revSpeedCamera
- * @property {boolean} fwdLanesEnabled
- * @property {boolean} revLanesEnabled
+ * @typedef {{
+ * tunnel:boolean,
+ * unpaved:boolean,
+ * headlights:boolean,
+ * beacons:boolean,
+ * nearbyHOV:boolean,
+ * fwdSpeedCamera:boolean,
+ * revSpeedCamera:boolean,
+ * fwdLanesEnabled:boolean,
+ * revLanesEnabled:boolean
+ * }}
  */
 let FlagAttributes;
 
@@ -185,7 +191,9 @@ const W = {
     },
   },
   'prefs': {
+    '_events': {},
     'attributes': {
+      /**@type {boolean} */
       'isImperial': true,
     },
   },
