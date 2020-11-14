@@ -74,51 +74,55 @@ let SegmentAttributes;
 let NodeAttributes;
 
 /**
- * @typedef {Object} StyleMapContent
- * @property {string} strokeColor
- * @property {string} strokeWidth
- * @property {string} strokeOpacity
- * @property {string} strokeDashstyle
- * @property {string} graphicZIndex
- * @property {string} fontFamily
- * @property {string} fontWeight
- * @property {string} fontColor
- * @property {string} labelOutlineColor
- * @property {string} labelOutlineWidth
- * @property {string} label
- * @property {string} angle
- * @property {string} pointerEvents
- * @property {boolean} visibility
+ * @typedef {{
+ * strokeColor:(string|undefined),
+ * strokeWidth:(string|undefined),
+ * strokeOpacity:(string|undefined),
+ * strokeDashstyle:(string|undefined),
+ * graphicZIndex:(string|undefined),
+ * fontFamily:(string|undefined),
+ * fontWeight:(string|undefined),
+ * fontColor:(string|undefined),
+ * labelOutlineColor:(string|undefined),
+ * labelOutlineWidth:(string|undefined),
+ * label:(string|undefined),
+ * angle:(string|undefined),
+ * pointerEvents:(string|undefined),
+ * visibility:(boolean|undefined),
+ * }}
  */
 let StyleMapContent;
 
 /**
- * @typedef {Object} StreetAttributes
- * @property {number} id
- * @property {?number} cityID
- * @property {?string} englishName
- * @property {?string} name
- * @property {boolean} isEmpty
- * @property {boolean} outOfScope
- * @property {boolean} persistent
- * @property {boolean} selected
- * @property {?string} signText
- * @property {?string} signType
- * @property {?number} state
+ * @typedef {{
+ * id:number,
+ * cityID:(number|null),
+ * englishName:(string|null),
+ * name:(string|null),
+ * isEmpty:boolean,
+ * outOfScope:boolean,
+ * persistent:boolean,
+ * selected:boolean,
+ * signText:(string|null),
+ * signType:(string|null),
+ * state:(number|null),
+ * }}
  */
 let StreetAttributes;
 
 /**
- * @typedef {Object} AddressAttributes
- * @property {Object} state
- * @property {StreetAttributes} street
+ * @typedef {{
+ * state:Object,
+ * street:StreetAttributes,
+ * }}
  */
 
 let AddressAttributes;
 
 /**
- * @typedef {Object} AddressObject
- * @property {AddressAttributes} attributes
+ * @typedef {{
+ * attributes:AddressAttributes,
+ * }}
  */
 let AddressObject;
 

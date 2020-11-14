@@ -732,17 +732,17 @@
     const hasStreetName = segmentModel.hasNonEmptyStreet();
     if (
       attributes.primaryStreetID !== null &&
-      address.attributes['state'] === undefined
+      address.attributes.state === undefined
     ) {
       consoleDebug('Address not ready', address, attributes);
       setTimeout(() => {
         drawLabels(segmentModel, simplified, true);
       }, 500);
     } else {
-      const addressAttributes = address['attributes'];
+      const addressAttributes = address.attributes;
       let streetPart = '';
       if (hasStreetName) {
-        streetPart = addressAttributes['street']['name'];
+        streetPart = addressAttributes.street.name;
       } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
         streetPart = '⚑';
       }
@@ -760,12 +760,9 @@
             break;
           }
           const altStreet = W.model.streets.objects[streetID];
-          if (
-            altStreet &&
-            altStreet['name'] !== addressAttributes['street']['name']
-          ) {
+          if (altStreet && altStreet.name !== addressAttributes.street.name) {
             ANsShown += 1;
-            altStreetPart += altStreet['name'] ? `(${altStreet['name']})` : '';
+            altStreetPart += altStreet.name ? `(${altStreet.name})` : '';
           }
         }
 
