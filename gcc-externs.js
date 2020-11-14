@@ -191,7 +191,9 @@ const W = {
     },
   },
   'prefs': {
+    '_events': {},
     'attributes': {
+      /**@type {boolean} */
       'isImperial': true,
     },
   },

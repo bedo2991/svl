@@ -695,11 +695,11 @@
     let res = '';
     if (number) {
       let numberString = number;
-      if (W.prefs.attributes['isImperial']) {
+      if (W.prefs.attributes['isImperial'] === true) {
         // Convert the speed limit to mph
         numberString = Math.round(number / 1.609344);
       }
-      numberString = number.toString();
+      numberString = numberString.toString();
       for (let i = 0; i < numberString.length; i += 1) {
         res += superScript[numberString.charAt(i)];
       }
@@ -3039,76 +3039,84 @@
     // console.debug("SVL: Registering segment events");
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.segments._events;
-    events.objectsadded.push({
-      'context': streetVectorLayer,
-      'callback': addSegments,
-      'svl': true,
-    });
-    events.objectschanged.push({
-      'context': streetVectorLayer,
-      'callback': editSegments,
-      'svl': true,
-    });
-    events.objectsremoved.push({
-      'context': streetVectorLayer,
-      'callback': removeSegments,
-      'svl': true,
-    });
-    events['objects-state-deleted'].push({
-      'context': streetVectorLayer,
-      'callback': segmentsStateDeleted,
-      'svl': true,
-    });
+    if (typeof events === 'object') {
+      events.objectsadded.push({
+        'context': streetVectorLayer,
+        'callback': addSegments,
+        'svl': true,
+      });
+      events.objectschanged.push({
+        'context': streetVectorLayer,
+        'callback': editSegments,
+        'svl': true,
+      });
+      events.objectsremoved.push({
+        'context': streetVectorLayer,
+        'callback': removeSegments,
+        'svl': true,
+      });
+      events['objects-state-deleted'].push({
+        'context': streetVectorLayer,
+        'callback': segmentsStateDeleted,
+        'svl': true,
+      });
+    }
   }
 
   function removeSegmentsEvents() {
     consoleDebug('SVL: Removing segments events');
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.segments._events;
-    events.objectsadded = events.objectsadded.filter(removeSVLEvents);
-    events.objectschanged = events.objectschanged.filter(removeSVLEvents);
-    events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
-    events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-      removeSVLEvents
-    );
+    if (typeof events === 'object') {
+      events.objectsadded = events.objectsadded.filter(removeSVLEvents);
+      events.objectschanged = events.objectschanged.filter(removeSVLEvents);
+      events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
+      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
+        removeSVLEvents
+      );
+    }
   }
 
   function removeNodeEvents() {
     consoleDebug('SVL: Removing node events');
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.nodes._events;
-    events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
-    events.objectsadded = events.objectsadded.filter(removeSVLEvents);
-    events.objectschanged = events.objectschanged.filter(removeSVLEvents);
-    events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-      removeSVLEvents
-    );
+    if (typeof events === 'object') {
+      events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
+      events.objectsadded = events.objectsadded.filter(removeSVLEvents);
+      events.objectschanged = events.objectschanged.filter(removeSVLEvents);
+      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
+        removeSVLEvents
+      );
+    }
   }
 
   function registerNodeEvents() {
     consoleDebug('SVL: Registering node events');
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.nodes._events;
-    events.objectsremoved.push({
-      'context': nodesVector,
-      'callback': removeNodes,
-      'svl': true,
-    });
-    events.objectsadded.push({
-      'context': nodesVector,
-      'callback': addNodes,
-      'svl': true,
-    });
-    events.objectschanged.push({
-      'context': nodesVector,
-      'callback': changeNodes,
-      'svl': true,
-    });
-    events['objects-state-deleted'].push({
-      'context': nodesVector,
-      'callback': nodeStateDeleted,
-      'svl': true,
-    });
+    if (typeof events === 'object') {
+      events.objectsremoved.push({
+        'context': nodesVector,
+        'callback': removeNodes,
+        'svl': true,
+      });
+      events.objectsadded.push({
+        'context': nodesVector,
+        'callback': addNodes,
+        'svl': true,
+      });
+      events.objectschanged.push({
+        'context': nodesVector,
+        'callback': changeNodes,
+        'svl': true,
+      });
+      events['objects-state-deleted'].push({
+        'context': nodesVector,
+        'callback': nodeStateDeleted,
+        'svl': true,
+      });
+    }
   }
 
   /**
@@ -3786,6 +3794,14 @@
         'The preferences have been moved to the sidebar on the left. Please look for the "SVL 🗺️" tab.'
       );
     });
+
+    // eslint-disable-next-line no-underscore-dangle
+    const events = W.prefs._events;
+    if (typeof events === 'object') {
+      events['change:isImperial'].push({
+        'callback': redrawAllSegments,
+      });
+    }
 
     console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
   }
