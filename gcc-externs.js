@@ -57,6 +57,7 @@ const Restriction = class {
  * rank:number,
  * fwdLaneCount:number,
  * revLaneCount:number,
+ * width:(number|undefined)
  * }}
  */
 let SegmentAttributes;
