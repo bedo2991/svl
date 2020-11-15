@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.5
+// @version    5.0.6
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.5';
+  const SVL_VERSION = '5.0.6';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -668,11 +668,14 @@
     return '#000';
   }
 
-  function getColorStringFromSpeed(speed) {
+  function getColorStringFromSpeed(metricspeed) {
     if (preferences['showSLSinglecolor']) {
       return preferences['SLColor'];
     }
     const type = W.prefs.attributes['isImperial'] ? 'imperial' : 'metric';
+    const speed = W.prefs.attributes['isImperial']
+      ? Math.round(metricspeed / 1.609344)
+      : metricspeed;
     return (
       preferences['speeds'][type][speed] ?? preferences['speeds']['default']
     );
@@ -3353,7 +3356,8 @@
       SVL_VERSION,
       `<b>Major update!</b>
             <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
-        <br>- 5.0.4: Added a global Layer Opacity preference
+            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
+            <br>- 5.0.5: Added a global Layer Opacity setting
         <br>From previous releases:
         <br>- Rendering completely rewritten: performance improvements
         <br>- The preference panel was redesigned and is now in the sidebar (SVL 🗺️)

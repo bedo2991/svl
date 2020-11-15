@@ -200,7 +200,7 @@ Q("Object.values", function(k) {
   function ya(a, c) {
     c = void 0 === c ? !0 : c;
     x("savePreferences");
-    a.version = "5.0.5";
+    a.version = "5.0.6";
     try {
       window.localStorage.setItem("svl", JSON.stringify(a)), c || w("success", "Preferences saved!");
     } catch (b) {
@@ -417,7 +417,7 @@ Q("Object.values", function(k) {
       return d.SLColor;
     }
     var c;
-    return null != (c = d.speeds[W.prefs.attributes.isImperial ? "imperial" : "metric"][a]) ? c : d.speeds["default"];
+    return null != (c = d.speeds[W.prefs.attributes.isImperial ? "imperial" : "metric"][W.prefs.attributes.isImperial ? Math.round(a / 1.609344) : a]) ? c : d.speeds["default"];
   }
   function th(a, c, b) {
     a ? (a = b.x - c.x, c = b.y - c.y) : (a = c.x - b.x, c = c.y - b.y);
@@ -982,7 +982,7 @@ Q("Object.values", function(k) {
     c.innerText = "Street Vector Layer";
     a.appendChild(c);
     c = document.createElement("span");
-    c.innerText = "Version 5.0.5";
+    c.innerText = "Version 5.0.6";
     a.appendChild(c);
     c = document.createElement("a");
     c.innerText = "Something not working? Report it here.";
@@ -1264,7 +1264,7 @@ Q("Object.values", function(k) {
     }
     d.startDisabled && M(1, !1);
     fi();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.5", '<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n        <br>- 5.0.4: Add a global Layer Opacity preference\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME\'s strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes\n        <br>- The "Next to Carpool/HOV/bus lane" is also shown\n        <br>- Removed: the zoom-level indicator while editing the preferences\n        <br>- Bug fixes and new bugs :)', 
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.6", '<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n            <br>- 5.0.5: Added a global Layer Opacity setting\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME\'s strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes\n        <br>- The "Next to Carpool/HOV/bus lane" is also shown\n        <br>- Removed: the zoom-level indicator while editing the preferences\n        <br>- Bug fixes and new bugs :)', 
     "", GM_info.script.supportURL);
   }
   function Qh(a) {
@@ -1293,7 +1293,7 @@ Q("Object.values", function(k) {
     !1 === Z() && w("info", "This is the first time that you run Street Vector Layer in this browser.\nSome info about it:\nBy default, use ALT+L to toggle the layer.\nYou can change the streets color, thickness and style using the panel on the left sidebar.\nYour preferences will be saved for the next time in your browser.\nThe other road layers will be automatically hidden (you can change this behaviour in the preference panel).\nHave fun and tell us on the Waze forum if you liked the script!");
     a = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var b = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.5", rendererOptions:{zIndexing:!0, }, });
+    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.6", rendererOptions:{zIndexing:!0, }, });
     z.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
@@ -1402,7 +1402,7 @@ Q("Object.values", function(k) {
     });
     a = W.prefs._events;
     "object" === typeof a && a["change:isImperial"].push({callback:X, });
-    console.log("[SVL] v. 5.0.5 initialized correctly.");
+    console.log("[SVL] v. 5.0.6 initialized correctly.");
   }
   function X() {
     x("DrawAllSegments");
@@ -1438,7 +1438,7 @@ Q("Object.values", function(k) {
       c[b] = arguments[b];
     }
     for (b = 0; b < c.length; b += 1) {
-      "string" === typeof c[b] ? console.log("[SVL] 5.0.5: " + c[b]) : console.dir(c[b]);
+      "string" === typeof c[b] ? console.log("[SVL] 5.0.6: " + c[b]) : console.dir(c[b]);
     }
   } : function() {
   }, Mh = Ea ? console.group : function() {
