@@ -442,6 +442,12 @@ const OpenLayers = {
 
       /**
        *
+       * @param {number} opacity
+       */
+      setOpacity(opacity) {}
+
+      /**
+       *
        * @param {boolean} bool
        */
       setVisibility(bool) {}

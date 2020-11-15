@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.4
+// @version    5.0.5
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.4';
+  const SVL_VERSION = '5.0.5';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -370,6 +370,8 @@
     preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
     preferences['renderGeomNodes'] =
       loadedPreferences?.['renderGeomNodes'] ?? false;
+
+    preferences['layerOpacity'] = loadedPreferences?.['layerOpacity'] ?? 0.9;
 
     preferences['streets'] = [];
     // Street: 1
@@ -1860,6 +1862,9 @@
       'svl_segmentsThreshold'
     ).value;
 
+    preferences['layerOpacity'] =
+      document.getElementById('svl_layerOpacity').value / 100.0;
+
     // Check if showUnderGPSPoints has been toggled
     if (
       preferences['showUnderGPSPoints'] !==
@@ -2189,6 +2194,9 @@
       preferences['routingModeEnabled'];
     document.getElementById('svl_showANs').checked = preferences['showANs'];
 
+    document.getElementById('svl_layerOpacity').value =
+      preferences['layerOpacity'] * 100;
+
     // Speed limits
     document.getElementById('svl_showSLtext').checked =
       preferences['showSLtext'];
@@ -2513,7 +2521,6 @@
     }); */
 
     streets.appendChild(decorations);
-    mainDiv.appendChild(streets);
 
     streets.appendChild(
       createCheckboxOption({
@@ -2521,6 +2528,19 @@
         title: 'Show Alternative Names',
         description:
           'When enabled, at most 2 ANs that differ from the primary name are shown under the street name.',
+      })
+    );
+
+    mainDiv.appendChild(streets);
+
+    renderingParameters.appendChild(
+      createIntegerOption({
+        id: 'layerOpacity',
+        title: 'Layer Opacity',
+        description: '10: almost invisible, 100: opaque.',
+        min: 10,
+        max: 100,
+        step: 5,
       })
     );
 
@@ -3333,14 +3353,16 @@
       SVL_VERSION,
       `<b>Major update!</b>
             <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
-        <br>- NEW: Rendering completely rewritten: performance improvements
-        <br>- NEW: The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
-        <br>- NEW: You can set what color to use for each speed limit (User request)
-        <br>- NEW: Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
-        <br>- NEW: Some options are now localised using WME's strings
-        <br>- NEW: Dead-end nodes are rendered with a different color
-        <br>- NEW: The Preference panel changes color when you have unsaved changes
-        <br>- NEW: The "Next to Carpool/HOV/bus lane" is also shown
+        <br>- 5.0.4: Added a global Layer Opacity preference
+        <br>From previous releases:
+        <br>- Rendering completely rewritten: performance improvements
+        <br>- The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
+        <br>- You can set what color to use for each speed limit (User request)
+        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
+        <br>- Some options are now localised using WME's strings
+        <br>- Dead-end nodes are rendered with a different color
+        <br>- The Preference panel changes color when you have unsaved changes
+        <br>- The "Next to Carpool/HOV/bus lane" is also shown
         <br>- Removed: the zoom-level indicator while editing the preferences
         <br>- Bug fixes and new bugs :)`,
       '',
@@ -3452,7 +3474,6 @@
             style = { 'display': 'none' };
           } else {
             streetVectorLayer.renderer.featureDx = 0;
-
             style['pointerEvents'] = 'none';
             if (!farZoom) {
               if (!feature.attributes.isArrow && preferences['realsize']) {
@@ -3825,6 +3846,7 @@
       }
     }
     clutterConstant = pref['clutterConstant'];
+    streetVectorLayer.setOpacity(preferences['layerOpacity']);
     redrawAllSegments();
   }
 
