@@ -15,7 +15,7 @@ var Ga = "function" == typeof Object.defineProperties ? Object.defineProperty : 
   l[n] = r.value;
   return l;
 };
-function Sh(l) {
+function Uh(l) {
   l = ["object" == typeof globalThis && globalThis, l, "object" == typeof window && window, "object" == typeof self && self, "object" == typeof global && global, ];
   for (var n = 0; n < l.length; ++n) {
     var r = l[n];
@@ -25,11 +25,11 @@ function Sh(l) {
   }
   throw Error("Cannot find global object");
 }
-var Th = Sh(this);
+var Vh = Uh(this);
 function Q(l, n) {
   if (n) {
     a: {
-      var r = Th;
+      var r = Vh;
       l = l.split(".");
       for (var w = 0; w < l.length - 1; w++) {
         var H = l[w];
@@ -71,21 +71,21 @@ Q("Symbol.iterator", function(l) {
   }
   l = Symbol("Symbol.iterator");
   for (var n = "Array Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".split(" "), r = 0; r < n.length; r++) {
-    var w = Th[n[r]];
+    var w = Vh[n[r]];
     "function" === typeof w && "function" != typeof w.prototype[l] && Ga(w.prototype, l, {configurable:!0, writable:!0, value:function() {
-      return Uh(xa(this));
+      return Wh(xa(this));
     }});
   }
   return l;
 });
-function Uh(l) {
+function Wh(l) {
   l = {next:l};
   l[Symbol.iterator] = function() {
     return this;
   };
   return l;
 }
-function Vh(l, n) {
+function Xh(l, n) {
   l instanceof String && (l += "");
   var r = 0, w = !1, H = {next:function() {
     if (!w && r < l.length) {
@@ -102,7 +102,7 @@ function Vh(l, n) {
 }
 Q("Array.prototype.keys", function(l) {
   return l ? l : function() {
-    return Vh(this, function(n) {
+    return Xh(this, function(n) {
       return n;
     });
   };
@@ -173,7 +173,7 @@ Q("Object.values", function(l) {
     w("success", "Preferences have been reset to the default values");
   }
   function r() {
-    WazeWrap.Alerts.prompt(GM_info.script.name, "N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!\n\nPaste your string here:", "", Wh, null);
+    WazeWrap.Alerts.prompt(GM_info.script.name, "N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!\n\nPaste your string here:", "", Yh, null);
   }
   function w(a, c) {
     try {
@@ -200,17 +200,17 @@ Q("Object.values", function(l) {
   function ya(a, c) {
     c = void 0 === c ? !0 : c;
     x("savePreferences");
-    a.version = "5.0.7";
+    a.version = "5.0.8";
     try {
       window.localStorage.setItem("svl", JSON.stringify(a)), c || w("success", "Preferences saved!");
     } catch (b) {
       console.error(b), w("error", "Could not save the preferences, your browser local storage seems to be full.");
     }
   }
-  function Xh(a) {
+  function Zh(a) {
     var c = a.u, b = a.roadType;
     a = a.A;
-    return d.realsize ? c ? a ? c : 0.6 * c : a ? Ha[b] : 0.6 * Ha[b] : parseInt(O[b].strokeWidth, 10);
+    return d.realsize ? c ? a ? c : 0.6 * c : a ? Ha[b] : 0.6 * Ha[b] : parseInt(N[b].strokeWidth, 10);
   }
   function Z(a) {
     a = void 0 === a ? !1 : a;
@@ -223,14 +223,14 @@ Q("Object.values", function(l) {
     }
     null === b && (a ? x("Overwriting existing preferences") : (c = !1, x("Creating new preferences for the first time")));
     d = {autoReload:{}};
-    var f, k, m;
-    d.autoReload.interval = null != (m = null == (f = b) ? void 0 : null == (k = f.autoReload) ? void 0 : k.interval) ? m : 60000;
-    var h, q, u;
-    d.autoReload.enabled = null != (u = null == (h = b) ? void 0 : null == (q = h.autoReload) ? void 0 : q.enabled) ? u : !1;
+    var f, h, m;
+    d.autoReload.interval = null != (m = null == (f = b) ? void 0 : null == (h = f.autoReload) ? void 0 : h.interval) ? m : 60000;
+    var g, q, u;
+    d.autoReload.enabled = null != (u = null == (g = b) ? void 0 : null == (q = g.autoReload) ? void 0 : q.enabled) ? u : !1;
     var p, y;
     d.showSLSinglecolor = null != (y = null == (p = b) ? void 0 : p.showSLSinglecolor) ? y : !1;
-    var v, g;
-    d.SLColor = null != (g = null == (v = b) ? void 0 : v.SLColor) ? g : "#ffdf00";
+    var v, k;
+    d.SLColor = null != (k = null == (v = b) ? void 0 : v.SLColor) ? k : "#ffdf00";
     var C, F, D, t, G;
     d.fakelock = null != (G = null != (t = null == (C = b) ? void 0 : C.fakelock) ? t : null == (F = WazeWrap) ? void 0 : null == (D = F.User) ? void 0 : D.Rank()) ? G : 6;
     var K, S;
@@ -279,7 +279,7 @@ Q("Object.values", function(l) {
     var gb, hb, ib, jb, kb, lb, mb, nb, ob;
     d.streets[1] = {strokeColor:null != (mb = null == (gb = b) ? void 0 : null == (hb = gb.streets[1]) ? void 0 : hb.strokeColor) ? mb : "#FFFFFF", strokeWidth:null != (nb = null == (ib = b) ? void 0 : null == (jb = ib.streets[1]) ? void 0 : jb.strokeWidth) ? nb : 10, strokeDashstyle:null != (ob = null == (kb = b) ? void 0 : null == (lb = kb.streets[1]) ? void 0 : lb.strokeDashstyle) ? ob : "solid", };
     var pb, qb, rb, sb, tb, ub, vb, wb, xb;
-    d.streets[20] = {strokeColor:null != (vb = null == (pb = b) ? void 0 : null == (qb = pb.streets[20]) ? void 0 : qb.strokeColor) ? vb : "#2282ab", strokeWidth:null != (wb = null == (rb = b) ? void 0 : null == (sb = rb.streets[20]) ? void 0 : sb.strokeWidth) ? wb : 9, strokeDashstyle:null != (xb = null == (tb = b) ? void 0 : null == (ub = tb.streets[20]) ? void 0 : ub.strokeDashstyle) ? xb : "solid", };
+    d.streets[20] = {strokeColor:null != (vb = null == (pb = b) ? void 0 : null == (qb = pb.streets[20]) ? void 0 : qb.strokeColor) ? vb : "#2282AB", strokeWidth:null != (wb = null == (rb = b) ? void 0 : null == (sb = rb.streets[20]) ? void 0 : sb.strokeWidth) ? wb : 9, strokeDashstyle:null != (xb = null == (tb = b) ? void 0 : null == (ub = tb.streets[20]) ? void 0 : ub.strokeDashstyle) ? xb : "solid", };
     var yb, zb, Ab, Bb, Cb, Db, Eb, Fb, Gb;
     d.streets[4] = {strokeColor:null != (Eb = null == (yb = b) ? void 0 : null == (zb = yb.streets[4]) ? void 0 : zb.strokeColor) ? Eb : "#3FC91C", strokeWidth:null != (Fb = null == (Ab = b) ? void 0 : null == (Bb = Ab.streets[4]) ? void 0 : Bb.strokeWidth) ? Fb : 11, strokeDashstyle:null != (Gb = null == (Cb = b) ? void 0 : null == (Db = Cb.streets[4]) ? void 0 : Db.strokeDashstyle) ? Gb : "solid", };
     var Hb, Ib, Jb, Kb, Lb, Mb, Nb, Ob, Pb;
@@ -430,63 +430,63 @@ Q("Object.values", function(l) {
       !0 === W.prefs.attributes.isImperial && (b = Math.round(a / 1.609344));
       b = b.toString();
       for (a = 0; a < b.length; a += 1) {
-        c += Yh[b.charAt(a)];
+        c += $h[b.charAt(a)];
       }
     }
     return c;
   }
   function uh(a, c, b) {
     b = void 0 === b ? !1 : b;
-    var e, f, k = [];
+    var e, f, h = [];
     var m = null;
-    var h = a.getAttributes(), q = a.getAddress(), u = a.hasNonEmptyStreet();
-    if (null !== h.primaryStreetID && void 0 === q.attributes.state) {
-      x("Address not ready", q, h), setTimeout(function() {
+    var g = a.getAttributes(), q = a.getAddress(), u = a.hasNonEmptyStreet();
+    if (null !== g.primaryStreetID && void 0 === q.attributes.state) {
+      x("Address not ready", q, g), setTimeout(function() {
         uh(a, c, !0);
       }, 500);
     } else {
       var p = q.attributes;
       q = "";
-      u ? q = p.street.name : 10 > h.roadType && !a.isInRoundabout() && (q = "\u2691");
+      u ? q = p.street.name : 10 > g.roadType && !a.isInRoundabout() && (q = "\u2691");
       u = "";
       if (d.showANs) {
-        for (var y = 0, v = 0; v < h.streetIDs.length; v += 1) {
-          var g = h.streetIDs[v];
+        for (var y = 0, v = 0; v < g.streetIDs.length; v += 1) {
+          var k = g.streetIDs[v];
           if (2 === y) {
             u += " \u2026";
             break;
           }
-          (g = W.model.streets.objects[g]) && g.name !== p.street.name && (y += 1, u += g.name ? "(" + g.name + ")" : "");
+          (k = W.model.streets.objects[k]) && k.name !== p.street.name && (y += 1, u += k.name ? "(" + k.name + ")" : "");
         }
         u = u.replace(")(", ", ");
         "" !== u && (u = "\n" + u);
       }
-      O[h.roadType] || (q += "\n!! UNSUPPORTED ROAD TYPE !!");
+      N[g.roadType] || (q += "\n!! UNSUPPORTED ROAD TYPE !!");
       p = "";
-      (null != (e = h.fwdMaxSpeed) ? e : h.revMaxSpeed) && d.showSLtext && (h.fwdMaxSpeed === h.revMaxSpeed ? p = qa(h.fwdMaxSpeed) : h.fwdMaxSpeed ? (p = qa(h.fwdMaxSpeed), h.revMaxSpeed && (p += "'" + qa(h.revMaxSpeed))) : (p = qa(h.revMaxSpeed), h.fwdMaxSpeed && (p += "'" + qa(h.fwdMaxSpeed))), h.fwdMaxSpeedUnverified || h.revMaxSpeedUnverified) && (p += "?");
+      (null != (e = g.fwdMaxSpeed) ? e : g.revMaxSpeed) && d.showSLtext && (g.fwdMaxSpeed === g.revMaxSpeed ? p = qa(g.fwdMaxSpeed) : g.fwdMaxSpeed ? (p = qa(g.fwdMaxSpeed), g.revMaxSpeed && (p += "'" + qa(g.revMaxSpeed))) : (p = qa(g.revMaxSpeed), g.fwdMaxSpeed && (p += "'" + qa(g.fwdMaxSpeed))), g.fwdMaxSpeedUnverified || g.revMaxSpeedUnverified) && (p += "?");
       e = q + " " + p;
       if (" " === e) {
         return [];
       }
-      p = h.roadType;
-      p = new OpenLayers.Feature.Vector(c[0], {myId:h.id, color:O[p] ? O[p].strokeColor : "#f00", outlinecolor:O[p] ? O[p].outlineColor : "#fff", outlinewidth:d.labelOutlineWidth, });
+      p = g.roadType;
+      p = new OpenLayers.Feature.Vector(c[0], {myId:g.id, color:N[p] ? N[p].strokeColor : "#f00", outlinecolor:N[p] ? N[p].outlineColor : "#fff", outlinewidth:d.labelOutlineWidth, });
       y = [];
       for (v = 0; v < c.length - 1; v += 1) {
-        g = c[v].distanceTo(c[v + 1]), y.push({index:v, h:g});
+        k = c[v].distanceTo(c[v + 1]), y.push({index:v, h:k});
       }
       y.sort(function(G, K) {
         return G.h > K.h ? -1 : G.h < K.h ? 1 : 0;
       });
       v = "" === q ? 1 : y.length;
-      g = vh * e.length;
-      for (var C = 0; C < y.length && 0 < v && !(y[C].h < (0 < C ? g : g - 30)); C += 1) {
+      k = vh * e.length;
+      for (var C = 0; C < y.length && 0 < v && !(y[C].h < (0 < C ? k : k - 30)); C += 1) {
         var F = y[C].index;
         var D = f = 0;
         D = c[F];
         var t = (new OpenLayers.Geometry.LineString([D, c[F + 1], ])).getCentroid(!0);
         m = p.clone();
         m.geometry = t;
-        h.fwdDirection ? (f = t.x - D.x, D = t.y - D.y) : (f = D.x - t.x, D = D.y - t.y);
+        g.fwdDirection ? (f = t.x - D.x, D = t.y - D.y) : (f = D.x - t.x, D = D.y - t.y);
         D = 90 + 180 * Math.atan2(f, D) / Math.PI;
         "" !== q ? (f = " \u25b6 ", 90 < D && 270 > D ? D -= 180 : f = " \u25c0 ") : f = "";
         a.isOneWay() || (f = "");
@@ -495,140 +495,140 @@ Q("Object.values", function(l) {
         m.attributes.a = 1 === F % 2;
         m.attributes.v = v;
         --v;
-        k.push(m);
+        h.push(m);
       }
     }
-    b && m && A.addFeatures(k, {silent:!0});
-    return k;
+    b && m && A.addFeatures(h, {silent:!0});
+    return h;
   }
   function wh(a) {
     var c = a.id, b = a.rev, e = a.l, f = a.m;
     a = th(a.j, b ? f : e, b ? e : f);
     return new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(e.x + 10 * Math.sin(a), e.y + 10 * Math.cos(a)), {myId:c, }, {rotation:a, externalGraphic:"https://raw.githubusercontent.com/bedo2991/svl/master/average.png", graphicWidth:36, graphicHeight:36, graphicZIndex:300, fillOpacity:1, pointerEvents:"none", });
   }
-  function Zh(a) {
+  function ai(a) {
     var c = a.getAttributes();
     x("Drawing segment: " + c.id);
-    var b = c.geometry.components, e = c.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, k = [], m = 100 * c.level, h = c.fwdDirection && c.revDirection, q = a.isInRoundabout(), u = !1, p = !1, y = c.roadType, v = Xh({u:c.width, roadType:y, A:h, });
-    h = v;
-    var g = null;
+    var b = c.geometry.components, e = c.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, h = [], m = 100 * c.level, g = c.fwdDirection && c.revDirection, q = a.isInRoundabout(), u = !1, p = !1, y = c.roadType, v = Zh({u:c.width, roadType:y, A:g, });
+    g = v;
+    var k = null;
     if (null === c.primaryStreetID) {
-      return g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.red.strokeColor, width:v, dash:d.red.strokeDashstyle, }), k.push(g), k;
+      return k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.red.strokeColor, width:v, dash:d.red.strokeDashstyle, }), h.push(k), h;
     }
     d.routingModeEnabled && null !== c.routingRoadType && (y = c.routingRoadType);
-    if (void 0 !== O[y]) {
+    if (void 0 !== N[y]) {
       var C;
       p = null != (C = c.fwdMaxSpeed) ? C : c.revMaxSpeed;
-      0 < c.level && (u = !0, g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", zIndex:m + 100, width:v, }), k.push(g));
+      0 < c.level && (u = !0, k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", zIndex:m + 100, width:v, }), h.push(k));
       if ((p = p && d.showSLcolor) && u) {
-        h = 0.56 * v;
+        g = 0.56 * v;
       } else {
         if (u || p) {
-          h = 0.68 * v;
+          g = 0.68 * v;
         }
       }
       if (p) {
         if (C = d.showDashedUnverifiedSL && (c.fwdMaxSpeedUnverified || c.revMaxSpeedUnverified) ? "dash" : "solid", d.showSLSinglecolor || !c.fwdMaxSpeed && !c.revMaxSpeed || c.fwdMaxSpeed === c.revMaxSpeed || a.isOneWay()) {
-          p = c.fwdMaxSpeed, a.isOneWay() && c.revDirection && (p = c.revMaxSpeed), p && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:za(p), width:u ? 0.8 * v : v, dash:C, a:!0, zIndex:m + 115, }), k.push(g));
+          p = c.fwdMaxSpeed, a.isOneWay() && c.revDirection && (p = c.revMaxSpeed), p && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:za(p), width:u ? 0.8 * v : v, dash:C, a:!0, zIndex:m + 115, }), h.push(k));
         } else {
           p = [];
           for (var F = [], D = 0; D < e.length - 1; D += 1) {
             var t = e[D], G = e[D + 1];
-            g = t.x - G.x;
+            k = t.x - G.x;
             var K = t.y - G.y;
             p[0] = t.clone();
             F[0] = t.clone();
             p[1] = G.clone();
             F[1] = G.clone();
             t = u ? 0.14 * v : 0.17 * v;
-            if (0.5 > Math.abs(g)) {
+            if (0.5 > Math.abs(k)) {
               0 < K ? (p[0].move(-t, 0), p[1].move(-t, 0), F[0].move(t, 0), F[1].move(t, 0)) : (p[0].move(t, 0), p[1].move(t, 0), F[0].move(-t, 0), F[1].move(-t, 0));
             } else {
-              var S = K / g;
+              var S = K / k;
               G = -1 / S;
               if (0.05 > Math.abs(S)) {
-                0 < g ? (p[0].move(0, t), p[1].move(0, t), F[0].move(0, -t), F[1].move(0, -t)) : (p[0].move(0, -t), p[1].move(0, -t), F[0].move(0, t), F[1].move(0, t));
+                0 < k ? (p[0].move(0, t), p[1].move(0, t), F[0].move(0, -t), F[1].move(0, -t)) : (p[0].move(0, -t), p[1].move(0, -t), F[0].move(0, t), F[1].move(0, t));
               } else {
-                if (0 < K && 0 < g || 0 > g && 0 < K) {
+                if (0 < K && 0 < k || 0 > k && 0 < K) {
                   t *= -1;
                 }
-                g = Math.sqrt(1 + G * G);
-                p[0].move(t / g, G / g * t);
-                p[1].move(t / g, G / g * t);
-                F[0].move(-t / g, G / g * -t);
-                F[1].move(-t / g, G / g * -t);
+                k = Math.sqrt(1 + G * G);
+                p[0].move(t / k, G / k * t);
+                p[1].move(t / k, G / k * t);
+                F[0].move(-t / k, G / k * -t);
+                F[1].move(-t / k, G / k * -t);
               }
             }
-            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(p), {myId:c.id, color:za(c.fwdMaxSpeed), width:h, dash:C, a:!0, zIndex:m + 105, });
-            k.push(g);
-            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(F), {myId:c.id, color:za(c.revMaxSpeed), width:h, dash:C, a:!0, zIndex:m + 110, });
-            k.push(g);
+            k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(p), {myId:c.id, color:za(c.fwdMaxSpeed), width:g, dash:C, a:!0, zIndex:m + 105, });
+            h.push(k);
+            k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(F), {myId:c.id, color:za(c.revMaxSpeed), width:g, dash:C, a:!0, zIndex:m + 110, });
+            h.push(k);
           }
         }
       }
-      g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:O[y].strokeColor, width:h, dash:O[y].strokeDashstyle, zIndex:m + 120, });
-      k.push(g);
-      0 > c.level && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", width:h, opacity:0.3, zIndex:m + 125, }), k.push(g));
+      k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:N[y].strokeColor, width:g, dash:N[y].strokeDashstyle, zIndex:m + 120, });
+      h.push(k);
+      0 > c.level && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", width:g, opacity:0.3, zIndex:m + 125, }), h.push(k));
       u = a.getLockRank() + 1;
       var J, B;
       if (u > d.fakelock || u > (null == (J = WazeWrap) ? void 0 : null == (B = J.User) ? void 0 : B.Rank())) {
-        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:xh.strokeColor, width:0.1 * h, dash:xh.strokeDashstyle, zIndex:m + 147, }), k.push(g);
+        k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:xh.strokeColor, width:0.1 * g, dash:xh.strokeDashstyle, zIndex:m + 147, }), h.push(k);
       }
       J = a.getFlagAttributes();
-      J.unpaved && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.dirty.strokeColor, width:0.7 * h, opacity:d.dirty.strokeOpacity, dash:d.dirty.strokeDashstyle, zIndex:m + 135, }), k.push(g));
-      c.hasClosures && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.closure.strokeColor, width:0.6 * h, dash:d.closure.strokeDashstyle, opacity:d.closure.strokeOpacity, a:!0, zIndex:m + 140, }), k.push(g));
+      J.unpaved && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.dirty.strokeColor, width:0.7 * g, opacity:d.dirty.strokeOpacity, dash:d.dirty.strokeDashstyle, zIndex:m + 135, }), h.push(k));
+      c.hasClosures && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.closure.strokeColor, width:0.6 * g, dash:d.closure.strokeDashstyle, opacity:d.closure.strokeOpacity, a:!0, zIndex:m + 140, }), h.push(k));
       if (c.fwdToll || c.revToll || c.restrictions.some(function(U) {
         return "TOLL" === U.getDefaultType();
       })) {
-        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.toll.strokeColor, width:0.3 * h, dash:d.toll.strokeDashstyle, opacity:d.toll.strokeOpacity, zIndex:m + 145, }), k.push(g);
+        k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.toll.strokeColor, width:0.3 * g, dash:d.toll.strokeDashstyle, opacity:d.toll.strokeOpacity, zIndex:m + 145, }), h.push(k);
       }
-      q && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Aa.strokeColor, width:0.15 * h, dash:Aa.strokeDashstyle, opacity:Aa.strokeOpacity, a:!0, zIndex:m + 150, }), k.push(g));
-      0 < c.restrictions.length && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.restriction.strokeColor, width:0.4 * h, dash:d.restriction.strokeDashstyle, opacity:d.restriction.strokeOpacity, a:!0, zIndex:m + 155, }), k.push(g));
-      !1 === c.validated && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:yh.strokeColor, width:0.5 * h, dash:yh.strokeDashstyle, a:!0, zIndex:m + 160, }), k.push(g));
-      J.headlights && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.headlights.strokeColor, width:0.2 * h, dash:d.headlights.strokeDashstyle, opacity:d.headlights.strokeOpacity, a:!0, zIndex:m + 165, }));
-      J.nearbyHOV && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.nearbyHOV.strokeColor, width:0.25 * h, dash:d.nearbyHOV.strokeDashstyle, opacity:d.nearbyHOV.strokeOpacity, a:!0, zIndex:m + 166, }));
-      0 < c.fwdLaneCount && (B = e.slice(-2), B[0] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * h, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 170, }), k.push(g));
-      0 < c.revLaneCount && (B = e.slice(0, 2), B[1] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * h, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 175, }), k.push(g));
+      q && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Aa.strokeColor, width:0.15 * g, dash:Aa.strokeDashstyle, opacity:Aa.strokeOpacity, a:!0, zIndex:m + 150, }), h.push(k));
+      0 < c.restrictions.length && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.restriction.strokeColor, width:0.4 * g, dash:d.restriction.strokeDashstyle, opacity:d.restriction.strokeOpacity, a:!0, zIndex:m + 155, }), h.push(k));
+      !1 === c.validated && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:yh.strokeColor, width:0.5 * g, dash:yh.strokeDashstyle, a:!0, zIndex:m + 160, }), h.push(k));
+      J.headlights && h.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.headlights.strokeColor, width:0.2 * g, dash:d.headlights.strokeDashstyle, opacity:d.headlights.strokeOpacity, a:!0, zIndex:m + 165, }));
+      J.nearbyHOV && h.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.nearbyHOV.strokeColor, width:0.25 * g, dash:d.nearbyHOV.strokeDashstyle, opacity:d.nearbyHOV.strokeOpacity, a:!0, zIndex:m + 166, }));
+      0 < c.fwdLaneCount && (B = e.slice(-2), B[0] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * g, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 170, }), h.push(k));
+      0 < c.revLaneCount && (B = e.slice(0, 2), B[1] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * g, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 175, }), h.push(k));
       if (!1 === c.fwdDirection || !1 === c.revDirection) {
         if (B = b, !q && c.length / b.length < d.arrowDeclutter && (B = f), !1 === (c.fwdDirection || c.revDirection)) {
           for (u = 0; u < B.length - 1; u += 1) {
-            k.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([B[u], B[u + 1], ])).getCentroid(!0), {myId:c.id, a:!0, i:!0, zIndex:m + 180, }, $h));
+            h.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([B[u], B[u + 1], ])).getCentroid(!0), {myId:c.id, a:!0, i:!0, zIndex:m + 180, }, bi));
           }
         } else {
           for (u = q ? 3 : 1, y = u - 1; y < B.length - 1; y += u) {
-            v = th(c.fwdDirection, B[y], B[y + 1]), C = new OpenLayers.Geometry.LineString([B[y], B[y + 1], ]), k.push(new OpenLayers.Feature.Vector(C.getCentroid(!0), {myId:c.id, a:!0, i:!0, }, {graphicName:"myTriangle", rotation:v, stroke:!0, strokeColor:"#000", graphiczIndex:m + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
+            v = th(c.fwdDirection, B[y], B[y + 1]), C = new OpenLayers.Geometry.LineString([B[y], B[y + 1], ]), h.push(new OpenLayers.Feature.Vector(C.getCentroid(!0), {myId:c.id, a:!0, i:!0, }, {graphicName:"myTriangle", rotation:v, stroke:!0, strokeColor:"#000", graphiczIndex:m + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
           }
         }
       }
-      J.fwdSpeedCamera && k.push(wh({id:c.id, rev:!1, j:c.fwdDirection, l:b[0], m:b[1], }));
-      J.revSpeedCamera && k.push(wh({id:c.id, rev:!0, j:c.fwdDirection, l:b[b.length - 1], m:b[b.length - 2], }));
+      J.fwdSpeedCamera && h.push(wh({id:c.id, rev:!1, j:c.fwdDirection, l:b[0], m:b[1], }));
+      J.revSpeedCamera && h.push(wh({id:c.id, rev:!0, j:c.fwdDirection, l:b[b.length - 1], m:b[b.length - 2], }));
       if (!0 === d.renderGeomNodes && !q) {
         for (q = 1; q < b.length - 2; q += 1) {
-          k.push(new OpenLayers.Feature.Vector(b[q], {myId:c.id, zIndex:m + 200, a:!0, i:!0, }, ai));
+          h.push(new OpenLayers.Feature.Vector(b[q], {myId:c.id, zIndex:m + 200, a:!0, i:!0, }, ci));
         }
       }
-      J.tunnel && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Ba.strokeColor, opacity:Ba.strokeOpacity, width:0.3 * h, dash:Ba.strokeDashstyle, zIndex:m + 177, }), k.push(g), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:zh.strokeColor, width:0.1 * h, dash:zh.strokeDashstyle, zIndex:m + 177, }), k.push(g));
+      J.tunnel && (k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Ba.strokeColor, opacity:Ba.strokeOpacity, width:0.3 * g, dash:Ba.strokeDashstyle, zIndex:m + 177, }), h.push(k), k = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:zh.strokeColor, width:0.1 * g, dash:zh.strokeDashstyle, zIndex:m + 177, }), h.push(k));
     }
     a = uh(a, f);
     0 < a.length && A.addFeatures(a, {silent:!0});
-    return k;
+    return h;
   }
   function Ah(a) {
     a = a.getAttributes();
     var c = new OpenLayers.Geometry.Point(a.geometry.x, a.geometry.y);
     return new OpenLayers.Feature.Vector(c, {myid:a.id, }, Bh(a));
   }
-  function bi() {
+  function di() {
     Z();
     aa(d);
     ba();
     w("info", "All's well that ends well! Now it's everything as it was before.");
   }
-  function ci() {
+  function ei() {
     GM_setClipboard(JSON.stringify(d));
     w("info", "The configuration has been copied to your clipboard. Please paste it in a file (CTRL+V) to store it.");
   }
-  function Wh(a, c) {
+  function Yh(a, c) {
     if (null !== c && "" !== c) {
       try {
         d = JSON.parse(c);
@@ -672,14 +672,21 @@ Q("Object.values", function(l) {
     document.getElementById("svl_saveNewPref").classList.add("btn-primary");
     document.getElementById("svl_rollbackButton").classList.remove("disabled");
     document.getElementById("sidepanel-svl").classList.add("svl_unsaved");
-    for (var a = 0; a < d.streets.length; a += 1) {
-      d.streets[a] && (d.streets[a] = {}, d.streets[a].strokeColor = document.getElementById("svl_streetColor_" + a).value, d.streets[a].strokeWidth = document.getElementById("svl_streetWidth_" + a).value, d.streets[a].strokeDashstyle = document.querySelector("#svl_strokeDashstyle_" + a + " option:checked").value);
+    var a = document.getElementById("svl_presets"), c = document.getElementById("svl_presets").value, b = !1;
+    "wme_colors" === c && (b = !0, d.streets = Gh[c].streets);
+    "svl_standard" === c && (b = !0, d.streets = Gh[c].streets);
+    if (b) {
+      Hh(), a.value = "", w("info", "Preset applied, don't forget to save your changes!");
+    } else {
+      for (a = 0; a < d.streets.length; a += 1) {
+        d.streets[a] && (d.streets[a] = {}, d.streets[a].strokeColor = document.getElementById("svl_streetColor_" + a).value, d.streets[a].strokeWidth = document.getElementById("svl_streetWidth_" + a).value, d.streets[a].strokeDashstyle = document.querySelector("#svl_strokeDashstyle_" + a + " option:checked").value);
+      }
     }
     d.fakelock = document.getElementById("svl_fakelock").value;
     a = W.prefs.attributes.isImperial ? "imperial" : "metric";
-    var c = Object.keys(d.speeds[a]);
+    c = Object.keys(d.speeds[a]);
     d.speeds[a] = {};
-    for (var b = 1; b < c.length + 1; b += 1) {
+    for (b = 1; b < c.length + 1; b += 1) {
       d.speeds[a][document.getElementById("svl_slValue_" + a + "_" + b).value] = document.getElementById("svl_slColor_" + a + "_" + b).value;
     }
     d.speeds["default"] = document.getElementById("svl_slColor_" + a + "_Default").value;
@@ -741,33 +748,57 @@ Q("Object.values", function(l) {
     d.showANs = document.getElementById("svl_showANs").checked;
     d.realsize = document.getElementById("svl_realsize").checked;
     d.realsize ? $("input.segmentsWidth").prop("disabled", !0) : $("input.segmentsWidth").prop("disabled", !1);
+    console.dir(d);
     aa(d);
     Eh();
   }
-  function di() {
+  function fi() {
     Fh();
     ya(d, !1);
     ba();
   }
-  function ei() {
+  function gi() {
     x("rollbackDefault");
     WazeWrap.Alerts.confirm(GM_info.script.name, "Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!", n, null, "Yes, I want to reset", "Cancel");
   }
-  function Gh(a) {
+  function hi(a) {
+    var c = a.id, b = a.title, e = a.description, f = a.options, h = a.g;
+    a = document.createElement("div");
+    a.className = "prefLineSelect";
+    "string" === typeof h && (a.classList.add("newOption"), a.dataset.version = h);
+    var m = document.createElement("select");
+    m.className = "prefElement";
+    h = document.createElement("label");
+    h.innerText = b;
+    m.id = "svl_" + c;
+    f && 0 < f.length && f.forEach(function(g) {
+      var q = document.createElement("option");
+      q.text = g.text;
+      q.value = g.value;
+      m.add(q);
+    });
+    c = document.createElement("i");
+    c.innerText = e;
+    a.appendChild(h);
+    a.appendChild(c);
+    a.appendChild(m);
+    return a;
+  }
+  function Ih(a) {
     var c = I18n.translations[I18n.locale];
     switch(a) {
       case "red":
         var b, e, f;
         return null != (f = null == c ? void 0 : null == (b = c.segment) ? void 0 : null == (e = b.address) ? void 0 : e.none) ? f : a;
       case "toll":
-        var k, m, h, q;
-        return null != (q = null == c ? void 0 : null == (k = c.edit) ? void 0 : null == (m = k.segment) ? void 0 : null == (h = m.fields) ? void 0 : h.toll_road) ? q : a;
+        var h, m, g, q;
+        return null != (q = null == c ? void 0 : null == (h = c.edit) ? void 0 : null == (m = h.segment) ? void 0 : null == (g = m.fields) ? void 0 : g.toll_road) ? q : a;
       case "restriction":
         var u, p, y;
         return null != (y = null == c ? void 0 : null == (u = c.restrictions) ? void 0 : null == (p = u.modal_headers) ? void 0 : p.restriction_summary) ? y : a;
       case "dirty":
-        var v, g, C, F;
-        return null != (F = null == c ? void 0 : null == (v = c.edit) ? void 0 : null == (g = v.segment) ? void 0 : null == (C = g.fields) ? void 0 : C.unpaved) ? F : a;
+        var v, k, C, F;
+        return null != (F = null == c ? void 0 : null == (v = c.edit) ? void 0 : null == (k = v.segment) ? void 0 : null == (C = k.fields) ? void 0 : C.unpaved) ? F : a;
       case "closure":
         var D, t, G;
         return null != (G = null == c ? void 0 : null == (D = c.objects) ? void 0 : null == (t = D.roadClosure) ? void 0 : t.name) ? G : a;
@@ -790,29 +821,29 @@ Q("Object.values", function(l) {
   function P(a) {
     var c = a.f, b = void 0 === a.c ? !0 : a.c, e = void 0 === a.b ? !1 : a.b;
     a = document.createElement("h5");
-    a.innerText = Gh(c);
+    a.innerText = Ih(c);
     var f = document.createElement("input");
     f.id = "svl_streetColor_" + c;
     f.className = "prefElement form-control";
     f.style.width = "55pt";
     f.title = "Color";
     f.type = "color";
-    var k = document.createElement("div");
-    b && (b = document.createElement("input"), b.id = "svl_streetWidth_" + c, b.className = Number.isInteger(c) ? "form-control prefElement segmentsWidth" : "form-control prefElement", b.style.width = "40pt", b.title = "Width (disabled if using real-size width)", b.type = "number", b.min = 1, b.max = 20, k.appendChild(b));
-    e && (b = document.createElement("input"), b.id = "svl_streetOpacity_" + c, b.className = "form-control prefElement", b.style.width = "45pt", b.title = "Opacity", b.type = "number", b.min = 0, b.max = 100, b.step = 10, k.appendChild(b));
+    var h = document.createElement("div");
+    b && (b = document.createElement("input"), b.id = "svl_streetWidth_" + c, b.className = Number.isInteger(c) ? "form-control prefElement segmentsWidth" : "form-control prefElement", b.style.width = "40pt", b.title = "Width (disabled if using real-size width)", b.type = "number", b.min = 1, b.max = 20, h.appendChild(b));
+    e && (b = document.createElement("input"), b.id = "svl_streetOpacity_" + c, b.className = "form-control prefElement", b.style.width = "45pt", b.title = "Opacity", b.type = "number", b.min = 0, b.max = 100, b.step = 10, h.appendChild(b));
     b = document.createElement("select");
     b.className = "prefElement";
     b.title = "Stroke style";
     b.id = "svl_strokeDashstyle_" + c;
     b.innerHTML = '<option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option>';
     b.className = "form-control prefElement";
-    k.className = "expand";
-    k.appendChild(f);
-    k.appendChild(b);
+    h.className = "expand";
+    h.appendChild(f);
+    h.appendChild(b);
     c = document.createElement("div");
     c.className = "prefLineStreets";
     c.appendChild(a);
-    c.appendChild(k);
+    c.appendChild(h);
     return c;
   }
   function ta(a, c) {
@@ -834,18 +865,21 @@ Q("Object.values", function(l) {
     a.appendChild(f);
     return a;
   }
-  function Hh() {
+  function Jh() {
     return {streets:["red"], decorations:"lanes toll restriction closure headlights dirty nearbyHOV".split(" "), };
+  }
+  function Hh() {
+    for (var a = 0; a < d.streets.length; a += 1) {
+      d.streets[a] && (document.getElementById("svl_streetWidth_" + a).value = d.streets[a].strokeWidth, document.getElementById("svl_streetColor_" + a).value = d.streets[a].strokeColor, document.getElementById("svl_strokeDashstyle_" + a).value = d.streets[a].strokeDashstyle);
+    }
   }
   function ba() {
     document.getElementById("svl_saveNewPref").classList.add("disabled");
     document.getElementById("svl_rollbackButton").classList.add("disabled");
     document.getElementById("svl_saveNewPref").classList.remove("btn-primary");
     document.getElementById("sidepanel-svl").classList.remove("svl_unsaved");
-    for (var a = 0; a < d.streets.length; a += 1) {
-      d.streets[a] && (document.getElementById("svl_streetWidth_" + a).value = d.streets[a].strokeWidth, document.getElementById("svl_streetColor_" + a).value = d.streets[a].strokeColor, document.getElementById("svl_strokeDashstyle_" + a).value = d.streets[a].strokeDashstyle);
-    }
-    a = Hh();
+    Hh();
+    var a = Jh();
     a.streets.forEach(function(f) {
       "red" !== f && (document.getElementById("svl_streetWidth_" + f).value = d[f].strokeWidth);
       document.getElementById("svl_streetColor_" + f).value = d[f].strokeColor;
@@ -886,18 +920,18 @@ Q("Object.values", function(l) {
     document.querySelectorAll(".segmentsWidth").forEach(function(f) {
       f.disabled = d.realsize;
     });
-    c = (e = W.prefs.attributes.isImperial) ? "imperial" : "metric";
-    b = Object.keys(d.speeds[c]);
-    document.querySelectorAll(e ? ".svl_metric" : ".svl_imperial").forEach(function(f) {
+    a = (b = W.prefs.attributes.isImperial) ? "imperial" : "metric";
+    c = Object.keys(d.speeds[a]);
+    document.querySelectorAll(b ? ".svl_metric" : ".svl_imperial").forEach(function(f) {
       f.style.display = "none";
     });
-    document.querySelectorAll(".svl_" + c).forEach(function(f) {
+    document.querySelectorAll(".svl_" + a).forEach(function(f) {
       f.style.display = "block";
     });
-    for (e = 1; e < b.length + 1; e += 1) {
-      document.getElementById("svl_slValue_" + c + "_" + e).value = b[e - 1], document.getElementById("svl_slColor_" + c + "_" + e).value = d.speeds[c][b[e - 1]];
+    for (b = 1; b < c.length + 1; b += 1) {
+      document.getElementById("svl_slValue_" + a + "_" + b).value = c[b - 1], document.getElementById("svl_slColor_" + a + "_" + b).value = d.speeds[a][c[b - 1]];
     }
-    document.getElementById("svl_slColor_" + c + "_Default").value = d.speeds["default"];
+    document.getElementById("svl_slColor_" + a + "_Default").value = d.speeds["default"];
   }
   function L(a) {
     var c = a.id, b = a.title, e = a.description, f = a.g;
@@ -920,42 +954,42 @@ Q("Object.values", function(l) {
     return a;
   }
   function V(a) {
-    var c = a.id, b = a.title, e = a.description, f = a.min, k = a.max, m = a.step, h = a.g;
+    var c = a.id, b = a.title, e = a.description, f = a.min, h = a.max, m = a.step, g = a.g;
     a = document.createElement("div");
     a.className = "prefLineInteger";
-    "string" === typeof h && (a.classList.add("newOption"), a.dataset.version = h);
-    h = document.createElement("label");
-    h.innerText = b;
+    "string" === typeof g && (a.classList.add("newOption"), a.dataset.version = g);
+    g = document.createElement("label");
+    g.innerText = b;
     b = document.createElement("input");
     b.className = "prefElement form-control";
     b.title = "Insert a number";
     b.id = "svl_" + c;
     b.type = "number";
     b.min = f;
-    b.max = k;
+    b.max = h;
     b.step = m;
-    h.appendChild(b);
-    a.appendChild(h);
+    g.appendChild(b);
+    a.appendChild(g);
     e && (c = document.createElement("i"), c.innerText = e, a.appendChild(c));
     return a;
   }
   function ra(a) {
-    var c = a.id, b = a.title, e = a.description, f = a.min, k = a.max, m = a.step, h = a.g;
+    var c = a.id, b = a.title, e = a.description, f = a.min, h = a.max, m = a.step, g = a.g;
     a = document.createElement("div");
     a.className = "prefLineSlider";
-    "string" === typeof h && (a.classList.add("newOption"), a.dataset.version = h);
-    h = document.createElement("label");
-    h.innerText = b;
+    "string" === typeof g && (a.classList.add("newOption"), a.dataset.version = g);
+    g = document.createElement("label");
+    g.innerText = b;
     b = document.createElement("input");
     b.className = "prefElement form-control";
     b.title = "Pick a value using the slider";
     b.id = "svl_" + c;
     b.type = "range";
     b.min = f;
-    b.max = k;
+    b.max = h;
     b.step = m;
-    h.appendChild(b);
-    a.appendChild(h);
+    g.appendChild(b);
+    a.appendChild(g);
     e && (c = document.createElement("i"), c.innerText = e, a.appendChild(c));
     return a;
   }
@@ -967,9 +1001,9 @@ Q("Object.values", function(l) {
     b.appendChild(c);
     return b;
   }
-  function fi() {
+  function ii() {
     var a = document.createElement("style");
-    a.innerHTML = '\n        <style>\n        #sidepanel-svl details{margin-bottom:9pt;}\n        .svl_unsaved{background-color:#ffcc00}\n        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}\n        .prefLineCheckbox{width:100%; margin-bottom:1vh;}\n        .prefLineCheckbox label{display:block;width:100%}\n        .prefLineCheckbox input{float:right;}\n        .prefLineInteger{width:100%; margin-bottom:1vh;}\n        .prefLineInteger label{display:block;width:100%}\n        .prefLineInteger input{float:right;}\n        .prefLineSlider {width:100%; margin-bottom:1vh;}\n        .prefLineSlider label{display:block;width:100%}\n        .prefLineSlider input{float:right;}\n        .newOption::before {content:"New since v. " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}\n        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}\n        .svl_logo {width:130px; display:inline-block; float:right}\n        #sidepanel-svl h5{text-transform: capitalize;}\n        .svl_support-link{display:inline-block; width:100%; text-align:center;}\n        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }\n        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}\n        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>';
+    a.innerHTML = '\n        <style>\n        #sidepanel-svl details{margin-bottom:9pt;}\n        .svl_unsaved{background-color:#ffcc00}\n        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}\n        .prefLineSelect{width:100%; margin-bottom:1vh;}\n        .prefLineSelect label{display:block;width:100%}\n        .prefLineCheckbox{width:100%; margin-bottom:1vh;}\n        .prefLineCheckbox label{display:block;width:100%}\n        .prefLineCheckbox input{float:right;}\n        .prefLineInteger{width:100%; margin-bottom:1vh;}\n        .prefLineInteger label{display:block;width:100%}\n        .prefLineInteger input{float:right;}\n        .prefLineSlider {width:100%; margin-bottom:1vh;}\n        .prefLineSlider label{display:block;width:100%}\n        .prefLineSlider input{float:right;}\n        .newOption::before {content:"New since v. " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}\n        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}\n        .svl_logo {width:130px; display:inline-block; float:right}\n        #sidepanel-svl h5{text-transform: capitalize;}\n        .svl_support-link{display:inline-block; width:100%; text-align:center;}\n        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }\n        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}\n        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>';
     document.body.appendChild(a);
     a = document.createElement("div");
     var c = document.createElement("img");
@@ -984,7 +1018,7 @@ Q("Object.values", function(l) {
     c.innerText = "Street Vector Layer";
     a.appendChild(c);
     c = document.createElement("span");
-    c.innerText = "Version 5.0.7";
+    c.innerText = "Version 5.0.8";
     a.appendChild(c);
     c = document.createElement("a");
     c.innerText = "Something not working? Report it here.";
@@ -1016,17 +1050,18 @@ Q("Object.values", function(l) {
     f.appendChild(b);
     f.appendChild(e);
     a.appendChild(f);
-    var k = Y("Roads Properties", !0);
-    k.appendChild(L({id:"realsize", title:"Use real-life Width", description:"When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences", g:"5.0.0", }));
+    var h = Y("Roads Properties", !0);
+    h.appendChild(L({id:"realsize", title:"Use real-life Width", description:"When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences", g:"5.0.0", }));
+    h.appendChild(hi({id:"presets", title:"Road Themes", description:"Applies a predefined theme to your preferences", options:[{text:"", value:""}, {text:"SVL Standard", value:"svl_standard"}, {text:"WME Colors", value:"wme_colors"}, ], g:"5.0.7", }));
     for (c = 0; c < d.streets.length; c += 1) {
-      d.streets[c] && k.appendChild(P({f:c, c:!0, b:!1}));
+      d.streets[c] && h.appendChild(P({f:c, c:!0, b:!1}));
     }
     f = Y("Segments Decorations");
     e = Y("Rendering Parameters");
     b = Y("Performance Tuning");
     c = Y("Speed Limits");
-    Hh().streets.forEach(function(m) {
-      "red" !== m ? k.appendChild(P({f:m, c:!0, b:!1, })) : k.appendChild(P({f:m, c:!1, b:!1, }));
+    Jh().streets.forEach(function(m) {
+      "red" !== m ? h.appendChild(P({f:m, c:!0, b:!1, })) : h.appendChild(P({f:m, c:!1, b:!1, }));
     });
     f.appendChild(P({f:"lanes", c:!1, b:!0, }));
     f.appendChild(P({f:"toll", c:!1, b:!0, }));
@@ -1035,13 +1070,13 @@ Q("Object.values", function(l) {
     f.appendChild(P({f:"headlights", c:!1, b:!0, }));
     f.appendChild(P({f:"dirty", c:!1, b:!0, }));
     f.appendChild(P({f:"nearbyHOV", c:!1, b:!0, }));
-    k.appendChild(f);
-    k.appendChild(L({id:"showANs", title:"Show Alternative Names", description:"When enabled, at most 2 ANs that differ from the primary name are shown under the street name.", }));
-    a.appendChild(k);
+    h.appendChild(f);
+    h.appendChild(L({id:"showANs", title:"Show Alternative Names", description:"When enabled, at most 2 ANs that differ from the primary name are shown under the street name.", }));
+    a.appendChild(h);
     e.appendChild(V({id:"layerOpacity", title:"Layer Opacity", description:"10: almost invisible, 100: opaque.", min:10, max:100, step:5, g:"5.0.6", }));
     e.appendChild(L({id:"routingModeEnabled", title:"Enable Routing Mode", description:"When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.", }));
     e.appendChild(L({id:"showUnderGPSPoints", title:"GPS Layer above Roads", description:"When enabled, the GPS layer gets shown above the road layer.", }));
-    k.appendChild(ra({id:"labelOutlineWidth", title:"Labels Outline Width", description:"How much border should the labels have?", min:0, max:10, step:1, }));
+    h.appendChild(ra({id:"labelOutlineWidth", title:"Labels Outline Width", description:"How much border should the labels have?", min:0, max:10, step:1, }));
     e.appendChild(L({id:"disableRoadLayers", title:"Hide WME Road Layer", description:"When enabled, the WME standard road layer gets hidden automatically.", }));
     e.appendChild(L({id:"startDisabled", title:"SVL Initially Disabled", description:"When enabled, the SVL does not get enabled automatically.", }));
     e.appendChild(ra({id:"clutterConstant", title:"Street Names Density", description:"For an higher value, less elements will be shown.", min:1, max:20, step:1, }));
@@ -1077,7 +1112,7 @@ Q("Object.values", function(l) {
     c.appendChild(b);
     c.appendChild(L({id:"showDashedUnverifiedSL", title:"Show unverified Speed Limits with a dashed Line", description:"If the speed limit is not verified, it will be shown with a different style.", }));
     b = document.createElement("h6");
-    b.innerText = Gh("speed limit");
+    b.innerText = Ih("speed limit");
     c.appendChild(b);
     b = "metric";
     c.appendChild(ta("Default", !0));
@@ -1112,56 +1147,56 @@ Q("Object.values", function(l) {
     document.querySelectorAll(".prefElement").forEach(function(m) {
       m.addEventListener("change", Fh);
     });
-    document.getElementById("svl_saveNewPref").addEventListener("click", di);
-    document.getElementById("svl_rollbackButton").addEventListener("click", bi);
-    document.getElementById("svl_resetButton").addEventListener("click", ei);
+    document.getElementById("svl_saveNewPref").addEventListener("click", fi);
+    document.getElementById("svl_rollbackButton").addEventListener("click", di);
+    document.getElementById("svl_resetButton").addEventListener("click", gi);
     document.getElementById("svl_importButton").addEventListener("click", r);
-    document.getElementById("svl_exportButton").addEventListener("click", ci);
+    document.getElementById("svl_exportButton").addEventListener("click", ei);
   }
-  function Ih(a) {
+  function Kh(a) {
     E.destroyFeatures(E.getFeaturesByAttribute("myid", a), {silent:!0});
   }
-  function gi(a) {
+  function ji(a) {
     x("Removing " + a.length + " nodes");
     if (I.zoom <= d.useWMERoadLayerAtZoom) {
       x("Destroy all nodes"), E.destroyFeatures(E.features, {silent:!0});
     } else {
-      if (N || a.length > d.nodesThreshold) {
-        N || ua();
+      if (O || a.length > d.nodesThreshold) {
+        O || ua();
       } else {
         var c;
         for (c = 0; c < a.length; c += 1) {
-          Ih(a[c].attributes.id);
+          Kh(a[c].attributes.id);
         }
       }
     }
   }
   function Bh(a) {
     var c;
-    return 1 === (null == (c = a.segIDs) ? void 0 : c.length) ? hi : ii;
+    return 1 === (null == (c = a.segIDs) ? void 0 : c.length) ? ki : li;
   }
-  function ji(a) {
+  function mi(a) {
     x("Change nodes");
     a.forEach(function(c) {
       var b = c.attributes, e = E.getFeaturesByAttribute("myid", b.id)[0];
       e ? (e.style = Bh(b), e.move(new OpenLayers.LonLat(b.geometry.x, b.geometry.y))) : 0 < b.id && E.addFeatures([Ah(c)], {silent:!0});
     });
   }
-  function ki(a) {
+  function ni(a) {
     x("Node state deleted");
     for (var c = 0; c < a.length; c += 1) {
-      Ih(a[c].getID());
+      Kh(a[c].getID());
     }
   }
-  function li(a) {
+  function oi(a) {
     for (var c = 0; c < a.length; c += 1) {
       va(a[c].getID());
     }
   }
-  function Jh(a) {
+  function Lh(a) {
     x("Adding " + a.length + " nodes");
-    if (N || a.length > d.nodesThreshold) {
-      N || ua();
+    if (O || a.length > d.nodesThreshold) {
+      O || ua();
     } else {
       if (I.zoom <= d.useWMERoadLayerAtZoom) {
         x("Not adding them because of the zoom");
@@ -1177,40 +1212,40 @@ Q("Object.values", function(l) {
   function T(a) {
     return !a.svl;
   }
-  function Kh() {
+  function Mh() {
     x("updateStatusBasedOnZoom running");
     var a = !0;
-    N && (Object.keys(W.model.segments.objects).length < d.segmentsThreshold && Object.keys(W.model.nodes.objects).length < d.nodesThreshold ? (N = !1, M(1, !0), M(0, !1), X()) : console.warn("[SVL] Still too many elements to draw: Segments: " + Object.keys(W.model.segments.objects).length + "/" + d.segmentsThreshold + ", Nodes: " + Object.keys(W.model.nodes.objects).length + "/" + d.nodesThreshold + " - You can change these thresholds in the preference panel."));
+    O && (Object.keys(W.model.segments.objects).length < d.segmentsThreshold && Object.keys(W.model.nodes.objects).length < d.nodesThreshold ? (O = !1, M(1, !0), M(0, !1), X()) : console.warn("[SVL] Still too many elements to draw: Segments: " + Object.keys(W.model.segments.objects).length + "/" + d.segmentsThreshold + ", Nodes: " + Object.keys(W.model.nodes.objects).length + "/" + d.nodesThreshold + " - You can change these thresholds in the preference panel."));
     I.zoom <= d.useWMERoadLayerAtZoom ? (x("Road layer automatically enabled because of zoom out"), !0 === z.visibility && (wa = !0, M(0, !0), M(1, !1)), a = !1) : wa && (x("Re-enabling SVL after zoom in"), M(1, !0), M(0, !1), wa = !1);
     return a;
   }
-  function mi() {
-    clearTimeout(Lh);
+  function pi() {
+    clearTimeout(Nh);
     x("manageZoom clearing timer");
-    Lh = setTimeout(Kh, 800);
+    Nh = setTimeout(Mh, 800);
   }
   function ua() {
     console.warn("[SVL] Abort drawing, too many elements");
-    N = !0;
+    O = !0;
     M(0, !0);
     M(1, !1);
     l();
   }
   function Da(a) {
     x("Adding " + a.length + " segments");
-    if (N || a.length > d.segmentsThreshold) {
-      N || ua();
+    if (O || a.length > d.segmentsThreshold) {
+      O || ua();
     } else {
       if (I.zoom <= d.useWMERoadLayerAtZoom) {
         x("Not adding them because of the zoom");
       } else {
-        Mh();
+        Oh();
         var c = [];
         a.forEach(function(b) {
-          null !== b && (c = c.concat(Zh(b)));
+          null !== b && (c = c.concat(ai(b)));
         });
         0 < c.length ? (x(c.length + " features added to the street layer"), z.addFeatures(c, {silent:!0})) : console.warn("[SVL] no features drawn");
-        Nh();
+        Ph();
       }
     }
   }
@@ -1219,7 +1254,7 @@ Q("Object.values", function(l) {
     z.destroyFeatures(z.getFeaturesByAttribute("myId", a), {silent:!0});
     A.destroyFeatures(A.getFeaturesByAttribute("myId", a), {silent:!0});
   }
-  function ni(a) {
+  function qi(a) {
     x("Edit " + a.length + " segments");
     a.forEach(function(c) {
       var b = c.getOldID();
@@ -1228,27 +1263,27 @@ Q("Object.values", function(l) {
       "Delete" !== c.state && Da([c]);
     });
   }
-  function oi(a) {
+  function ri(a) {
     x("Removing " + a.length + " segments");
-    I.zoom <= d.useWMERoadLayerAtZoom ? (x("Destroy all segments and labels because of zoom out"), z.destroyFeatures(z.features, {silent:!0, }), A.destroyFeatures(A.features, {silent:!0})) : N || a.length > d.segmentsThreshold ? N || ua() : (Mh(), a.forEach(function(c) {
+    I.zoom <= d.useWMERoadLayerAtZoom ? (x("Destroy all segments and labels because of zoom out"), z.destroyFeatures(z.features, {silent:!0, }), A.destroyFeatures(A.features, {silent:!0})) : O || a.length > d.segmentsThreshold ? O || ua() : (Oh(), a.forEach(function(c) {
       va(c.attributes.id);
-    }), Nh());
+    }), Ph());
   }
-  function Oh(a) {
+  function Qh(a) {
     x("ManageVisibilityChanged", a);
     E.setVisibility(a.object.visibility);
     A.setVisibility(a.object.visibility);
-    a.object.visibility ? (x("enabled: registering events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded.push({context:z, callback:Da, svl:!0, }), a.objectschanged.push({context:z, callback:ni, svl:!0, }), a.objectsremoved.push({context:z, callback:oi, svl:!0, }), a["objects-state-deleted"].push({context:z, callback:li, svl:!0, })), x("SVL: Registering node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved.push({context:E, callback:gi, svl:!0, 
-    }), a.objectsadded.push({context:E, callback:Jh, svl:!0, }), a.objectschanged.push({context:E, callback:ji, svl:!0, }), a["objects-state-deleted"].push({context:E, callback:ki, svl:!0, })), !0 === Kh() && X()) : (x("disabled: unregistering events"), x("SVL: Removing segments events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a.objectsremoved = a.objectsremoved.filter(T), a["objects-state-deleted"] = 
+    a.object.visibility ? (x("enabled: registering events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded.push({context:z, callback:Da, svl:!0, }), a.objectschanged.push({context:z, callback:qi, svl:!0, }), a.objectsremoved.push({context:z, callback:ri, svl:!0, }), a["objects-state-deleted"].push({context:z, callback:oi, svl:!0, })), x("SVL: Registering node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved.push({context:E, callback:ji, svl:!0, 
+    }), a.objectsadded.push({context:E, callback:Lh, svl:!0, }), a.objectschanged.push({context:E, callback:mi, svl:!0, }), a["objects-state-deleted"].push({context:E, callback:ni, svl:!0, })), !0 === Mh() && X()) : (x("disabled: unregistering events"), x("SVL: Removing segments events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a.objectsremoved = a.objectsremoved.filter(T), a["objects-state-deleted"] = 
     a["objects-state-deleted"].filter(T)), x("SVL: Removing node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved = a.objectsremoved.filter(T), a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a["objects-state-deleted"] = a["objects-state-deleted"].filter(T)), l());
   }
-  function Ph(a) {
+  function Rh(a) {
     a = void 0 === a ? 1 : a;
-    30 < a ? console.error("SVL: could not initialize WazeWrap") : WazeWrap && WazeWrap.Ready && WazeWrap.Interface && WazeWrap.Alerts ? pi() : (console.log("SVL: WazeWrap not ready, retrying in 800ms"), setTimeout(function() {
-      Ph(a + 1);
+    30 < a ? console.error("SVL: could not initialize WazeWrap") : WazeWrap && WazeWrap.Ready && WazeWrap.Interface && WazeWrap.Alerts ? si() : (console.log("SVL: WazeWrap not ready, retrying in 800ms"), setTimeout(function() {
+      Rh(a + 1);
     }, 800));
   }
-  function pi() {
+  function si() {
     console.log("SVL: initializing WazeWrap");
     try {
       (new WazeWrap.Interface.Shortcut("SVLToggleLayer", "Toggle SVL", "svl", "Street Vector Layer", "A+l", function() {
@@ -1265,11 +1300,11 @@ Q("Object.values", function(l) {
       console.error("SVL: could not add layer checkbox");
     }
     d.startDisabled && M(1, !1);
-    fi();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.7", "<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n            <br>- 5.0.7: New options are highlighted in the preference panel\n            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n            <br>- 5.0.5: Added a global Layer Opacity setting\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME's strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes", 
+    ii();
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.8", "<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n            <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.\n            <br>- 5.0.7: New options are highlighted in the preference panel\n            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n            <br>- 5.0.5: Added a global Layer Opacity setting\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME's strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes", 
     "", GM_info.script.supportURL);
   }
-  function Qh(a) {
+  function Sh(a) {
     a = void 0 === a ? 0 : a;
     try {
       if (void 0 === W || void 0 === W.map || void 0 === W.model) {
@@ -1281,7 +1316,7 @@ Q("Object.values", function(l) {
         console.warn(e);
         console.warn("Could not initialize SVL correctly. Maybe the Waze model was not ready. Retrying in 500ms...");
         setTimeout(function() {
-          Qh(c);
+          Sh(c);
         }, 500);
         return;
       }
@@ -1295,12 +1330,12 @@ Q("Object.values", function(l) {
     !1 === Z() && w("info", "This is the first time that you run Street Vector Layer in this browser.\nSome info about it:\nBy default, use ALT+L to toggle the layer.\nYou can change the streets color, thickness and style using the panel on the left sidebar.\nYour preferences will be saved for the next time in your browser.\nThe other road layers will be automatically hidden (you can change this behaviour in the preference panel).\nHave fun and tell us on the Waze forum if you liked the script!");
     a = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var b = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.7", rendererOptions:{zIndexing:!0, }, });
+    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.8", rendererOptions:{zIndexing:!0, }, });
     z.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
-        var k = H();
-        2 > I.zoom || e.attributes.a && k || e.attributes.s && !k ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(z.renderer.extent) ? (z.renderer.featureDx = 0, f.pointerEvents = "none", k || !e.attributes.i && d.realsize && (f.strokeWidth /= I.resolution)) : f = {display:"none"};
+        var h = H();
+        2 > I.zoom || e.attributes.a && h || e.attributes.s && !h ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(z.renderer.extent) ? (z.renderer.featureDx = 0, f.pointerEvents = "none", h || !e.attributes.i && d.realsize && (f.strokeWidth /= I.resolution)) : f = {display:"none"};
         return z.renderer.drawGeometry(e.geometry, f, e.id);
       }
     };
@@ -1317,38 +1352,38 @@ Q("Object.values", function(l) {
     };
     A = new OpenLayers.Layer.Vector("Labels Vector", {uniqueName:"vectorLabels", styleMap:b, visibility:!d.startDisabled, });
     A.renderer.drawFeature = function(e, f) {
-      var k = I.zoom;
-      if (2 > k) {
+      var h = I.zoom;
+      if (2 > h) {
         return !1;
       }
       null == f && (f = e.style);
       if (e.geometry) {
         var m = H();
-        7 - e.attributes.v > k || e.attributes.a && m || e.attributes.s && !m ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(A.renderer.extent) ? (A.renderer.featureDx = 0, f.pointerEvents = "none", f.fontSize = m ? d.farZoomLabelSize : d.closeZoomLabelSize) : f = {display:"none"};
-        k = A.renderer.drawGeometry(e.geometry, f, e.id);
-        "none" !== f.display && f.label && !1 !== k ? (m = e.geometry.getCentroid(), A.renderer.drawText(e.id, f, m)) : A.renderer.removeText(e.id);
-        return k;
+        7 - e.attributes.v > h || e.attributes.a && m || e.attributes.s && !m ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(A.renderer.extent) ? (A.renderer.featureDx = 0, f.pointerEvents = "none", f.fontSize = m ? d.farZoomLabelSize : d.closeZoomLabelSize) : f = {display:"none"};
+        h = A.renderer.drawGeometry(e.geometry, f, e.id);
+        "none" !== f.display && f.label && !1 !== h ? (m = e.geometry.getCentroid(), A.renderer.drawText(e.id, f, m)) : A.renderer.removeText(e.id);
+        return h;
       }
     };
-    A.renderer.drawText = function(e, f, k) {
+    A.renderer.drawText = function(e, f, h) {
       var m = !!f.labelOutlineWidth;
       if (m) {
-        var h = OpenLayers.Util.extend({}, f);
-        h.fontColor = h.labelOutlineColor;
-        h.fontStrokeColor = h.labelOutlineColor;
-        h.fontStrokeWidth = f.labelOutlineWidth;
-        f.labelOutlineOpacity && (h.fontOpacity = f.labelOutlineOpacity);
-        delete h.labelOutlineWidth;
-        A.renderer.drawText(e, h, k);
+        var g = OpenLayers.Util.extend({}, f);
+        g.fontColor = g.labelOutlineColor;
+        g.fontStrokeColor = g.labelOutlineColor;
+        g.fontStrokeWidth = f.labelOutlineWidth;
+        f.labelOutlineOpacity && (g.fontOpacity = f.labelOutlineOpacity);
+        delete g.labelOutlineWidth;
+        A.renderer.drawText(e, g, h);
       }
       var q = A.renderer.getResolution();
-      h = (k.x - A.renderer.featureDx) / q + A.renderer.left;
-      var u = k.y / q - A.renderer.top;
+      g = (h.x - A.renderer.featureDx) / q + A.renderer.left;
+      var u = h.y / q - A.renderer.top;
       m = m ? A.renderer.LABEL_OUTLINE_SUFFIX : A.renderer.LABEL_ID_SUFFIX;
       q = A.renderer.nodeFactory(e + m, "text");
-      q.setAttributeNS(null, "x", h);
+      q.setAttributeNS(null, "x", g);
       q.setAttributeNS(null, "y", -u);
-      (f.angle || 0 === f.angle) && q.setAttributeNS(null, "transform", "rotate(" + f.angle + "," + h + "," + -u + ")");
+      (f.angle || 0 === f.angle) && q.setAttributeNS(null, "transform", "rotate(" + f.angle + "," + g + "," + -u + ")");
       f.fontFamily && q.setAttributeNS(null, "font-family", f.fontFamily);
       f.fontWeight && q.setAttributeNS(null, "font-weight", f.fontWeight);
       f.fontSize && q.setAttributeNS(null, "font-size", f.fontSize);
@@ -1369,16 +1404,16 @@ Q("Object.values", function(l) {
         q.removeChild(q.lastChild);
       }
       for (v = 0; v < y; v += 1) {
-        var g = A.renderer.nodeFactory(e + m + "_tspan_" + v, "tspan");
-        !0 === f.labelSelect && (g.C = e, g.D = k, g.F = k.B);
+        var k = A.renderer.nodeFactory(e + m + "_tspan_" + v, "tspan");
+        !0 === f.labelSelect && (k.C = e, k.D = h, k.F = h.B);
         if (!1 === OpenLayers.IS_GECKO) {
           var C = void 0;
-          g.setAttributeNS(null, "baseline-shift", null != (C = OpenLayers.Renderer.SVG.LABEL_VSHIFT[u[1]]) ? C : "-35%");
+          k.setAttributeNS(null, "baseline-shift", null != (C = OpenLayers.Renderer.SVG.LABEL_VSHIFT[u[1]]) ? C : "-35%");
         }
-        g.setAttribute("x", h);
-        0 === v ? (C = OpenLayers.Renderer.SVG.LABEL_VFACTOR[u[1]], null == C && (C = -.5), g.setAttribute("dy", C * (y - 1) + "em")) : g.setAttribute("dy", "1em");
-        g.textContent = "" === p[v] ? " " : p[v];
-        g.parentNode || q.appendChild(g);
+        k.setAttribute("x", g);
+        0 === v ? (C = OpenLayers.Renderer.SVG.LABEL_VFACTOR[u[1]], null == C && (C = -.5), k.setAttribute("dy", C * (y - 1) + "em")) : k.setAttribute("dy", "1em");
+        k.textContent = "" === p[v] ? " " : p[v];
+        k.parentNode || q.appendChild(k);
       }
       q.parentNode || A.renderer.textRoot.appendChild(q);
     };
@@ -1394,45 +1429,46 @@ Q("Object.values", function(l) {
     d.showUnderGPSPoints && Ch();
     Dh();
     Eh();
-    I.events.register("zoomend", null, mi, !0);
-    Ph();
+    I.events.register("zoomend", null, pi, !0);
+    Rh();
     I.zoom <= d.useWMERoadLayerAtZoom ? M(0, !0) : ca.getVisibility() && d.disableRoadLayers && (M(0, !1), console.log("SVL: WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel."));
-    z.events.register("visibilitychanged", z, Oh);
-    Oh({object:z, });
+    z.events.register("visibilitychanged", z, Qh);
+    Qh({object:z, });
     $(".olControlAttribution").click(function() {
       w("info", 'The preferences have been moved to the sidebar on the left. Please look for the "SVL \ud83d\uddfa\ufe0f" tab.');
     });
     a = W.prefs._events;
     "object" === typeof a && a["change:isImperial"].push({callback:X, });
-    console.log("[SVL] v. 5.0.7 initialized correctly.");
+    console.log("[SVL] v. 5.0.8 initialized correctly.");
   }
   function X() {
     x("DrawAllSegments");
     l();
     Da(Object.values(W.model.segments.objects));
-    Jh(Object.values(W.model.nodes.objects));
+    Lh(Object.values(W.model.nodes.objects));
   }
   function aa(a) {
+    N = [];
     for (var c = 0; c < a.streets.length; c += 1) {
       if (a.streets[c]) {
         var b = a.streets[c].strokeColor;
-        O[c] = {strokeColor:a.streets[c].strokeColor, strokeWidth:a.streets[c].strokeWidth, strokeDashstyle:a.streets[c].strokeDashstyle, outlineColor:127 > 0.299 * parseInt(b.substring(1, 3), 16) + 0.587 * parseInt(b.substring(3, 5), 16) + 0.114 * parseInt(b.substring(5, 7), 16) ? "#FFF" : "#000", };
+        N[c] = {strokeColor:a.streets[c].strokeColor, strokeWidth:a.streets[c].strokeWidth, strokeDashstyle:a.streets[c].strokeDashstyle, outlineColor:127 > 0.299 * parseInt(b.substring(1, 3), 16) + 0.587 * parseInt(b.substring(3, 5), 16) + 0.114 * parseInt(b.substring(5, 7), 16) ? "#FFF" : "#000", };
       }
     }
     vh = a.clutterConstant;
     z.setOpacity(d.layerOpacity);
     X();
   }
-  function Rh(a) {
+  function Th(a) {
     a = void 0 === a ? 0 : a;
     if (void 0 === W || void 0 === W.map) {
       console.log("SVL not ready to start, retrying in 600ms");
       var c = a + 1;
       20 > c ? setTimeout(function() {
-        Rh(c);
+        Th(c);
       }, 600) : w("error", "Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!");
     } else {
-      Qh();
+      Sh();
     }
   }
   var Ea = "true" === window.localStorage.getItem("svlDebugOn"), x = Ea ? function(a) {
@@ -1440,14 +1476,18 @@ Q("Object.values", function(l) {
       c[b] = arguments[b];
     }
     for (b = 0; b < c.length; b += 1) {
-      "string" === typeof c[b] ? console.log("[SVL] 5.0.7: " + c[b]) : console.dir(c[b]);
+      "string" === typeof c[b] ? console.log("[SVL] 5.0.8: " + c[b]) : console.dir(c[b]);
     }
   } : function() {
-  }, Mh = Ea ? console.group : function() {
-  }, Nh = Ea ? console.groupEnd : function() {
-  }, Ca = null, vh, O = [], z, E, A, N = !1, d, ca, wa, I, sa = {ROAD_LAYER:null, SVL_LAYER:null, }, Yh = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079".split(""), yh = {strokeColor:"#F53BFF", strokeWidth:3, strokeDashstyle:"solid", }, Aa = {strokeColor:"#111111", strokeWidth:1, strokeDashstyle:"dash", strokeOpacity:0.6, }, ii = {stroke:!1, fillColor:"#0015FF", fillOpacity:0.9, pointRadius:3, pointerEvents:"none", }, hi = {stroke:!1, fillColor:"#C31CFF", fillOpacity:0.9, pointRadius:3, 
-  pointerEvents:"none", }, $h = {graphicName:"x", strokeColor:"#f00", strokeWidth:1.5, fillColor:"#FFFF40", fillOpacity:0.7, pointRadius:7, pointerEvents:"none", }, ai = {stroke:!1, fillColor:"#000", fillOpacity:0.5, pointRadius:3.5, graphicZIndex:179, pointerEvents:"none", }, xh = {strokeColor:"#000", strokeDashstyle:"solid", }, zh = {strokeColor:"#C90", strokeDashstyle:"longdash", }, Ba = {strokeColor:"#fff", strokeOpacity:0.8, strokeDashstyle:"longdash", }, Ha = {1:5.0, 2:5.5, 3:22.5, 4:6.0, 5:2.0, 
-  6:10.0, 7:9.0, 8:4.0, 10:2.0, 15:8.0, 16:2.0, 17:5.0, 18:6.0, 19:5.0, 20:5.0, 22:3.0, }, Lh = null;
-  Rh();
+  }, Oh = Ea ? console.group : function() {
+  }, Ph = Ea ? console.groupEnd : function() {
+  }, Ca = null, vh, N = [], z, E, A, O = !1, d, ca, wa, I, sa = {ROAD_LAYER:null, SVL_LAYER:null, }, $h = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079".split(""), yh = {strokeColor:"#F53BFF", strokeWidth:3, strokeDashstyle:"solid", }, Aa = {strokeColor:"#111111", strokeWidth:1, strokeDashstyle:"dash", strokeOpacity:0.6, }, li = {stroke:!1, fillColor:"#0015FF", fillOpacity:0.9, pointRadius:3, pointerEvents:"none", }, ki = {stroke:!1, fillColor:"#C31CFF", fillOpacity:0.9, pointRadius:3, 
+  pointerEvents:"none", }, bi = {graphicName:"x", strokeColor:"#f00", strokeWidth:1.5, fillColor:"#FFFF40", fillOpacity:0.7, pointRadius:7, pointerEvents:"none", }, ci = {stroke:!1, fillColor:"#000", fillOpacity:0.5, pointRadius:3.5, graphicZIndex:179, pointerEvents:"none", }, xh = {strokeColor:"#000", strokeDashstyle:"solid", }, zh = {strokeColor:"#C90", strokeDashstyle:"longdash", }, Ba = {strokeColor:"#fff", strokeOpacity:0.8, strokeDashstyle:"longdash", }, Ha = {1:5.0, 2:5.5, 3:22.5, 4:6.0, 5:2.0, 
+  6:10.0, 7:9.0, 8:4.0, 10:2.0, 15:8.0, 16:2.0, 17:5.0, 18:6.0, 19:5.0, 20:5.0, 22:3.0, }, Gh = {svl_standard:{streets:[null, {strokeColor:"#FFFFFF", strokeWidth:10, strokeDashstyle:"solid", }, {strokeColor:"#CBA12E", strokeWidth:12, strokeDashstyle:"solid", }, {strokeColor:"#387FB8", strokeWidth:18, strokeDashstyle:"solid", }, {strokeColor:"#3FC91C", strokeWidth:11, strokeDashstyle:"solid", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#C13040", strokeWidth:16, 
+  strokeDashstyle:"solid", }, {strokeColor:"#ECE589", strokeWidth:14, strokeDashstyle:"solid", }, {strokeColor:"#82614A", strokeWidth:7, strokeDashstyle:"solid", }, null, {strokeColor:"#0000FF", strokeWidth:5, strokeDashstyle:"dash", }, null, null, null, null, {strokeColor:"#FF8000", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#B700FF", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#00FFB3", strokeWidth:7, strokeDashstyle:"solid", }, {strokeColor:"#FFFFFF", strokeWidth:8, 
+  strokeDashstyle:"dash", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#2282AB", strokeWidth:9, strokeDashstyle:"solid", }, null, {strokeColor:"#C6C7FF", strokeWidth:6, strokeDashstyle:"solid", }, ], }, wme_colors:{streets:[null, {strokeColor:"#FFFFDD", strokeWidth:10, strokeDashstyle:"solid", }, {strokeColor:"#FDFAA7", strokeWidth:12, strokeDashstyle:"solid", }, {strokeColor:"#6870C3", strokeWidth:18, strokeDashstyle:"solid", }, {strokeColor:"#B3BFB3", strokeWidth:11, 
+  strokeDashstyle:"solid", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#469FBB", strokeWidth:16, strokeDashstyle:"solid", }, {strokeColor:"#69BF88", strokeWidth:14, strokeDashstyle:"solid", }, {strokeColor:"#867342", strokeWidth:7, strokeDashstyle:"solid", }, null, {strokeColor:"#9A9A9A", strokeWidth:5, strokeDashstyle:"dash", }, null, null, null, null, {strokeColor:"#6FB6BE", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#9A9A9A", strokeWidth:5, 
+  strokeDashstyle:"dash", }, {strokeColor:"#BEBA6C", strokeWidth:7, strokeDashstyle:"solid", }, {strokeColor:"#D8D8F9", strokeWidth:8, strokeDashstyle:"dash", }, {strokeColor:"#222222", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#ABABAB", strokeWidth:9, strokeDashstyle:"solid", }, null, {strokeColor:"#64799A", strokeWidth:6, strokeDashstyle:"solid", }, ], }, }, Nh = null;
+  Th();
 })();
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.7
+// @version    5.0.8
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.7';
+  const SVL_VERSION = '5.0.8';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -47,7 +47,7 @@
 
   let clutterConstant;
 
-  const streetStyles = [];
+  let streetStyles = [];
   /** @type {OpenLayers.Layer.Vector} */
   let streetVectorLayer;
   /** @type {OpenLayers.Layer.Vector} */
@@ -277,6 +277,190 @@
     '22': 3.0, // "Alley"
     // "service": 21,
   };
+  const presets = {
+    'svl_standard': {
+      streets: [
+        null,
+        {
+          'strokeColor': '#FFFFFF',
+          'strokeWidth': 10,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#CBA12E',
+          'strokeWidth': 12,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#387FB8',
+          'strokeWidth': 18,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#3FC91C',
+          'strokeWidth': 11,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#00FF00',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#C13040',
+          'strokeWidth': 16,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#ECE589',
+          'strokeWidth': 14,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#82614A',
+          'strokeWidth': 7,
+          'strokeDashstyle': 'solid',
+        },
+        null,
+        {
+          'strokeColor': '#0000FF',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        null,
+        null,
+        null,
+        null,
+        {
+          'strokeColor': '#FF8000',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dashdot',
+        },
+        {
+          'strokeColor': '#B700FF',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#00FFB3',
+          'strokeWidth': 7,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#FFFFFF',
+          'strokeWidth': 8,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#00FF00',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dashdot',
+        },
+        {
+          'strokeColor': '#2282AB',
+          'strokeWidth': 9,
+          'strokeDashstyle': 'solid',
+        },
+        null,
+        {
+          'strokeColor': '#C6C7FF',
+          'strokeWidth': 6,
+          'strokeDashstyle': 'solid',
+        },
+      ],
+    },
+    'wme_colors': {
+      streets: [
+        null,
+        {
+          'strokeColor': '#FFFFDD',
+          'strokeWidth': 10,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#FDFAA7',
+          'strokeWidth': 12,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#6870C3',
+          'strokeWidth': 18,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#B3BFB3',
+          'strokeWidth': 11,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#00FF00',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#469FBB',
+          'strokeWidth': 16,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#69BF88',
+          'strokeWidth': 14,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#867342',
+          'strokeWidth': 7,
+          'strokeDashstyle': 'solid',
+        },
+        null,
+        {
+          'strokeColor': '#9A9A9A',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        null,
+        null,
+        null,
+        null,
+        {
+          'strokeColor': '#6FB6BE',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dashdot',
+        },
+        {
+          'strokeColor': '#9A9A9A',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#BEBA6C',
+          'strokeWidth': 7,
+          'strokeDashstyle': 'solid',
+        },
+        {
+          'strokeColor': '#D8D8F9',
+          'strokeWidth': 8,
+          'strokeDashstyle': 'dash',
+        },
+        {
+          'strokeColor': '#222222',
+          'strokeWidth': 5,
+          'strokeDashstyle': 'dashdot',
+        },
+        {
+          'strokeColor': '#ABABAB',
+          'strokeWidth': 9,
+          'strokeDashstyle': 'solid',
+        },
+        null,
+        {
+          'strokeColor': '#64799A',
+          'strokeWidth': 6,
+          'strokeDashstyle': 'solid',
+        },
+      ],
+    },
+  };
 
   function getWidth({ segmentWidth, roadType, twoWay }) {
     // If in close zoom and user enabled the realsize mode
@@ -385,7 +569,7 @@
     // Parking: 20
     preferences['streets'][20] = {
       'strokeColor':
-        loadedPreferences?.['streets'][20]?.['strokeColor'] ?? '#2282ab',
+        loadedPreferences?.['streets'][20]?.['strokeColor'] ?? '#2282AB',
       'strokeWidth': loadedPreferences?.['streets'][20]?.['strokeWidth'] ?? 9,
       'strokeDashstyle':
         loadedPreferences?.['streets'][20]?.['strokeDashstyle'] ?? 'solid',
@@ -1688,18 +1872,36 @@
     document.getElementById('svl_rollbackButton').classList.remove('disabled');
     document.getElementById('sidepanel-svl').classList.add('svl_unsaved');
     // $("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
-    for (let i = 0; i < preferences['streets'].length; i += 1) {
-      if (preferences['streets'][i]) {
-        preferences['streets'][i] = {};
-        preferences['streets'][i]['strokeColor'] = document.getElementById(
-          `svl_streetColor_${i}`
-        ).value;
-        preferences['streets'][i]['strokeWidth'] = document.getElementById(
-          `svl_streetWidth_${i}`
-        ).value;
-        preferences['streets'][i]['strokeDashstyle'] = document.querySelector(
-          `#svl_strokeDashstyle_${i} option:checked`
-        ).value;
+
+    const presetSelect = document.getElementById('svl_presets');
+    const presetValue = document.getElementById('svl_presets').value;
+    let presetApplied = false;
+    if (presetValue === 'wme_colors') {
+      presetApplied = true;
+      preferences['streets'] = presets[presetValue]['streets'];
+    }
+    if (presetValue === 'svl_standard') {
+      presetApplied = true;
+      preferences['streets'] = presets[presetValue]['streets'];
+    }
+    if (presetApplied) {
+      updateStreetsPreferenceValues();
+      presetSelect.value = '';
+      safeAlert('info', "Preset applied, don't forget to save your changes!");
+    } else {
+      for (let i = 0; i < preferences['streets'].length; i += 1) {
+        if (preferences['streets'][i]) {
+          preferences['streets'][i] = {};
+          preferences['streets'][i]['strokeColor'] = document.getElementById(
+            `svl_streetColor_${i}`
+          ).value;
+          preferences['streets'][i]['strokeWidth'] = document.getElementById(
+            `svl_streetWidth_${i}`
+          ).value;
+          preferences['streets'][i]['strokeDashstyle'] = document.querySelector(
+            `#svl_strokeDashstyle_${i} option:checked`
+          ).value;
+        }
       }
     }
 
@@ -1914,6 +2116,7 @@
       $('input.segmentsWidth').prop('disabled', false);
     }
 
+    console.dir(preferences);
     updateStylesFromPreferences(preferences);
     updateRefreshStatus();
   }
@@ -1942,6 +2145,36 @@
       'Yes, I want to reset',
       'Cancel'
     );
+  }
+
+  function createDropdownOption({ id, title, description, options, isNew }) {
+    const line = document.createElement('div');
+    line.className = 'prefLineSelect';
+    if (typeof isNew === 'string') {
+      line.classList.add('newOption');
+      line.dataset.version = isNew;
+    }
+
+    const newSelect = document.createElement('select');
+    newSelect.className = 'prefElement';
+
+    const label = document.createElement('label');
+    label.innerText = title;
+    newSelect.id = `svl_${id}`;
+    if (options && options.length > 0) {
+      options.forEach((o) => {
+        const option = document.createElement('option');
+        option.text = o.text;
+        option.value = o.value;
+        newSelect.add(option);
+      });
+    }
+    const i = document.createElement('i');
+    i.innerText = description;
+    line.appendChild(label);
+    line.appendChild(i);
+    line.appendChild(newSelect);
+    return line;
   }
 
   function createDashStyleDropdown(id) {
@@ -2103,15 +2336,7 @@
     };
   }
 
-  /**
-   * This function updates the values shown on the preference panel with the one saved in the preferences object.
-   *
-   */
-  function updatePreferenceValues() {
-    document.getElementById('svl_saveNewPref').classList.add('disabled');
-    document.getElementById('svl_rollbackButton').classList.add('disabled');
-    document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
-    document.getElementById('sidepanel-svl').classList.remove('svl_unsaved');
+  function updateStreetsPreferenceValues() {
     for (let i = 0; i < preferences['streets'].length; i += 1) {
       if (preferences['streets'][i]) {
         document.getElementById(`svl_streetWidth_${i}`).value =
@@ -2122,6 +2347,18 @@
           preferences['streets'][i]['strokeDashstyle'];
       }
     }
+  }
+
+  /**
+   * This function updates the values shown on the preference panel with the one saved in the preferences object.
+   *
+   */
+  function updatePreferenceValues() {
+    document.getElementById('svl_saveNewPref').classList.add('disabled');
+    document.getElementById('svl_rollbackButton').classList.add('disabled');
+    document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
+    document.getElementById('sidepanel-svl').classList.remove('svl_unsaved');
+    updateStreetsPreferenceValues();
 
     const options = getOptions();
     options['streets'].forEach((o) => {
@@ -2376,6 +2613,8 @@
         #sidepanel-svl details{margin-bottom:9pt;}
         .svl_unsaved{background-color:#ffcc00}
         .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
+        .prefLineSelect{width:100%; margin-bottom:1vh;}
+        .prefLineSelect label{display:block;width:100%}
         .prefLineCheckbox{width:100%; margin-bottom:1vh;}
         .prefLineCheckbox label{display:block;width:100%}
         .prefLineCheckbox input{float:right;}
@@ -2462,6 +2701,20 @@
         description:
           'When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences',
         isNew: '5.0.0',
+      })
+    );
+
+    streets.appendChild(
+      createDropdownOption({
+        id: 'presets',
+        title: 'Road Themes',
+        description: 'Applies a predefined theme to your preferences',
+        options: [
+          { 'text': '', 'value': '' },
+          { 'text': 'SVL Standard', 'value': 'svl_standard' },
+          { 'text': 'WME Colors', 'value': 'wme_colors' },
+        ],
+        isNew: '5.0.7',
       })
     );
 
@@ -3402,6 +3655,7 @@
       SVL_VERSION,
       `<b>Major update!</b>
             <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
+            <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
             <br>- 5.0.7: New options are highlighted in the preference panel
             <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
             <br>- 5.0.5: Added a global Layer Opacity setting
@@ -3883,6 +4137,7 @@
   }
 
   function updateStylesFromPreferences(pref) {
+    streetStyles = [];
     for (let i = 0; i < pref['streets'].length; i += 1) {
       if (pref['streets'][i]) {
         streetStyles[i] = {
