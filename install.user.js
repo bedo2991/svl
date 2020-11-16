@@ -1,24 +1,24 @@
-function xa(k) {
+function xa(l) {
   var n = 0;
   return function() {
-    return n < k.length ? {done:!1, value:k[n++], } : {done:!0};
+    return n < l.length ? {done:!1, value:l[n++], } : {done:!0};
   };
 }
-function Fa(k) {
-  var n = "undefined" != typeof Symbol && Symbol.iterator && k[Symbol.iterator];
-  return n ? n.call(k) : {next:xa(k)};
+function Fa(l) {
+  var n = "undefined" != typeof Symbol && Symbol.iterator && l[Symbol.iterator];
+  return n ? n.call(l) : {next:xa(l)};
 }
-var Ga = "function" == typeof Object.defineProperties ? Object.defineProperty : function(k, n, r) {
-  if (k == Array.prototype || k == Object.prototype) {
-    return k;
+var Ga = "function" == typeof Object.defineProperties ? Object.defineProperty : function(l, n, r) {
+  if (l == Array.prototype || l == Object.prototype) {
+    return l;
   }
-  k[n] = r.value;
-  return k;
+  l[n] = r.value;
+  return l;
 };
-function Sh(k) {
-  k = ["object" == typeof globalThis && globalThis, k, "object" == typeof window && window, "object" == typeof self && self, "object" == typeof global && global, ];
-  for (var n = 0; n < k.length; ++n) {
-    var r = k[n];
+function Sh(l) {
+  l = ["object" == typeof globalThis && globalThis, l, "object" == typeof window && window, "object" == typeof self && self, "object" == typeof global && global, ];
+  for (var n = 0; n < l.length; ++n) {
+    var r = l[n];
     if (r && r.Math == Math) {
       return r;
     }
@@ -26,26 +26,26 @@ function Sh(k) {
   throw Error("Cannot find global object");
 }
 var Th = Sh(this);
-function Q(k, n) {
+function Q(l, n) {
   if (n) {
     a: {
       var r = Th;
-      k = k.split(".");
-      for (var w = 0; w < k.length - 1; w++) {
-        var H = k[w];
+      l = l.split(".");
+      for (var w = 0; w < l.length - 1; w++) {
+        var H = l[w];
         if (!(H in r)) {
           break a;
         }
         r = r[H];
       }
-      k = k[k.length - 1];
-      w = r[k];
+      l = l[l.length - 1];
+      w = r[l];
       n = n(w);
-      n != w && null != n && Ga(r, k, {configurable:!0, writable:!0, value:n});
+      n != w && null != n && Ga(r, l, {configurable:!0, writable:!0, value:n});
     }
   }
 }
-Q("Symbol", function(k) {
+Q("Symbol", function(l) {
   function n(H) {
     if (this instanceof n) {
       throw new TypeError("Symbol is not a constructor");
@@ -53,44 +53,44 @@ Q("Symbol", function(k) {
     return new r("jscomp_symbol_" + (H || "") + "_" + w++, H);
   }
   function r(H, R) {
-    this.m = H;
+    this.o = H;
     Ga(this, "description", {configurable:!0, writable:!0, value:R});
   }
-  if (k) {
-    return k;
+  if (l) {
+    return l;
   }
   r.prototype.toString = function() {
-    return this.m;
+    return this.o;
   };
   var w = 0;
   return n;
 });
-Q("Symbol.iterator", function(k) {
-  if (k) {
-    return k;
+Q("Symbol.iterator", function(l) {
+  if (l) {
+    return l;
   }
-  k = Symbol("Symbol.iterator");
+  l = Symbol("Symbol.iterator");
   for (var n = "Array Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".split(" "), r = 0; r < n.length; r++) {
     var w = Th[n[r]];
-    "function" === typeof w && "function" != typeof w.prototype[k] && Ga(w.prototype, k, {configurable:!0, writable:!0, value:function() {
+    "function" === typeof w && "function" != typeof w.prototype[l] && Ga(w.prototype, l, {configurable:!0, writable:!0, value:function() {
       return Uh(xa(this));
     }});
   }
-  return k;
+  return l;
 });
-function Uh(k) {
-  k = {next:k};
-  k[Symbol.iterator] = function() {
+function Uh(l) {
+  l = {next:l};
+  l[Symbol.iterator] = function() {
     return this;
   };
-  return k;
+  return l;
 }
-function Vh(k, n) {
-  k instanceof String && (k += "");
+function Vh(l, n) {
+  l instanceof String && (l += "");
   var r = 0, w = !1, H = {next:function() {
-    if (!w && r < k.length) {
+    if (!w && r < l.length) {
       var R = r++;
-      return {value:n(R, k[R]), done:!1};
+      return {value:n(R, l[R]), done:!1};
     }
     w = !0;
     return {done:!0, value:void 0};
@@ -100,30 +100,30 @@ function Vh(k, n) {
   };
   return H;
 }
-Q("Array.prototype.keys", function(k) {
-  return k ? k : function() {
+Q("Array.prototype.keys", function(l) {
+  return l ? l : function() {
     return Vh(this, function(n) {
       return n;
     });
   };
 });
-Q("Number.isFinite", function(k) {
-  return k ? k : function(n) {
+Q("Number.isFinite", function(l) {
+  return l ? l : function(n) {
     return "number" !== typeof n ? !1 : !isNaN(n) && Infinity !== n && -Infinity !== n;
   };
 });
-Q("Number.isInteger", function(k) {
-  return k ? k : function(n) {
+Q("Number.isInteger", function(l) {
+  return l ? l : function(n) {
     return Number.isFinite(n) ? n === Math.floor(n) : !1;
   };
 });
-Q("Object.is", function(k) {
-  return k ? k : function(n, r) {
+Q("Object.is", function(l) {
+  return l ? l : function(n, r) {
     return n === r ? 0 !== n || 1 / n === 1 / r : n !== n && r !== r;
   };
 });
-Q("Array.prototype.includes", function(k) {
-  return k ? k : function(n, r) {
+Q("Array.prototype.includes", function(l) {
+  return l ? l : function(n, r) {
     var w = this;
     w instanceof String && (w = String(w));
     var H = w.length;
@@ -137,8 +137,8 @@ Q("Array.prototype.includes", function(k) {
     return !1;
   };
 });
-Q("String.prototype.includes", function(k) {
-  return k ? k : function(n, r) {
+Q("String.prototype.includes", function(l) {
+  return l ? l : function(n, r) {
     if (null == this) {
       throw new TypeError("The 'this' value for String.prototype.includes must not be null or undefined");
     }
@@ -148,8 +148,8 @@ Q("String.prototype.includes", function(k) {
     return -1 !== this.indexOf(n, r || 0);
   };
 });
-Q("Object.values", function(k) {
-  return k ? k : function(n) {
+Q("Object.values", function(l) {
+  return l ? l : function(n) {
     var r = [], w;
     for (w in n) {
       Object.prototype.hasOwnProperty.call(n, w) && r.push(n[w]);
@@ -158,7 +158,7 @@ Q("Object.values", function(k) {
   };
 });
 (function() {
-  function k() {
+  function l() {
     x("Destroy all features");
     z.destroyFeatures(z.features, {silent:!0, });
     A.destroyFeatures(A.features, {silent:!0});
@@ -200,7 +200,7 @@ Q("Object.values", function(k) {
   function ya(a, c) {
     c = void 0 === c ? !0 : c;
     x("savePreferences");
-    a.version = "5.0.6";
+    a.version = "5.0.7";
     try {
       window.localStorage.setItem("svl", JSON.stringify(a)), c || w("success", "Preferences saved!");
     } catch (b) {
@@ -208,8 +208,8 @@ Q("Object.values", function(k) {
     }
   }
   function Xh(a) {
-    var c = a.s, b = a.roadType;
-    a = a.v;
+    var c = a.u, b = a.roadType;
+    a = a.A;
     return d.realsize ? c ? a ? c : 0.6 * c : a ? Ha[b] : 0.6 * Ha[b] : parseInt(O[b].strokeWidth, 10);
   }
   function Z(a) {
@@ -223,10 +223,10 @@ Q("Object.values", function(k) {
     }
     null === b && (a ? x("Overwriting existing preferences") : (c = !1, x("Creating new preferences for the first time")));
     d = {autoReload:{}};
-    var f, h, m;
-    d.autoReload.interval = null != (m = null == (f = b) ? void 0 : null == (h = f.autoReload) ? void 0 : h.interval) ? m : 60000;
-    var l, q, u;
-    d.autoReload.enabled = null != (u = null == (l = b) ? void 0 : null == (q = l.autoReload) ? void 0 : q.enabled) ? u : !1;
+    var f, k, m;
+    d.autoReload.interval = null != (m = null == (f = b) ? void 0 : null == (k = f.autoReload) ? void 0 : k.interval) ? m : 60000;
+    var h, q, u;
+    d.autoReload.enabled = null != (u = null == (h = b) ? void 0 : null == (q = h.autoReload) ? void 0 : q.enabled) ? u : !1;
     var p, y;
     d.showSLSinglecolor = null != (y = null == (p = b) ? void 0 : p.showSLSinglecolor) ? y : !1;
     var v, g;
@@ -274,7 +274,7 @@ Q("Object.values", function(k) {
     var cb, db;
     d.renderGeomNodes = null != (db = null == (cb = b) ? void 0 : cb.renderGeomNodes) ? db : !1;
     var eb, fb;
-    d.layerOpacity = null != (fb = null == (eb = b) ? void 0 : eb.layerOpacity) ? fb : 0.9;
+    d.layerOpacity = null != (fb = null == (eb = b) ? void 0 : eb.layerOpacity) ? fb : 0.8;
     d.streets = [];
     var gb, hb, ib, jb, kb, lb, mb, nb, ob;
     d.streets[1] = {strokeColor:null != (mb = null == (gb = b) ? void 0 : null == (hb = gb.streets[1]) ? void 0 : hb.strokeColor) ? mb : "#FFFFFF", strokeWidth:null != (nb = null == (ib = b) ? void 0 : null == (jb = ib.streets[1]) ? void 0 : jb.strokeWidth) ? nb : 10, strokeDashstyle:null != (ob = null == (kb = b) ? void 0 : null == (lb = kb.streets[1]) ? void 0 : lb.strokeDashstyle) ? ob : "solid", };
@@ -437,21 +437,21 @@ Q("Object.values", function(k) {
   }
   function uh(a, c, b) {
     b = void 0 === b ? !1 : b;
-    var e, f, h = [];
+    var e, f, k = [];
     var m = null;
-    var l = a.getAttributes(), q = a.getAddress(), u = a.hasNonEmptyStreet();
-    if (null !== l.primaryStreetID && void 0 === q.attributes.state) {
-      x("Address not ready", q, l), setTimeout(function() {
+    var h = a.getAttributes(), q = a.getAddress(), u = a.hasNonEmptyStreet();
+    if (null !== h.primaryStreetID && void 0 === q.attributes.state) {
+      x("Address not ready", q, h), setTimeout(function() {
         uh(a, c, !0);
       }, 500);
     } else {
       var p = q.attributes;
       q = "";
-      u ? q = p.street.name : 10 > l.roadType && !a.isInRoundabout() && (q = "\u2691");
+      u ? q = p.street.name : 10 > h.roadType && !a.isInRoundabout() && (q = "\u2691");
       u = "";
       if (d.showANs) {
-        for (var y = 0, v = 0; v < l.streetIDs.length; v += 1) {
-          var g = l.streetIDs[v];
+        for (var y = 0, v = 0; v < h.streetIDs.length; v += 1) {
+          var g = h.streetIDs[v];
           if (2 === y) {
             u += " \u2026";
             break;
@@ -461,75 +461,75 @@ Q("Object.values", function(k) {
         u = u.replace(")(", ", ");
         "" !== u && (u = "\n" + u);
       }
-      O[l.roadType] || (q += "\n!! UNSUPPORTED ROAD TYPE !!");
+      O[h.roadType] || (q += "\n!! UNSUPPORTED ROAD TYPE !!");
       p = "";
-      (null != (e = l.fwdMaxSpeed) ? e : l.revMaxSpeed) && d.showSLtext && (l.fwdMaxSpeed === l.revMaxSpeed ? p = qa(l.fwdMaxSpeed) : l.fwdMaxSpeed ? (p = qa(l.fwdMaxSpeed), l.revMaxSpeed && (p += "'" + qa(l.revMaxSpeed))) : (p = qa(l.revMaxSpeed), l.fwdMaxSpeed && (p += "'" + qa(l.fwdMaxSpeed))), l.fwdMaxSpeedUnverified || l.revMaxSpeedUnverified) && (p += "?");
+      (null != (e = h.fwdMaxSpeed) ? e : h.revMaxSpeed) && d.showSLtext && (h.fwdMaxSpeed === h.revMaxSpeed ? p = qa(h.fwdMaxSpeed) : h.fwdMaxSpeed ? (p = qa(h.fwdMaxSpeed), h.revMaxSpeed && (p += "'" + qa(h.revMaxSpeed))) : (p = qa(h.revMaxSpeed), h.fwdMaxSpeed && (p += "'" + qa(h.fwdMaxSpeed))), h.fwdMaxSpeedUnverified || h.revMaxSpeedUnverified) && (p += "?");
       e = q + " " + p;
       if (" " === e) {
         return [];
       }
-      p = l.roadType;
-      p = new OpenLayers.Feature.Vector(c[0], {myId:l.id, color:O[p] ? O[p].strokeColor : "#f00", outlinecolor:O[p] ? O[p].outlineColor : "#fff", outlinewidth:d.labelOutlineWidth, });
+      p = h.roadType;
+      p = new OpenLayers.Feature.Vector(c[0], {myId:h.id, color:O[p] ? O[p].strokeColor : "#f00", outlinecolor:O[p] ? O[p].outlineColor : "#fff", outlinewidth:d.labelOutlineWidth, });
       y = [];
       for (v = 0; v < c.length - 1; v += 1) {
-        g = c[v].distanceTo(c[v + 1]), y.push({index:v, g:g});
+        g = c[v].distanceTo(c[v + 1]), y.push({index:v, h:g});
       }
       y.sort(function(G, K) {
-        return G.g > K.g ? -1 : G.g < K.g ? 1 : 0;
+        return G.h > K.h ? -1 : G.h < K.h ? 1 : 0;
       });
       v = "" === q ? 1 : y.length;
       g = vh * e.length;
-      for (var C = 0; C < y.length && 0 < v && !(y[C].g < (0 < C ? g : g - 30)); C += 1) {
+      for (var C = 0; C < y.length && 0 < v && !(y[C].h < (0 < C ? g : g - 30)); C += 1) {
         var F = y[C].index;
         var D = f = 0;
         D = c[F];
         var t = (new OpenLayers.Geometry.LineString([D, c[F + 1], ])).getCentroid(!0);
         m = p.clone();
         m.geometry = t;
-        l.fwdDirection ? (f = t.x - D.x, D = t.y - D.y) : (f = D.x - t.x, D = D.y - t.y);
+        h.fwdDirection ? (f = t.x - D.x, D = t.y - D.y) : (f = D.x - t.x, D = D.y - t.y);
         D = 90 + 180 * Math.atan2(f, D) / Math.PI;
         "" !== q ? (f = " \u25b6 ", 90 < D && 270 > D ? D -= 180 : f = " \u25c0 ") : f = "";
         a.isOneWay() || (f = "");
         m.attributes.label = f + e + f + u;
         m.attributes.angle = D;
         m.attributes.a = 1 === F % 2;
-        m.attributes.u = v;
+        m.attributes.v = v;
         --v;
-        h.push(m);
+        k.push(m);
       }
     }
-    b && m && A.addFeatures(h, {silent:!0});
-    return h;
+    b && m && A.addFeatures(k, {silent:!0});
+    return k;
   }
   function wh(a) {
-    var c = a.id, b = a.rev, e = a.j, f = a.l;
-    a = th(a.i, b ? f : e, b ? e : f);
+    var c = a.id, b = a.rev, e = a.l, f = a.m;
+    a = th(a.j, b ? f : e, b ? e : f);
     return new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(e.x + 10 * Math.sin(a), e.y + 10 * Math.cos(a)), {myId:c, }, {rotation:a, externalGraphic:"https://raw.githubusercontent.com/bedo2991/svl/master/average.png", graphicWidth:36, graphicHeight:36, graphicZIndex:300, fillOpacity:1, pointerEvents:"none", });
   }
   function Zh(a) {
     var c = a.getAttributes();
     x("Drawing segment: " + c.id);
-    var b = c.geometry.components, e = c.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, h = [], m = 100 * c.level, l = c.fwdDirection && c.revDirection, q = a.isInRoundabout(), u = !1, p = !1, y = c.roadType, v = Xh({s:c.width, roadType:y, v:l, });
-    l = v;
+    var b = c.geometry.components, e = c.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, k = [], m = 100 * c.level, h = c.fwdDirection && c.revDirection, q = a.isInRoundabout(), u = !1, p = !1, y = c.roadType, v = Xh({u:c.width, roadType:y, A:h, });
+    h = v;
     var g = null;
     if (null === c.primaryStreetID) {
-      return g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.red.strokeColor, width:v, dash:d.red.strokeDashstyle, }), h.push(g), h;
+      return g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.red.strokeColor, width:v, dash:d.red.strokeDashstyle, }), k.push(g), k;
     }
     d.routingModeEnabled && null !== c.routingRoadType && (y = c.routingRoadType);
     if (void 0 !== O[y]) {
       var C;
       p = null != (C = c.fwdMaxSpeed) ? C : c.revMaxSpeed;
-      0 < c.level && (u = !0, g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", zIndex:m + 100, width:v, }), h.push(g));
+      0 < c.level && (u = !0, g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", zIndex:m + 100, width:v, }), k.push(g));
       if ((p = p && d.showSLcolor) && u) {
-        l = 0.56 * v;
+        h = 0.56 * v;
       } else {
         if (u || p) {
-          l = 0.68 * v;
+          h = 0.68 * v;
         }
       }
       if (p) {
         if (C = d.showDashedUnverifiedSL && (c.fwdMaxSpeedUnverified || c.revMaxSpeedUnverified) ? "dash" : "solid", d.showSLSinglecolor || !c.fwdMaxSpeed && !c.revMaxSpeed || c.fwdMaxSpeed === c.revMaxSpeed || a.isOneWay()) {
-          p = c.fwdMaxSpeed, a.isOneWay() && c.revDirection && (p = c.revMaxSpeed), p && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:za(p), width:u ? 0.8 * v : v, dash:C, a:!0, zIndex:m + 115, }), h.push(g));
+          p = c.fwdMaxSpeed, a.isOneWay() && c.revDirection && (p = c.revMaxSpeed), p && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:za(p), width:u ? 0.8 * v : v, dash:C, a:!0, zIndex:m + 115, }), k.push(g));
         } else {
           p = [];
           for (var F = [], D = 0; D < e.length - 1; D += 1) {
@@ -559,59 +559,59 @@ Q("Object.values", function(k) {
                 F[1].move(-t / g, G / g * -t);
               }
             }
-            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(p), {myId:c.id, color:za(c.fwdMaxSpeed), width:l, dash:C, a:!0, zIndex:m + 105, });
-            h.push(g);
-            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(F), {myId:c.id, color:za(c.revMaxSpeed), width:l, dash:C, a:!0, zIndex:m + 110, });
-            h.push(g);
+            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(p), {myId:c.id, color:za(c.fwdMaxSpeed), width:h, dash:C, a:!0, zIndex:m + 105, });
+            k.push(g);
+            g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(F), {myId:c.id, color:za(c.revMaxSpeed), width:h, dash:C, a:!0, zIndex:m + 110, });
+            k.push(g);
           }
         }
       }
-      g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:O[y].strokeColor, width:l, dash:O[y].strokeDashstyle, zIndex:m + 120, });
-      h.push(g);
-      0 > c.level && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", width:l, opacity:0.3, zIndex:m + 125, }), h.push(g));
+      g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:O[y].strokeColor, width:h, dash:O[y].strokeDashstyle, zIndex:m + 120, });
+      k.push(g);
+      0 > c.level && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:"#000000", width:h, opacity:0.3, zIndex:m + 125, }), k.push(g));
       u = a.getLockRank() + 1;
       var J, B;
       if (u > d.fakelock || u > (null == (J = WazeWrap) ? void 0 : null == (B = J.User) ? void 0 : B.Rank())) {
-        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:xh.strokeColor, width:0.1 * l, dash:xh.strokeDashstyle, zIndex:m + 147, }), h.push(g);
+        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:xh.strokeColor, width:0.1 * h, dash:xh.strokeDashstyle, zIndex:m + 147, }), k.push(g);
       }
       J = a.getFlagAttributes();
-      J.unpaved && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.dirty.strokeColor, width:0.7 * l, opacity:d.dirty.strokeOpacity, dash:d.dirty.strokeDashstyle, zIndex:m + 135, }), h.push(g));
-      c.hasClosures && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.closure.strokeColor, width:0.6 * l, dash:d.closure.strokeDashstyle, opacity:d.closure.strokeOpacity, a:!0, zIndex:m + 140, }), h.push(g));
+      J.unpaved && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.dirty.strokeColor, width:0.7 * h, opacity:d.dirty.strokeOpacity, dash:d.dirty.strokeDashstyle, zIndex:m + 135, }), k.push(g));
+      c.hasClosures && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.closure.strokeColor, width:0.6 * h, dash:d.closure.strokeDashstyle, opacity:d.closure.strokeOpacity, a:!0, zIndex:m + 140, }), k.push(g));
       if (c.fwdToll || c.revToll || c.restrictions.some(function(U) {
         return "TOLL" === U.getDefaultType();
       })) {
-        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.toll.strokeColor, width:0.3 * l, dash:d.toll.strokeDashstyle, opacity:d.toll.strokeOpacity, zIndex:m + 145, }), h.push(g);
+        g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.toll.strokeColor, width:0.3 * h, dash:d.toll.strokeDashstyle, opacity:d.toll.strokeOpacity, zIndex:m + 145, }), k.push(g);
       }
-      q && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Aa.strokeColor, width:0.15 * l, dash:Aa.strokeDashstyle, opacity:Aa.strokeOpacity, a:!0, zIndex:m + 150, }), h.push(g));
-      0 < c.restrictions.length && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.restriction.strokeColor, width:0.4 * l, dash:d.restriction.strokeDashstyle, opacity:d.restriction.strokeOpacity, a:!0, zIndex:m + 155, }), h.push(g));
-      !1 === c.validated && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:yh.strokeColor, width:0.5 * l, dash:yh.strokeDashstyle, a:!0, zIndex:m + 160, }), h.push(g));
-      J.headlights && h.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.headlights.strokeColor, width:0.2 * l, dash:d.headlights.strokeDashstyle, opacity:d.headlights.strokeOpacity, a:!0, zIndex:m + 165, }));
-      J.nearbyHOV && h.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.nearbyHOV.strokeColor, width:0.25 * l, dash:d.nearbyHOV.strokeDashstyle, opacity:d.nearbyHOV.strokeOpacity, a:!0, zIndex:m + 166, }));
-      0 < c.fwdLaneCount && (B = e.slice(-2), B[0] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * l, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 170, }), h.push(g));
-      0 < c.revLaneCount && (B = e.slice(0, 2), B[1] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * l, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 175, }), h.push(g));
+      q && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Aa.strokeColor, width:0.15 * h, dash:Aa.strokeDashstyle, opacity:Aa.strokeOpacity, a:!0, zIndex:m + 150, }), k.push(g));
+      0 < c.restrictions.length && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.restriction.strokeColor, width:0.4 * h, dash:d.restriction.strokeDashstyle, opacity:d.restriction.strokeOpacity, a:!0, zIndex:m + 155, }), k.push(g));
+      !1 === c.validated && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:yh.strokeColor, width:0.5 * h, dash:yh.strokeDashstyle, a:!0, zIndex:m + 160, }), k.push(g));
+      J.headlights && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.headlights.strokeColor, width:0.2 * h, dash:d.headlights.strokeDashstyle, opacity:d.headlights.strokeOpacity, a:!0, zIndex:m + 165, }));
+      J.nearbyHOV && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:d.nearbyHOV.strokeColor, width:0.25 * h, dash:d.nearbyHOV.strokeDashstyle, opacity:d.nearbyHOV.strokeOpacity, a:!0, zIndex:m + 166, }));
+      0 < c.fwdLaneCount && (B = e.slice(-2), B[0] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * h, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 170, }), k.push(g));
+      0 < c.revLaneCount && (B = e.slice(0, 2), B[1] = (new OpenLayers.Geometry.LineString([B[0], B[1], ])).getCentroid(!0), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(B), {myId:c.id, color:d.lanes.strokeColor, width:0.3 * h, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:m + 175, }), k.push(g));
       if (!1 === c.fwdDirection || !1 === c.revDirection) {
         if (B = b, !q && c.length / b.length < d.arrowDeclutter && (B = f), !1 === (c.fwdDirection || c.revDirection)) {
           for (u = 0; u < B.length - 1; u += 1) {
-            h.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([B[u], B[u + 1], ])).getCentroid(!0), {myId:c.id, a:!0, h:!0, zIndex:m + 180, }, $h));
+            k.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([B[u], B[u + 1], ])).getCentroid(!0), {myId:c.id, a:!0, i:!0, zIndex:m + 180, }, $h));
           }
         } else {
           for (u = q ? 3 : 1, y = u - 1; y < B.length - 1; y += u) {
-            v = th(c.fwdDirection, B[y], B[y + 1]), C = new OpenLayers.Geometry.LineString([B[y], B[y + 1], ]), h.push(new OpenLayers.Feature.Vector(C.getCentroid(!0), {myId:c.id, a:!0, h:!0, }, {graphicName:"myTriangle", rotation:v, stroke:!0, strokeColor:"#000", graphiczIndex:m + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
+            v = th(c.fwdDirection, B[y], B[y + 1]), C = new OpenLayers.Geometry.LineString([B[y], B[y + 1], ]), k.push(new OpenLayers.Feature.Vector(C.getCentroid(!0), {myId:c.id, a:!0, i:!0, }, {graphicName:"myTriangle", rotation:v, stroke:!0, strokeColor:"#000", graphiczIndex:m + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
           }
         }
       }
-      J.fwdSpeedCamera && h.push(wh({id:c.id, rev:!1, i:c.fwdDirection, j:b[0], l:b[1], }));
-      J.revSpeedCamera && h.push(wh({id:c.id, rev:!0, i:c.fwdDirection, j:b[b.length - 1], l:b[b.length - 2], }));
+      J.fwdSpeedCamera && k.push(wh({id:c.id, rev:!1, j:c.fwdDirection, l:b[0], m:b[1], }));
+      J.revSpeedCamera && k.push(wh({id:c.id, rev:!0, j:c.fwdDirection, l:b[b.length - 1], m:b[b.length - 2], }));
       if (!0 === d.renderGeomNodes && !q) {
         for (q = 1; q < b.length - 2; q += 1) {
-          h.push(new OpenLayers.Feature.Vector(b[q], {myId:c.id, zIndex:m + 200, a:!0, h:!0, }, ai));
+          k.push(new OpenLayers.Feature.Vector(b[q], {myId:c.id, zIndex:m + 200, a:!0, i:!0, }, ai));
         }
       }
-      J.tunnel && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Ba.strokeColor, opacity:Ba.strokeOpacity, width:0.3 * l, dash:Ba.strokeDashstyle, zIndex:m + 177, }), h.push(g), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:zh.strokeColor, width:0.1 * l, dash:zh.strokeDashstyle, zIndex:m + 177, }), h.push(g));
+      J.tunnel && (g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:Ba.strokeColor, opacity:Ba.strokeOpacity, width:0.3 * h, dash:Ba.strokeDashstyle, zIndex:m + 177, }), k.push(g), g = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:c.id, color:zh.strokeColor, width:0.1 * h, dash:zh.strokeDashstyle, zIndex:m + 177, }), k.push(g));
     }
     a = uh(a, f);
     0 < a.length && A.addFeatures(a, {silent:!0});
-    return h;
+    return k;
   }
   function Ah(a) {
     a = a.getAttributes();
@@ -760,8 +760,8 @@ Q("Object.values", function(k) {
         var b, e, f;
         return null != (f = null == c ? void 0 : null == (b = c.segment) ? void 0 : null == (e = b.address) ? void 0 : e.none) ? f : a;
       case "toll":
-        var h, m, l, q;
-        return null != (q = null == c ? void 0 : null == (h = c.edit) ? void 0 : null == (m = h.segment) ? void 0 : null == (l = m.fields) ? void 0 : l.toll_road) ? q : a;
+        var k, m, h, q;
+        return null != (q = null == c ? void 0 : null == (k = c.edit) ? void 0 : null == (m = k.segment) ? void 0 : null == (h = m.fields) ? void 0 : h.toll_road) ? q : a;
       case "restriction":
         var u, p, y;
         return null != (y = null == c ? void 0 : null == (u = c.restrictions) ? void 0 : null == (p = u.modal_headers) ? void 0 : p.restriction_summary) ? y : a;
@@ -797,22 +797,22 @@ Q("Object.values", function(k) {
     f.style.width = "55pt";
     f.title = "Color";
     f.type = "color";
-    var h = document.createElement("div");
-    b && (b = document.createElement("input"), b.id = "svl_streetWidth_" + c, b.className = Number.isInteger(c) ? "form-control prefElement segmentsWidth" : "form-control prefElement", b.style.width = "40pt", b.title = "Width (disabled if using real-size width)", b.type = "number", b.min = 1, b.max = 20, h.appendChild(b));
-    e && (b = document.createElement("input"), b.id = "svl_streetOpacity_" + c, b.className = "form-control prefElement", b.style.width = "45pt", b.title = "Opacity", b.type = "number", b.min = 0, b.max = 100, b.step = 10, h.appendChild(b));
+    var k = document.createElement("div");
+    b && (b = document.createElement("input"), b.id = "svl_streetWidth_" + c, b.className = Number.isInteger(c) ? "form-control prefElement segmentsWidth" : "form-control prefElement", b.style.width = "40pt", b.title = "Width (disabled if using real-size width)", b.type = "number", b.min = 1, b.max = 20, k.appendChild(b));
+    e && (b = document.createElement("input"), b.id = "svl_streetOpacity_" + c, b.className = "form-control prefElement", b.style.width = "45pt", b.title = "Opacity", b.type = "number", b.min = 0, b.max = 100, b.step = 10, k.appendChild(b));
     b = document.createElement("select");
     b.className = "prefElement";
     b.title = "Stroke style";
     b.id = "svl_strokeDashstyle_" + c;
     b.innerHTML = '<option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option>';
     b.className = "form-control prefElement";
-    h.className = "expand";
-    h.appendChild(f);
-    h.appendChild(b);
+    k.className = "expand";
+    k.appendChild(f);
+    k.appendChild(b);
     c = document.createElement("div");
     c.className = "prefLineStreets";
     c.appendChild(a);
-    c.appendChild(h);
+    c.appendChild(k);
     return c;
   }
   function ta(a, c) {
@@ -900,11 +900,11 @@ Q("Object.values", function(k) {
     document.getElementById("svl_slColor_" + c + "_Default").value = d.speeds["default"];
   }
   function L(a) {
-    var c = a.id, b = a.title;
-    a = a.description;
-    var e = document.createElement("div");
-    e.className = "prefLineCheckbox";
-    var f = document.createElement("label");
+    var c = a.id, b = a.title, e = a.description, f = a.g;
+    a = document.createElement("div");
+    a.className = "prefLineCheckbox";
+    "string" === typeof f && (a.classList.add("newOption"), a.dataset.version = f);
+    f = document.createElement("label");
     f.innerText = b;
     b = document.createElement("input");
     b.className = "prefElement";
@@ -913,47 +913,49 @@ Q("Object.values", function(k) {
     b.type = "checkbox";
     b.checked = d[c];
     f.appendChild(b);
-    e.appendChild(f);
+    a.appendChild(f);
     c = document.createElement("i");
-    c.innerText = a;
-    e.appendChild(c);
-    return e;
+    c.innerText = e;
+    a.appendChild(c);
+    return a;
   }
   function V(a) {
-    var c = a.id, b = a.title, e = a.description, f = a.min, h = a.max, m = a.step;
+    var c = a.id, b = a.title, e = a.description, f = a.min, k = a.max, m = a.step, h = a.g;
     a = document.createElement("div");
     a.className = "prefLineInteger";
-    var l = document.createElement("label");
-    l.innerText = b;
+    "string" === typeof h && (a.classList.add("newOption"), a.dataset.version = h);
+    h = document.createElement("label");
+    h.innerText = b;
     b = document.createElement("input");
     b.className = "prefElement form-control";
     b.title = "Insert a number";
     b.id = "svl_" + c;
     b.type = "number";
     b.min = f;
-    b.max = h;
+    b.max = k;
     b.step = m;
-    l.appendChild(b);
-    a.appendChild(l);
+    h.appendChild(b);
+    a.appendChild(h);
     e && (c = document.createElement("i"), c.innerText = e, a.appendChild(c));
     return a;
   }
   function ra(a) {
-    var c = a.id, b = a.title, e = a.description, f = a.min, h = a.max, m = a.step;
+    var c = a.id, b = a.title, e = a.description, f = a.min, k = a.max, m = a.step, h = a.g;
     a = document.createElement("div");
     a.className = "prefLineSlider";
-    var l = document.createElement("label");
-    l.innerText = b;
+    "string" === typeof h && (a.classList.add("newOption"), a.dataset.version = h);
+    h = document.createElement("label");
+    h.innerText = b;
     b = document.createElement("input");
     b.className = "prefElement form-control";
     b.title = "Pick a value using the slider";
     b.id = "svl_" + c;
     b.type = "range";
     b.min = f;
-    b.max = h;
+    b.max = k;
     b.step = m;
-    l.appendChild(b);
-    a.appendChild(l);
+    h.appendChild(b);
+    a.appendChild(h);
     e && (c = document.createElement("i"), c.innerText = e, a.appendChild(c));
     return a;
   }
@@ -967,7 +969,7 @@ Q("Object.values", function(k) {
   }
   function fi() {
     var a = document.createElement("style");
-    a.innerHTML = "\n        <style>\n        #sidepanel-svl details{margin-bottom:9pt;}\n        .svl_unsaved{background-color:#ffcc00}\n        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}\n        .prefLineCheckbox{width:100%; margin-bottom:1vh;}\n        .prefLineCheckbox label{display:block;width:100%}\n        .prefLineCheckbox input{float:right;}\n        .prefLineInteger{width:100%; margin-bottom:1vh;}\n        .prefLineInteger label{display:block;width:100%}\n        .prefLineInteger input{float:right;}\n        .prefLineSlider {width:100%; margin-bottom:1vh;}\n        .prefLineSlider label{display:block;width:100%}\n        .prefLineSlider input{float:right;}\n        .svl_logo {width:130px; display:inline-block; float:right}\n        #sidepanel-svl h5{text-transform: capitalize;}\n        .svl_support-link{display:inline-block; width:100%; text-align:center;}\n        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }\n        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}\n        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>";
+    a.innerHTML = '\n        <style>\n        #sidepanel-svl details{margin-bottom:9pt;}\n        .svl_unsaved{background-color:#ffcc00}\n        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}\n        .prefLineCheckbox{width:100%; margin-bottom:1vh;}\n        .prefLineCheckbox label{display:block;width:100%}\n        .prefLineCheckbox input{float:right;}\n        .prefLineInteger{width:100%; margin-bottom:1vh;}\n        .prefLineInteger label{display:block;width:100%}\n        .prefLineInteger input{float:right;}\n        .prefLineSlider {width:100%; margin-bottom:1vh;}\n        .prefLineSlider label{display:block;width:100%}\n        .prefLineSlider input{float:right;}\n        .newOption::before {content:"New since v. " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}\n        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}\n        .svl_logo {width:130px; display:inline-block; float:right}\n        #sidepanel-svl h5{text-transform: capitalize;}\n        .svl_support-link{display:inline-block; width:100%; text-align:center;}\n        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }\n        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}\n        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>';
     document.body.appendChild(a);
     a = document.createElement("div");
     var c = document.createElement("img");
@@ -982,7 +984,7 @@ Q("Object.values", function(k) {
     c.innerText = "Street Vector Layer";
     a.appendChild(c);
     c = document.createElement("span");
-    c.innerText = "Version 5.0.6";
+    c.innerText = "Version 5.0.7";
     a.appendChild(c);
     c = document.createElement("a");
     c.innerText = "Something not working? Report it here.";
@@ -1014,17 +1016,17 @@ Q("Object.values", function(k) {
     f.appendChild(b);
     f.appendChild(e);
     a.appendChild(f);
-    var h = Y("Roads Properties", !0);
-    h.appendChild(L({id:"realsize", title:"Use real-life Width", description:"When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences", }));
+    var k = Y("Roads Properties", !0);
+    k.appendChild(L({id:"realsize", title:"Use real-life Width", description:"When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences", g:"5.0.0", }));
     for (c = 0; c < d.streets.length; c += 1) {
-      d.streets[c] && h.appendChild(P({f:c, c:!0, b:!1}));
+      d.streets[c] && k.appendChild(P({f:c, c:!0, b:!1}));
     }
     f = Y("Segments Decorations");
     e = Y("Rendering Parameters");
     b = Y("Performance Tuning");
     c = Y("Speed Limits");
     Hh().streets.forEach(function(m) {
-      "red" !== m ? h.appendChild(P({f:m, c:!0, b:!1, })) : h.appendChild(P({f:m, c:!1, b:!1, }));
+      "red" !== m ? k.appendChild(P({f:m, c:!0, b:!1, })) : k.appendChild(P({f:m, c:!1, b:!1, }));
     });
     f.appendChild(P({f:"lanes", c:!1, b:!0, }));
     f.appendChild(P({f:"toll", c:!1, b:!0, }));
@@ -1033,13 +1035,13 @@ Q("Object.values", function(k) {
     f.appendChild(P({f:"headlights", c:!1, b:!0, }));
     f.appendChild(P({f:"dirty", c:!1, b:!0, }));
     f.appendChild(P({f:"nearbyHOV", c:!1, b:!0, }));
-    h.appendChild(f);
-    h.appendChild(L({id:"showANs", title:"Show Alternative Names", description:"When enabled, at most 2 ANs that differ from the primary name are shown under the street name.", }));
-    a.appendChild(h);
-    e.appendChild(V({id:"layerOpacity", title:"Layer Opacity", description:"10: almost invisible, 100: opaque.", min:10, max:100, step:5, }));
+    k.appendChild(f);
+    k.appendChild(L({id:"showANs", title:"Show Alternative Names", description:"When enabled, at most 2 ANs that differ from the primary name are shown under the street name.", }));
+    a.appendChild(k);
+    e.appendChild(V({id:"layerOpacity", title:"Layer Opacity", description:"10: almost invisible, 100: opaque.", min:10, max:100, step:5, g:"5.0.6", }));
     e.appendChild(L({id:"routingModeEnabled", title:"Enable Routing Mode", description:"When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.", }));
     e.appendChild(L({id:"showUnderGPSPoints", title:"GPS Layer above Roads", description:"When enabled, the GPS layer gets shown above the road layer.", }));
-    h.appendChild(ra({id:"labelOutlineWidth", title:"Labels Outline Width", description:"How much border should the labels have?", min:0, max:10, step:1, }));
+    k.appendChild(ra({id:"labelOutlineWidth", title:"Labels Outline Width", description:"How much border should the labels have?", min:0, max:10, step:1, }));
     e.appendChild(L({id:"disableRoadLayers", title:"Hide WME Road Layer", description:"When enabled, the WME standard road layer gets hidden automatically.", }));
     e.appendChild(L({id:"startDisabled", title:"SVL Initially Disabled", description:"When enabled, the SVL does not get enabled automatically.", }));
     e.appendChild(ra({id:"clutterConstant", title:"Street Names Density", description:"For an higher value, less elements will be shown.", min:1, max:20, step:1, }));
@@ -1062,8 +1064,8 @@ Q("Object.values", function(k) {
     a.appendChild(e);
     b.appendChild(V({id:"useWMERoadLayerAtZoom", title:"Stop using SVL at zoom level", description:"When you reach this zoom level, the road layer gets automatically enabled.", min:0, max:5, step:1, }));
     b.appendChild(V({id:"switchZoom", title:"Close-zoom until level", description:"When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)", min:5, max:9, step:1, }));
-    b.appendChild(V({id:"segmentsThreshold", title:"Segments threshold", description:"When the WME wants to draw more than this amount of segments, switch to the road layer", min:1000, max:10000, step:100, }));
-    b.appendChild(V({id:"nodesThreshold", title:"Nodes threshold", description:"When the WME wants to draw more than this amount of nodes, switch to the road layer", min:1000, max:10000, step:100, }));
+    b.appendChild(V({id:"segmentsThreshold", title:"Segments threshold", description:"When the WME wants to draw more than this amount of segments, switch to the road layer", min:1000, max:10000, step:100, g:"5.0.4", }));
+    b.appendChild(V({id:"nodesThreshold", title:"Nodes threshold", description:"When the WME wants to draw more than this amount of nodes, switch to the road layer", min:1000, max:10000, step:100, g:"5.0.4", }));
     a.appendChild(b);
     c.appendChild(L({id:"showSLtext", title:"Show on the Street Name", description:"Show the speed limit as text at the end of the street name.", }));
     c.appendChild(L({id:"showSLcolor", title:"Show using colors", description:"Show the speed limit by coloring the segment's outline.", }));
@@ -1192,7 +1194,7 @@ Q("Object.values", function(k) {
     N = !0;
     M(0, !0);
     M(1, !1);
-    k();
+    l();
   }
   function Da(a) {
     x("Adding " + a.length + " segments");
@@ -1238,7 +1240,7 @@ Q("Object.values", function(k) {
     A.setVisibility(a.object.visibility);
     a.object.visibility ? (x("enabled: registering events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded.push({context:z, callback:Da, svl:!0, }), a.objectschanged.push({context:z, callback:ni, svl:!0, }), a.objectsremoved.push({context:z, callback:oi, svl:!0, }), a["objects-state-deleted"].push({context:z, callback:li, svl:!0, })), x("SVL: Registering node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved.push({context:E, callback:gi, svl:!0, 
     }), a.objectsadded.push({context:E, callback:Jh, svl:!0, }), a.objectschanged.push({context:E, callback:ji, svl:!0, }), a["objects-state-deleted"].push({context:E, callback:ki, svl:!0, })), !0 === Kh() && X()) : (x("disabled: unregistering events"), x("SVL: Removing segments events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a.objectsremoved = a.objectsremoved.filter(T), a["objects-state-deleted"] = 
-    a["objects-state-deleted"].filter(T)), x("SVL: Removing node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved = a.objectsremoved.filter(T), a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a["objects-state-deleted"] = a["objects-state-deleted"].filter(T)), k());
+    a["objects-state-deleted"].filter(T)), x("SVL: Removing node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved = a.objectsremoved.filter(T), a.objectsadded = a.objectsadded.filter(T), a.objectschanged = a.objectschanged.filter(T), a["objects-state-deleted"] = a["objects-state-deleted"].filter(T)), l());
   }
   function Ph(a) {
     a = void 0 === a ? 1 : a;
@@ -1264,7 +1266,7 @@ Q("Object.values", function(k) {
     }
     d.startDisabled && M(1, !1);
     fi();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.6", '<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n            <br>- 5.0.5: Added a global Layer Opacity setting\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME\'s strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes\n        <br>- The "Next to Carpool/HOV/bus lane" is also shown\n        <br>- Removed: the zoom-level indicator while editing the preferences\n        <br>- Bug fixes and new bugs :)', 
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.7", "<b>Major update!</b>\n            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)\n            <br>- 5.0.7: New options are highlighted in the preference panel\n            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n            <br>- 5.0.5: Added a global Layer Opacity setting\n        <br>From previous releases:\n        <br>- Rendering completely rewritten: performance improvements\n        <br>- The preference panel was redesigned and is now in the sidebar (SVL \ud83d\uddfa\ufe0f)\n        <br>- You can set what color to use for each speed limit (User request)\n        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)\n        <br>- Some options are now localised using WME's strings\n        <br>- Dead-end nodes are rendered with a different color\n        <br>- The Preference panel changes color when you have unsaved changes", 
     "", GM_info.script.supportURL);
   }
   function Qh(a) {
@@ -1293,12 +1295,12 @@ Q("Object.values", function(k) {
     !1 === Z() && w("info", "This is the first time that you run Street Vector Layer in this browser.\nSome info about it:\nBy default, use ALT+L to toggle the layer.\nYou can change the streets color, thickness and style using the panel on the left sidebar.\nYour preferences will be saved for the next time in your browser.\nThe other road layers will be automatically hidden (you can change this behaviour in the preference panel).\nHave fun and tell us on the Waze forum if you liked the script!");
     a = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var b = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.6", rendererOptions:{zIndexing:!0, }, });
+    z = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:"SVL v. 5.0.7", rendererOptions:{zIndexing:!0, }, });
     z.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
-        var h = H();
-        2 > I.zoom || e.attributes.a && h || e.attributes.o && !h ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(z.renderer.extent) ? (z.renderer.featureDx = 0, f.pointerEvents = "none", h || !e.attributes.h && d.realsize && (f.strokeWidth /= I.resolution)) : f = {display:"none"};
+        var k = H();
+        2 > I.zoom || e.attributes.a && k || e.attributes.s && !k ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(z.renderer.extent) ? (z.renderer.featureDx = 0, f.pointerEvents = "none", k || !e.attributes.i && d.realsize && (f.strokeWidth /= I.resolution)) : f = {display:"none"};
         return z.renderer.drawGeometry(e.geometry, f, e.id);
       }
     };
@@ -1315,38 +1317,38 @@ Q("Object.values", function(k) {
     };
     A = new OpenLayers.Layer.Vector("Labels Vector", {uniqueName:"vectorLabels", styleMap:b, visibility:!d.startDisabled, });
     A.renderer.drawFeature = function(e, f) {
-      var h = I.zoom;
-      if (2 > h) {
+      var k = I.zoom;
+      if (2 > k) {
         return !1;
       }
       null == f && (f = e.style);
       if (e.geometry) {
         var m = H();
-        7 - e.attributes.u > h || e.attributes.a && m || e.attributes.o && !m ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(A.renderer.extent) ? (A.renderer.featureDx = 0, f.pointerEvents = "none", f.fontSize = m ? d.farZoomLabelSize : d.closeZoomLabelSize) : f = {display:"none"};
-        h = A.renderer.drawGeometry(e.geometry, f, e.id);
-        "none" !== f.display && f.label && !1 !== h ? (m = e.geometry.getCentroid(), A.renderer.drawText(e.id, f, m)) : A.renderer.removeText(e.id);
-        return h;
+        7 - e.attributes.v > k || e.attributes.a && m || e.attributes.s && !m ? f = {display:"none"} : e.geometry.getBounds().intersectsBounds(A.renderer.extent) ? (A.renderer.featureDx = 0, f.pointerEvents = "none", f.fontSize = m ? d.farZoomLabelSize : d.closeZoomLabelSize) : f = {display:"none"};
+        k = A.renderer.drawGeometry(e.geometry, f, e.id);
+        "none" !== f.display && f.label && !1 !== k ? (m = e.geometry.getCentroid(), A.renderer.drawText(e.id, f, m)) : A.renderer.removeText(e.id);
+        return k;
       }
     };
-    A.renderer.drawText = function(e, f, h) {
+    A.renderer.drawText = function(e, f, k) {
       var m = !!f.labelOutlineWidth;
       if (m) {
-        var l = OpenLayers.Util.extend({}, f);
-        l.fontColor = l.labelOutlineColor;
-        l.fontStrokeColor = l.labelOutlineColor;
-        l.fontStrokeWidth = f.labelOutlineWidth;
-        f.labelOutlineOpacity && (l.fontOpacity = f.labelOutlineOpacity);
-        delete l.labelOutlineWidth;
-        A.renderer.drawText(e, l, h);
+        var h = OpenLayers.Util.extend({}, f);
+        h.fontColor = h.labelOutlineColor;
+        h.fontStrokeColor = h.labelOutlineColor;
+        h.fontStrokeWidth = f.labelOutlineWidth;
+        f.labelOutlineOpacity && (h.fontOpacity = f.labelOutlineOpacity);
+        delete h.labelOutlineWidth;
+        A.renderer.drawText(e, h, k);
       }
       var q = A.renderer.getResolution();
-      l = (h.x - A.renderer.featureDx) / q + A.renderer.left;
-      var u = h.y / q - A.renderer.top;
+      h = (k.x - A.renderer.featureDx) / q + A.renderer.left;
+      var u = k.y / q - A.renderer.top;
       m = m ? A.renderer.LABEL_OUTLINE_SUFFIX : A.renderer.LABEL_ID_SUFFIX;
       q = A.renderer.nodeFactory(e + m, "text");
-      q.setAttributeNS(null, "x", l);
+      q.setAttributeNS(null, "x", h);
       q.setAttributeNS(null, "y", -u);
-      (f.angle || 0 === f.angle) && q.setAttributeNS(null, "transform", "rotate(" + f.angle + "," + l + "," + -u + ")");
+      (f.angle || 0 === f.angle) && q.setAttributeNS(null, "transform", "rotate(" + f.angle + "," + h + "," + -u + ")");
       f.fontFamily && q.setAttributeNS(null, "font-family", f.fontFamily);
       f.fontWeight && q.setAttributeNS(null, "font-weight", f.fontWeight);
       f.fontSize && q.setAttributeNS(null, "font-size", f.fontSize);
@@ -1368,12 +1370,12 @@ Q("Object.values", function(k) {
       }
       for (v = 0; v < y; v += 1) {
         var g = A.renderer.nodeFactory(e + m + "_tspan_" + v, "tspan");
-        !0 === f.labelSelect && (g.B = e, g.C = h, g.D = h.A);
+        !0 === f.labelSelect && (g.C = e, g.D = k, g.F = k.B);
         if (!1 === OpenLayers.IS_GECKO) {
           var C = void 0;
           g.setAttributeNS(null, "baseline-shift", null != (C = OpenLayers.Renderer.SVG.LABEL_VSHIFT[u[1]]) ? C : "-35%");
         }
-        g.setAttribute("x", l);
+        g.setAttribute("x", h);
         0 === v ? (C = OpenLayers.Renderer.SVG.LABEL_VFACTOR[u[1]], null == C && (C = -.5), g.setAttribute("dy", C * (y - 1) + "em")) : g.setAttribute("dy", "1em");
         g.textContent = "" === p[v] ? " " : p[v];
         g.parentNode || q.appendChild(g);
@@ -1402,11 +1404,11 @@ Q("Object.values", function(k) {
     });
     a = W.prefs._events;
     "object" === typeof a && a["change:isImperial"].push({callback:X, });
-    console.log("[SVL] v. 5.0.6 initialized correctly.");
+    console.log("[SVL] v. 5.0.7 initialized correctly.");
   }
   function X() {
     x("DrawAllSegments");
-    k();
+    l();
     Da(Object.values(W.model.segments.objects));
     Jh(Object.values(W.model.nodes.objects));
   }
@@ -1438,7 +1440,7 @@ Q("Object.values", function(k) {
       c[b] = arguments[b];
     }
     for (b = 0; b < c.length; b += 1) {
-      "string" === typeof c[b] ? console.log("[SVL] 5.0.6: " + c[b]) : console.dir(c[b]);
+      "string" === typeof c[b] ? console.log("[SVL] 5.0.7: " + c[b]) : console.dir(c[b]);
     }
   } : function() {
   }, Mh = Ea ? console.group : function() {

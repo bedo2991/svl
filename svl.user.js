@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.6
+// @version    5.0.7
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.6';
+  const SVL_VERSION = '5.0.7';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -371,7 +371,7 @@
     preferences['renderGeomNodes'] =
       loadedPreferences?.['renderGeomNodes'] ?? false;
 
-    preferences['layerOpacity'] = loadedPreferences?.['layerOpacity'] ?? 0.9;
+    preferences['layerOpacity'] = loadedPreferences?.['layerOpacity'] ?? 0.8;
 
     preferences['streets'] = [];
     // Street: 1
@@ -2241,9 +2241,17 @@
       preferences['speeds']['default'];
   }
 
-  function createCheckboxOption({ id, title, description }) {
+  /**
+   *
+   * @param {{id:string,title:string,description:string,isNew:(string|undefined)}} param0
+   */
+  function createCheckboxOption({ id, title, description, isNew }) {
     const line = document.createElement('div');
     line.className = 'prefLineCheckbox';
+    if (typeof isNew === 'string') {
+      line.classList.add('newOption');
+      line.dataset.version = isNew;
+    }
     const label = document.createElement('label');
     label.innerText = title;
 
@@ -2264,9 +2272,25 @@
     return line;
   }
 
-  function createIntegerOption({ id, title, description, min, max, step }) {
+  /**
+   *
+   * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined)}} param0
+   */
+  function createIntegerOption({
+    id,
+    title,
+    description,
+    min,
+    max,
+    step,
+    isNew,
+  }) {
     const line = document.createElement('div');
     line.className = 'prefLineInteger';
+    if (typeof isNew === 'string') {
+      line.classList.add('newOption');
+      line.dataset.version = isNew;
+    }
     const label = document.createElement('label');
     label.innerText = title;
 
@@ -2292,9 +2316,25 @@
     return line;
   }
 
-  function createRangeOption({ id, title, description, min, max, step }) {
+  /**
+   *
+   * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined)}} param0
+   */
+  function createRangeOption({
+    id,
+    title,
+    description,
+    min,
+    max,
+    step,
+    isNew,
+  }) {
     const line = document.createElement('div');
     line.className = 'prefLineSlider';
+    if (typeof isNew === 'string') {
+      line.classList.add('newOption');
+      line.dataset.version = isNew;
+    }
     const label = document.createElement('label');
     label.innerText = title;
 
@@ -2345,6 +2385,8 @@
         .prefLineSlider {width:100%; margin-bottom:1vh;}
         .prefLineSlider label{display:block;width:100%}
         .prefLineSlider input{float:right;}
+        .newOption::before {content:"New since v. " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
+        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}
         .svl_logo {width:130px; display:inline-block; float:right}
         #sidepanel-svl h5{text-transform: capitalize;}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
@@ -2419,6 +2461,7 @@
         title: 'Use real-life Width',
         description:
           'When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences',
+        isNew: '5.0.0',
       })
     );
 
@@ -2544,6 +2587,7 @@
         min: 10,
         max: 100,
         step: 5,
+        isNew: '5.0.6',
       })
     );
 
@@ -2738,6 +2782,7 @@
         min: 1000,
         max: 10000,
         step: 100,
+        isNew: '5.0.4',
       })
     );
 
@@ -2750,6 +2795,7 @@
         min: 1000,
         max: 10000,
         step: 100,
+        isNew: '5.0.4',
       })
     );
     mainDiv.appendChild(performance);
@@ -3356,6 +3402,7 @@
       SVL_VERSION,
       `<b>Major update!</b>
             <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
+            <br>- 5.0.7: New options are highlighted in the preference panel
             <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
             <br>- 5.0.5: Added a global Layer Opacity setting
         <br>From previous releases:
@@ -3365,10 +3412,7 @@
         <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
         <br>- Some options are now localised using WME's strings
         <br>- Dead-end nodes are rendered with a different color
-        <br>- The Preference panel changes color when you have unsaved changes
-        <br>- The "Next to Carpool/HOV/bus lane" is also shown
-        <br>- Removed: the zoom-level indicator while editing the preferences
-        <br>- Bug fixes and new bugs :)`,
+        <br>- The Preference panel changes color when you have unsaved changes`,
       '',
       GM_info.script.supportURL
     );
