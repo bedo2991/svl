@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.8
+// @version    5.0.9
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.8';
+  const SVL_VERSION = '5.0.9';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -543,13 +543,19 @@
 
     preferences['segmentsThreshold'] =
       loadedPreferences?.['segmentsThreshold'] ?? 3000;
+
     preferences['nodesThreshold'] =
       loadedPreferences?.['nodesThreshold'] ?? 4000;
 
     preferences['showUnderGPSPoints'] =
       loadedPreferences?.['showUnderGPSPoints'] ?? false;
+
     preferences['routingModeEnabled'] =
       loadedPreferences?.['routingModeEnabled'] ?? false;
+
+    preferences['hideRoutingModeBlock'] =
+      loadedPreferences?.['hideRoutingModeBlock'] ?? false;
+
     preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
     preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
     preferences['renderGeomNodes'] =
@@ -704,7 +710,7 @@
       'strokeColor': loadedPreferences?.['lanes']?.['strokeColor'] ?? '#454443',
       'strokeDashstyle':
         loadedPreferences?.['lanes']?.['strokeDashstyle'] ?? 'dash',
-      'strokeOpacity': loadPreferences?.['lanes']?.['strokeOpacity'] ?? 0.9,
+      'strokeOpacity': loadedPreferences?.['lanes']?.['strokeOpacity'] ?? 0.9,
     };
     preferences['toll'] = {
       'strokeColor': loadedPreferences?.['toll']?.['strokeColor'] ?? '#00E1FF',
@@ -1827,15 +1833,46 @@
     }
   }
 
+  /**
+   *
+   * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
+   */
+  function createInput({ id, type, className, title, min, max, step }) {
+    const input = document.createElement('input');
+    input.id = 'svl_' + id;
+    if (className) {
+      input.className = className;
+    }
+    if (title) {
+      input.title = title;
+    }
+    input.type = type;
+    if (type === 'range' || type === 'number') {
+      input.min = min;
+      input.max = max;
+      input.step = step;
+    }
+    return input;
+  }
+
   function updateRoutingModePanel() {
-    let routingModeDiv;
-    if (preferences['routingModeEnabled']) {
+    const ID = 'svl_routingModeDiv';
+    const div = document.getElementById(ID);
+    if (
+      preferences['routingModeEnabled'] &&
+      preferences['hideRoutingModeBlock'] !== true
+    ) {
+      if (div !== null) {
+        //The panel already exists
+        return;
+      }
       // Show the routing panel
+      let routingModeDiv;
       routingModeDiv = document.createElement('div');
-      routingModeDiv.id = 'routingModeDiv';
+      routingModeDiv.id = ID;
       routingModeDiv.className = 'routingDiv';
       routingModeDiv.innerHTML =
-        'Routing Mode<br><small>Hover to temporary disable it<small>';
+        "SVL's Routing Mode<br><small>Hover to temporary disable it<small>";
       routingModeDiv.addEventListener('mouseenter', () => {
         // Temporary disable routing mode
         preferences['routingModeEnabled'] = false;
@@ -1851,7 +1888,7 @@
       document.getElementById('map').appendChild(routingModeDiv);
     } else {
       // Remove the routing panel
-      document.getElementById('routingModeDiv')?.remove(); // jshint ignore:line
+      div?.remove();
     }
   }
 
@@ -2086,21 +2123,16 @@
       ).checked;
     }
 
-    // Check if routing mode has been toggled
-    if (
-      preferences['routingModeEnabled'] !==
-      document.getElementById('svl_routingModeEnabled').checked
-    ) {
-      // This value has been updated, change the layer positions.
-      preferences['routingModeEnabled'] = document.getElementById(
-        'svl_routingModeEnabled'
-      ).checked;
-      updateRoutingModePanel();
-    } else {
-      preferences['routingModeEnabled'] = document.getElementById(
-        'svl_routingModeEnabled'
-      ).checked;
-    }
+    // Routing mode
+    preferences['routingModeEnabled'] = document.getElementById(
+      'svl_routingModeEnabled'
+    ).checked;
+
+    preferences['hideRoutingModeBlock'] = document.getElementById(
+      'svl_hideRoutingModeBlock'
+    ).checked;
+    updateRoutingModePanel();
+    // End: Routing mode
 
     preferences['useWMERoadLayerAtZoom'] = document.getElementById(
       'svl_useWMERoadLayerAtZoom'
@@ -2116,7 +2148,7 @@
       $('input.segmentsWidth').prop('disabled', false);
     }
 
-    console.dir(preferences);
+    //console.dir(preferences);
     updateStylesFromPreferences(preferences);
     updateRefreshStatus();
   }
@@ -2225,39 +2257,42 @@
     const title = document.createElement('h5');
     title.innerText = getLocalisedString(i);
 
-    const color = document.createElement('input');
-    color.id = `svl_streetColor_${i}`;
-    color.className = 'prefElement form-control';
+    const color = createInput({
+      id: `streetColor_${i}`,
+      className: 'prefElement form-control',
+      title: 'Color',
+      type: 'color',
+    });
     color.style['width'] = '55pt';
-    color.title = 'Color';
-    color.type = 'color';
 
     const inputs = document.createElement('div');
 
     if (showWidth) {
-      const width = document.createElement('input');
-      width.id = `svl_streetWidth_${i}`;
-      width.className = Number.isInteger(i)
-        ? 'form-control prefElement segmentsWidth'
-        : 'form-control prefElement';
+      const width = createInput({
+        id: `streetWidth_${i}`,
+        type: 'number',
+        title: 'Width (disabled if using real-size width)',
+        className: Number.isInteger(i)
+          ? 'form-control prefElement segmentsWidth'
+          : 'form-control prefElement',
+        min: 1,
+        max: 20,
+        step: 1,
+      });
       width.style['width'] = '40pt';
-      width.title = 'Width (disabled if using real-size width)';
-      width.type = 'number';
-      width.min = 1;
-      width.max = 20;
       inputs.appendChild(width);
     }
 
     if (showOpacity) {
-      const opacity = document.createElement('input');
-      opacity.id = `svl_streetOpacity_${i}`;
-      opacity.className = 'form-control prefElement';
+      const opacity = createInput({
+        id: `streetOpacity_${i}`,
+        className: 'form-control prefElement',
+        type: 'number',
+        min: 0,
+        max: 100,
+        step: 10,
+      });
       opacity.style['width'] = '45pt';
-      opacity.title = 'Opacity';
-      opacity.type = 'number';
-      opacity.min = 0;
-      opacity.max = 100;
-      opacity.step = 10;
       inputs.appendChild(opacity);
     }
 
@@ -2288,14 +2323,16 @@
     inputs.appendChild(label);
 
     if (typeof i === 'number') {
-      const slValue = document.createElement('input');
-      slValue.id = `svl_slValue_${type}_${i}`;
-      slValue.className = 'form-control prefElement';
+      const slValue = createInput({
+        id: `slValue_${type}_${i}`,
+        className: 'form-control prefElement',
+        title: 'Speed Limit Value',
+        type: 'number',
+        min: 0,
+        max: 150,
+        step: 1,
+      });
       slValue.style['width'] = '50pt';
-      slValue.title = 'Speed Limit Value';
-      slValue.type = 'number';
-      slValue.min = 0;
-      slValue.max = 150;
       inputs.appendChild(slValue);
 
       const span = document.createElement('span');
@@ -2303,15 +2340,15 @@
       inputs.appendChild(span);
     }
 
-    const color = document.createElement('input');
-    color.id = `svl_slColor_${type}_${i}`;
-    color.className = 'prefElement form-control';
+    const color = createInput({
+      id: `slColor_${type}_${i}`,
+      className: 'prefElement form-control',
+      type: 'color',
+      title: 'Color',
+    });
     color.style['width'] = '55pt';
-    color.title = 'Color';
-    color.type = 'color';
 
     inputs.className = 'expand';
-
     inputs.appendChild(color);
 
     const line = document.createElement('div');
@@ -2432,6 +2469,8 @@
       preferences['showUnderGPSPoints'];
     document.getElementById('svl_routingModeEnabled').checked =
       preferences['routingModeEnabled'];
+    document.getElementById('svl_hideRoutingModeBlock').checked =
+      preferences['hideRoutingModeBlock'];
     document.getElementById('svl_showANs').checked = preferences['showANs'];
 
     document.getElementById('svl_layerOpacity').value =
@@ -2492,12 +2531,12 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement';
-    input.title = 'True or False';
-    input.id = `svl_${id}`;
-    input.type = 'checkbox';
-    input.checked = preferences[id];
+    const input = createInput({
+      id,
+      className: 'prefElement',
+      type: 'checkbox',
+      title: 'True or False',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2531,15 +2570,15 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement form-control';
-    input.title = 'Insert a number';
-    input.id = `svl_${id}`;
-    input.type = 'number';
-
-    input.min = min;
-    input.max = max;
-    input.step = step;
+    const input = createInput({
+      id,
+      min,
+      max,
+      step,
+      type: 'number',
+      title: 'Insert a number',
+      className: 'prefElement form-control',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2575,15 +2614,15 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement form-control';
-    input.title = 'Pick a value using the slider';
-    input.id = `svl_${id}`;
-    input.type = 'range';
-
-    input.min = min;
-    input.max = max;
-    input.step = step;
+    const input = createInput({
+      id,
+      min,
+      max,
+      step,
+      title: 'Pick a value using the slider',
+      className: 'prefElement form-control',
+      type: 'range',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2630,7 +2669,8 @@
         #sidepanel-svl h5{text-transform: capitalize;}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
-        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}
+        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
+        .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>`;
 
     document.body.appendChild(style);
@@ -2714,7 +2754,7 @@
           { 'text': 'SVL Standard', 'value': 'svl_standard' },
           { 'text': 'WME Colors', 'value': 'wme_colors' },
         ],
-        isNew: '5.0.7',
+        isNew: '5.0.8',
       })
     );
 
@@ -2850,6 +2890,16 @@
         title: 'Enable Routing Mode',
         description:
           'When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.',
+      })
+    );
+
+    renderingParameters.appendChild(
+      createCheckboxOption({
+        id: 'hideRoutingModeBlock',
+        title: 'Hide the Routing Mode Panel',
+        description:
+          'When enabled, the overlay to temporarily disable the routing mode is not shown.',
+        isNew: '5.0.9',
       })
     );
 
@@ -3093,10 +3143,11 @@
       })
     );
 
-    const colorPicker = document.createElement('input');
-    colorPicker.type = 'color';
-    colorPicker.className = 'prefElement form-control';
-    colorPicker.id = 'svl_SLColor';
+    const colorPicker = createInput({
+      id: 'SLColor',
+      type: 'color',
+      className: 'prefElement form-control',
+    });
     speedLimits.appendChild(colorPicker);
 
     speedLimits.appendChild(
@@ -3653,20 +3704,12 @@
     WazeWrap.Interface.ShowScriptUpdate(
       'Street Vector Layer',
       SVL_VERSION,
-      `<b>Major update!</b>
-            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
-            <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
-            <br>- 5.0.7: New options are highlighted in the preference panel
-            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
-            <br>- 5.0.5: Added a global Layer Opacity setting
-        <br>From previous releases:
-        <br>- Rendering completely rewritten: performance improvements
-        <br>- The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
-        <br>- You can set what color to use for each speed limit (User request)
-        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
-        <br>- Some options are now localised using WME's strings
-        <br>- Dead-end nodes are rendered with a different color
-        <br>- The Preference panel changes color when you have unsaved changes`,
+      `<b>What's new?</b>
+      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes
+      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
+      <br>- 5.0.7: New options are highlighted in the preference panel
+      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
+      <br>- 5.0.5: Added a global Layer Opacity setting`,
       '',
       GM_info.script.supportURL
     );
@@ -3976,21 +4019,6 @@
         label.setAttributeNS(null, 'stroke-width', style['fontStrokeWidth']);
       }
 
-      /*
-            if (style['fontOpacity']) {
-                label.setAttributeNS(null, "opacity", style['fontOpacity']);
-            }
-
-            if (style['fontStyle']) {
-                label.setAttributeNS(null, "font-style", style['fontStyle']);
-            }
-            if (style['labelSelect'] === true) {
-                label.setAttributeNS(null, "pointer-events", "visible");
-                label._featureId = featureId;
-            } else {
-                label.setAttributeNS(null, "pointer-events", "none");
-            }
-            */
       label.setAttributeNS(null, 'pointer-events', 'none');
 
       const align =
@@ -4160,7 +4188,6 @@
   function bootstrapSVL(trials = 0) {
     // Check all requisites for the script
 
-    // TODO: to make loading faster, the document.getElementById can run later
     if (W === undefined || W.map === undefined) {
       console.log('SVL not ready to start, retrying in 600ms');
       const attempts = trials + 1;
