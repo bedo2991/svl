@@ -2669,7 +2669,8 @@
         #sidepanel-svl h5{text-transform: capitalize;}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
-        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000}
+        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
+        .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>`;
 
     document.body.appendChild(style);
