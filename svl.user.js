@@ -704,7 +704,7 @@
       'strokeColor': loadedPreferences?.['lanes']?.['strokeColor'] ?? '#454443',
       'strokeDashstyle':
         loadedPreferences?.['lanes']?.['strokeDashstyle'] ?? 'dash',
-      'strokeOpacity': loadPreferences?.['lanes']?.['strokeOpacity'] ?? 0.9,
+      'strokeOpacity': loadedPreferences?.['lanes']?.['strokeOpacity'] ?? 0.9,
     };
     preferences['toll'] = {
       'strokeColor': loadedPreferences?.['toll']?.['strokeColor'] ?? '#00E1FF',
@@ -3681,20 +3681,12 @@
     WazeWrap.Interface.ShowScriptUpdate(
       'Street Vector Layer',
       SVL_VERSION,
-      `<b>Major update!</b>
-            <br>Many things have changed! You may need to change some settings to have a similar view as before (for example increasing the streets width)
-            <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
-            <br>- 5.0.7: New options are highlighted in the preference panel
-            <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
-            <br>- 5.0.5: Added a global Layer Opacity setting
-        <br>From previous releases:
-        <br>- Rendering completely rewritten: performance improvements
-        <br>- The preference panel was redesigned and is now in the sidebar (SVL 🗺️)
-        <br>- You can set what color to use for each speed limit (User request)
-        <br>- Added an option to render the streets based on their width (one way streets are thinner, their size changes when you zoom)
-        <br>- Some options are now localised using WME's strings
-        <br>- Dead-end nodes are rendered with a different color
-        <br>- The Preference panel changes color when you have unsaved changes`,
+      `<b>What's new?</b>
+      <br>- 5.0.9: Code refactoring, bug fixes
+      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
+      <br>- 5.0.7: New options are highlighted in the preference panel
+      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
+      <br>- 5.0.5: Added a global Layer Opacity setting`,
       '',
       GM_info.script.supportURL
     );
