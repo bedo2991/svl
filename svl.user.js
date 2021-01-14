@@ -1857,17 +1857,22 @@
 
   function updateRoutingModePanel() {
     const ID = 'svl_routingModeDiv';
+    const div = document.getElementById(ID);
     if (
       preferences['routingModeEnabled'] &&
       preferences['hideRoutingModeBlock'] !== true
     ) {
+      if (div !== null) {
+        //The panel already exists
+        return;
+      }
       // Show the routing panel
       let routingModeDiv;
       routingModeDiv = document.createElement('div');
       routingModeDiv.id = ID;
       routingModeDiv.className = 'routingDiv';
       routingModeDiv.innerHTML =
-        'Routing Mode<br><small>Hover to temporary disable it<small>';
+        "SVL's Routing Mode<br><small>Hover to temporary disable it<small>";
       routingModeDiv.addEventListener('mouseenter', () => {
         // Temporary disable routing mode
         preferences['routingModeEnabled'] = false;
@@ -1883,7 +1888,7 @@
       document.getElementById('map').appendChild(routingModeDiv);
     } else {
       // Remove the routing panel
-      document.getElementById(ID)?.remove();
+      div?.remove();
     }
   }
 
@@ -2118,29 +2123,16 @@
       ).checked;
     }
 
+    // Routing mode
+    preferences['routingModeEnabled'] = document.getElementById(
+      'svl_routingModeEnabled'
+    ).checked;
+
     preferences['hideRoutingModeBlock'] = document.getElementById(
       'svl_hideRoutingModeBlock'
     ).checked;
-
-    if (preferences['hideRoutingModeBlock']) {
-      updateRoutingModePanel();
-    }
-
-    // Check if routing mode has been toggled
-    if (
-      preferences['routingModeEnabled'] !==
-      document.getElementById('svl_routingModeEnabled').checked
-    ) {
-      // This value has been updated, change the layer positions.
-      preferences['routingModeEnabled'] = document.getElementById(
-        'svl_routingModeEnabled'
-      ).checked;
-      updateRoutingModePanel();
-    } else {
-      preferences['routingModeEnabled'] = document.getElementById(
-        'svl_routingModeEnabled'
-      ).checked;
-    }
+    updateRoutingModePanel();
+    // End: Routing mode
 
     preferences['useWMERoadLayerAtZoom'] = document.getElementById(
       'svl_useWMERoadLayerAtZoom'
@@ -2677,7 +2669,7 @@
         #sidepanel-svl h5{text-transform: capitalize;}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
-        .routingDiv{opacity: 0.95; font-size:1.2em; border:0.2em #000 solid; position:absolute; top:3em; right:2em; padding:0.5em; background-color:#b30000}
+        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>`;
 
     document.body.appendChild(style);
@@ -2903,7 +2895,7 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'hideRoutingModeBlock',
-        title: 'Do not show the Routing Mode Block',
+        title: 'Hide the Routing Mode Panel',
         description:
           'When enabled, the overlay to temporarily disable the routing mode is not shown.',
         isNew: '5.0.9',
