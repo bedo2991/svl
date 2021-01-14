@@ -543,13 +543,19 @@
 
     preferences['segmentsThreshold'] =
       loadedPreferences?.['segmentsThreshold'] ?? 3000;
+
     preferences['nodesThreshold'] =
       loadedPreferences?.['nodesThreshold'] ?? 4000;
 
     preferences['showUnderGPSPoints'] =
       loadedPreferences?.['showUnderGPSPoints'] ?? false;
+
     preferences['routingModeEnabled'] =
       loadedPreferences?.['routingModeEnabled'] ?? false;
+
+    preferences['hideRoutingModeBlock'] =
+      loadedPreferences?.['hideRoutingModeBlock'] ?? false;
+
     preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
     preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
     preferences['renderGeomNodes'] =
@@ -1850,11 +1856,15 @@
   }
 
   function updateRoutingModePanel() {
-    let routingModeDiv;
-    if (preferences['routingModeEnabled']) {
+    const ID = 'svl_routingModeDiv';
+    if (
+      preferences['routingModeEnabled'] &&
+      preferences['hideRoutingModeBlock'] !== true
+    ) {
       // Show the routing panel
+      let routingModeDiv;
       routingModeDiv = document.createElement('div');
-      routingModeDiv.id = 'routingModeDiv';
+      routingModeDiv.id = ID;
       routingModeDiv.className = 'routingDiv';
       routingModeDiv.innerHTML =
         'Routing Mode<br><small>Hover to temporary disable it<small>';
@@ -1873,7 +1883,7 @@
       document.getElementById('map').appendChild(routingModeDiv);
     } else {
       // Remove the routing panel
-      document.getElementById('routingModeDiv')?.remove(); // jshint ignore:line
+      document.getElementById(ID)?.remove();
     }
   }
 
@@ -2106,6 +2116,14 @@
       preferences['showUnderGPSPoints'] = document.getElementById(
         'svl_showUnderGPSPoints'
       ).checked;
+    }
+
+    preferences['hideRoutingModeBlock'] = document.getElementById(
+      'svl_hideRoutingModeBlock'
+    ).checked;
+
+    if (preferences['hideRoutingModeBlock']) {
+      updateRoutingModePanel();
     }
 
     // Check if routing mode has been toggled
@@ -2459,6 +2477,8 @@
       preferences['showUnderGPSPoints'];
     document.getElementById('svl_routingModeEnabled').checked =
       preferences['routingModeEnabled'];
+    document.getElementById('svl_hideRoutingModeBlock').checked =
+      preferences['hideRoutingModeBlock'];
     document.getElementById('svl_showANs').checked = preferences['showANs'];
 
     document.getElementById('svl_layerOpacity').value =
@@ -2877,6 +2897,16 @@
         title: 'Enable Routing Mode',
         description:
           'When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.',
+      })
+    );
+
+    renderingParameters.appendChild(
+      createCheckboxOption({
+        id: 'hideRoutingModeBlock',
+        title: 'Do not show the Routing Mode Block',
+        description:
+          'When enabled, the overlay to temporarily disable the routing mode is not shown.',
+        isNew: '5.0.9',
       })
     );
 
@@ -3682,7 +3712,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>What's new?</b>
-      <br>- 5.0.9: Code refactoring, bug fixes
+      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes
       <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
       <br>- 5.0.7: New options are highlighted in the preference panel
       <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
