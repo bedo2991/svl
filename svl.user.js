@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.8
+// @version    5.0.9
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.8';
+  const SVL_VERSION = '5.0.9';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -1827,6 +1827,28 @@
     }
   }
 
+  /**
+   *
+   * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
+   */
+  function createInput({ id, type, className, title, min, max, step }) {
+    const input = document.createElement('input');
+    input.id = 'svl_' + id;
+    if (className) {
+      input.className = className;
+    }
+    if (title) {
+      input.title = title;
+    }
+    input.type = type;
+    if (type === 'range' || type === 'number') {
+      input.min = min;
+      input.max = max;
+      input.step = step;
+    }
+    return input;
+  }
+
   function updateRoutingModePanel() {
     let routingModeDiv;
     if (preferences['routingModeEnabled']) {
@@ -2116,7 +2138,7 @@
       $('input.segmentsWidth').prop('disabled', false);
     }
 
-    console.dir(preferences);
+    //console.dir(preferences);
     updateStylesFromPreferences(preferences);
     updateRefreshStatus();
   }
@@ -2225,39 +2247,42 @@
     const title = document.createElement('h5');
     title.innerText = getLocalisedString(i);
 
-    const color = document.createElement('input');
-    color.id = `svl_streetColor_${i}`;
-    color.className = 'prefElement form-control';
+    const color = createInput({
+      id: `streetColor_${i}`,
+      className: 'prefElement form-control',
+      title: 'Color',
+      type: 'color',
+    });
     color.style['width'] = '55pt';
-    color.title = 'Color';
-    color.type = 'color';
 
     const inputs = document.createElement('div');
 
     if (showWidth) {
-      const width = document.createElement('input');
-      width.id = `svl_streetWidth_${i}`;
-      width.className = Number.isInteger(i)
-        ? 'form-control prefElement segmentsWidth'
-        : 'form-control prefElement';
+      const width = createInput({
+        id: `streetWidth_${i}`,
+        type: 'number',
+        title: 'Width (disabled if using real-size width)',
+        className: Number.isInteger(i)
+          ? 'form-control prefElement segmentsWidth'
+          : 'form-control prefElement',
+        min: 1,
+        max: 20,
+        step: 1,
+      });
       width.style['width'] = '40pt';
-      width.title = 'Width (disabled if using real-size width)';
-      width.type = 'number';
-      width.min = 1;
-      width.max = 20;
       inputs.appendChild(width);
     }
 
     if (showOpacity) {
-      const opacity = document.createElement('input');
-      opacity.id = `svl_streetOpacity_${i}`;
-      opacity.className = 'form-control prefElement';
+      const opacity = createInput({
+        id: `streetOpacity_${i}`,
+        className: 'form-control prefElement',
+        type: 'number',
+        min: 0,
+        max: 100,
+        step: 10,
+      });
       opacity.style['width'] = '45pt';
-      opacity.title = 'Opacity';
-      opacity.type = 'number';
-      opacity.min = 0;
-      opacity.max = 100;
-      opacity.step = 10;
       inputs.appendChild(opacity);
     }
 
@@ -2288,14 +2313,16 @@
     inputs.appendChild(label);
 
     if (typeof i === 'number') {
-      const slValue = document.createElement('input');
-      slValue.id = `svl_slValue_${type}_${i}`;
-      slValue.className = 'form-control prefElement';
+      const slValue = createInput({
+        id: `slValue_${type}_${i}`,
+        className: 'form-control prefElement',
+        title: 'Speed Limit Value',
+        type: 'number',
+        min: 0,
+        max: 150,
+        step: 1,
+      });
       slValue.style['width'] = '50pt';
-      slValue.title = 'Speed Limit Value';
-      slValue.type = 'number';
-      slValue.min = 0;
-      slValue.max = 150;
       inputs.appendChild(slValue);
 
       const span = document.createElement('span');
@@ -2303,15 +2330,15 @@
       inputs.appendChild(span);
     }
 
-    const color = document.createElement('input');
-    color.id = `svl_slColor_${type}_${i}`;
-    color.className = 'prefElement form-control';
+    const color = createInput({
+      id: `slColor_${type}_${i}`,
+      className: 'prefElement form-control',
+      type: 'color',
+      title: 'Color',
+    });
     color.style['width'] = '55pt';
-    color.title = 'Color';
-    color.type = 'color';
 
     inputs.className = 'expand';
-
     inputs.appendChild(color);
 
     const line = document.createElement('div');
@@ -2492,12 +2519,12 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement';
-    input.title = 'True or False';
-    input.id = `svl_${id}`;
-    input.type = 'checkbox';
-    input.checked = preferences[id];
+    const input = createInput({
+      id,
+      className: 'prefElement',
+      type: 'checkbox',
+      title: 'True or False',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2531,15 +2558,15 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement form-control';
-    input.title = 'Insert a number';
-    input.id = `svl_${id}`;
-    input.type = 'number';
-
-    input.min = min;
-    input.max = max;
-    input.step = step;
+    const input = createInput({
+      id,
+      min,
+      max,
+      step,
+      type: 'number',
+      title: 'Insert a number',
+      className: 'prefElement form-control',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2575,15 +2602,15 @@
     const label = document.createElement('label');
     label.innerText = title;
 
-    const input = document.createElement('input');
-    input.className = 'prefElement form-control';
-    input.title = 'Pick a value using the slider';
-    input.id = `svl_${id}`;
-    input.type = 'range';
-
-    input.min = min;
-    input.max = max;
-    input.step = step;
+    const input = createInput({
+      id,
+      min,
+      max,
+      step,
+      title: 'Pick a value using the slider',
+      className: 'prefElement form-control',
+      type: 'range',
+    });
 
     label.appendChild(input);
     line.appendChild(label);
@@ -2714,7 +2741,7 @@
           { 'text': 'SVL Standard', 'value': 'svl_standard' },
           { 'text': 'WME Colors', 'value': 'wme_colors' },
         ],
-        isNew: '5.0.7',
+        isNew: '5.0.8',
       })
     );
 
@@ -3093,10 +3120,11 @@
       })
     );
 
-    const colorPicker = document.createElement('input');
-    colorPicker.type = 'color';
-    colorPicker.className = 'prefElement form-control';
-    colorPicker.id = 'svl_SLColor';
+    const colorPicker = createInput({
+      id: 'SLColor',
+      type: 'color',
+      className: 'prefElement form-control',
+    });
     speedLimits.appendChild(colorPicker);
 
     speedLimits.appendChild(
@@ -3976,21 +4004,6 @@
         label.setAttributeNS(null, 'stroke-width', style['fontStrokeWidth']);
       }
 
-      /*
-            if (style['fontOpacity']) {
-                label.setAttributeNS(null, "opacity", style['fontOpacity']);
-            }
-
-            if (style['fontStyle']) {
-                label.setAttributeNS(null, "font-style", style['fontStyle']);
-            }
-            if (style['labelSelect'] === true) {
-                label.setAttributeNS(null, "pointer-events", "visible");
-                label._featureId = featureId;
-            } else {
-                label.setAttributeNS(null, "pointer-events", "none");
-            }
-            */
       label.setAttributeNS(null, 'pointer-events', 'none');
 
       const align =
@@ -4160,7 +4173,6 @@
   function bootstrapSVL(trials = 0) {
     // Check all requisites for the script
 
-    // TODO: to make loading faster, the document.getElementById can run later
     if (W === undefined || W.map === undefined) {
       console.log('SVL not ready to start, retrying in 600ms');
       const attempts = trials + 1;
