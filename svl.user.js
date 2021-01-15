@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.0.9
+// @version    5.1.0
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.9';
+  const SVL_VERSION = '5.1.0';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -242,14 +242,11 @@
     try {
       window.localStorage.setItem('svl', JSON.stringify(pref));
       if (!silent) {
-        safeAlert('success', 'Preferences saved!');
+        safeAlert('success', _('preferences_saved'));
       }
     } catch (e) {
       console.error(e);
-      safeAlert(
-        'error',
-        'Could not save the preferences, your browser local storage seems to be full.'
-      );
+      safeAlert('error', _('preferences_saving_error'));
     }
   }
 
@@ -1772,18 +1769,12 @@
     loadPreferences();
     updateStylesFromPreferences(preferences);
     updatePreferenceValues();
-    safeAlert(
-      'info',
-      "All's well that ends well! Now it's everything as it was before."
-    );
+    safeAlert('info', _('preferences_rollback'));
   }
 
   function exportPreferences() {
     GM_setClipboard(JSON.stringify(preferences));
-    safeAlert(
-      'info',
-      'The configuration has been copied to your clipboard. Please paste it in a file (CTRL+V) to store it.'
-    );
+    safeAlert('info', _('export_preferences_message'));
   }
 
   function importPreferences(e, pastedText) {
@@ -1791,19 +1782,16 @@
       try {
         preferences = JSON.parse(pastedText);
       } catch (ex) {
-        safeAlert(
-          'error',
-          'Your string seems to be somehow wrong. Please check that is a valid JSON string'
-        );
+        safeAlert('error', _('preferences_parsing_error'));
         return;
       }
       if (preferences !== null && preferences['streets']) {
         updateStylesFromPreferences(preferences);
         savePreferences(preferences);
         updatePreferenceValues();
-        safeAlert('success', 'Done, preferences imported!');
+        safeAlert('success', _('preferences_imported'));
       } else {
-        safeAlert('error', 'Something went wrong. Is your string correct?');
+        safeAlert('error', 'preferences_importing_error');
       }
     }
   }
@@ -1811,7 +1799,9 @@
   const importPreferencesCallback = () => {
     WazeWrap.Alerts.prompt(
       GM_info.script.name,
-      'N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!\n\nPaste your string here:',
+      `${_('preferences_import_prompt')}\n\n${_(
+        'preferences_import_prompt_2'
+      )}`,
       '',
       importPreferences,
       null
@@ -1871,8 +1861,9 @@
       routingModeDiv = document.createElement('div');
       routingModeDiv.id = ID;
       routingModeDiv.className = 'routingDiv';
-      routingModeDiv.innerHTML =
-        "SVL's Routing Mode<br><small>Hover to temporary disable it<small>";
+      routingModeDiv.innerHTML = `${_(
+        'routing_mode_panel_title'
+      )}<br><small>${_('routing_mode_panel_body')}<small>`;
       routingModeDiv.addEventListener('mouseenter', () => {
         // Temporary disable routing mode
         preferences['routingModeEnabled'] = false;
@@ -1905,8 +1896,10 @@
 
   function updateValuesFromPreferences() {
     document.getElementById('svl_saveNewPref').classList.remove('disabled');
+    document.getElementById('svl_saveNewPref').disabled = false;
     document.getElementById('svl_saveNewPref').classList.add('btn-primary');
     document.getElementById('svl_rollbackButton').classList.remove('disabled');
+    document.getElementById('svl_rollbackButton').disabled = false;
     document.getElementById('sidepanel-svl').classList.add('svl_unsaved');
     // $("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
 
@@ -1924,7 +1917,7 @@
     if (presetApplied) {
       updateStreetsPreferenceValues();
       presetSelect.value = '';
-      safeAlert('info', "Preset applied, don't forget to save your changes!");
+      safeAlert('info', _('preset_applied'));
     } else {
       for (let i = 0; i < preferences['streets'].length; i += 1) {
         if (preferences['streets'][i]) {
@@ -2164,18 +2157,20 @@
     saveDefaultPreferences();
     updateStylesFromPreferences(preferences);
     updatePreferenceValues();
-    safeAlert('success', 'Preferences have been reset to the default values');
+    safeAlert('success', _('preferences_reset_message'));
   };
 
   function resetPreferencesCallback() {
     consoleDebug('rollbackDefault');
     WazeWrap.Alerts.confirm(
       GM_info.script.name,
-      'Are you sure you want to rollback to the default settings?\nANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!',
+      `${_('preferences_reset_question')}\n${_(
+        'preferences_reset_question_2'
+      )}`,
       resetPreferences,
       null,
-      'Yes, I want to reset',
-      'Cancel'
+      _('preferences_reset_yes'),
+      _('preferences_reset_cancel')
     );
   }
 
@@ -2214,8 +2209,12 @@
     newSelect.className = 'prefElement';
     newSelect.title = 'Stroke style';
     newSelect.id = `svl_${id}`;
-    newSelect.innerHTML =
-      '<option value="solid">Solid</option><option value="dash">Dashed</option><option value="dashdot">Dash Dot</option><option value="longdash">Long Dash</option><option value="longdashdot">Long Dash Dot</option><option value="dot">Dot</option>';
+    newSelect.innerHTML = `<option value="solid">${_('line_solid')}</option>
+       <option value="dash">${_('line_dash')}</option>
+       <option value="dashdot">${_('line_dashdot')}</option>
+       <option value="longdash">${_('line_longdash')}</option>
+       <option value="longdashdot">${_('line_longdashdot')}</option>
+       <option value="dot">${_('line_dot')}</option>`;
     return newSelect;
   }
 
@@ -2254,13 +2253,13 @@
     showWidth = true,
     showOpacity = false,
   }) {
-    const title = document.createElement('h5');
+    const title = document.createElement('h6');
     title.innerText = getLocalisedString(i);
 
     const color = createInput({
       id: `streetColor_${i}`,
       className: 'prefElement form-control',
-      title: 'Color',
+      title: _('color'),
       type: 'color',
     });
     color.style['width'] = '55pt';
@@ -2271,7 +2270,7 @@
       const width = createInput({
         id: `streetWidth_${i}`,
         type: 'number',
-        title: 'Width (disabled if using real-size width)',
+        title: `${_('width')} (${_('width_disabled')})`,
         className: Number.isInteger(i)
           ? 'form-control prefElement segmentsWidth'
           : 'form-control prefElement',
@@ -2287,6 +2286,7 @@
       const opacity = createInput({
         id: `streetOpacity_${i}`,
         className: 'form-control prefElement',
+        title: _('opacity'),
         type: 'number',
         min: 0,
         max: 100,
@@ -2326,7 +2326,7 @@
       const slValue = createInput({
         id: `slValue_${type}_${i}`,
         className: 'form-control prefElement',
-        title: 'Speed Limit Value',
+        title: _('speed_limit_value'),
         type: 'number',
         min: 0,
         max: 150,
@@ -2336,7 +2336,7 @@
       inputs.appendChild(slValue);
 
       const span = document.createElement('span');
-      span.innerText = metric ? 'km/h' : 'mph';
+      span.innerText = metric ? _('kmh') : _('mph');
       inputs.appendChild(span);
     }
 
@@ -2344,7 +2344,7 @@
       id: `slColor_${type}_${i}`,
       className: 'prefElement form-control',
       type: 'color',
-      title: 'Color',
+      title: _('color'),
     });
     color.style['width'] = '55pt';
 
@@ -2392,7 +2392,9 @@
    */
   function updatePreferenceValues() {
     document.getElementById('svl_saveNewPref').classList.add('disabled');
+    document.getElementById('svl_saveNewPref').disabled = true;
     document.getElementById('svl_rollbackButton').classList.add('disabled');
+    document.getElementById('svl_rollbackButton').disabled = true;
     document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
     document.getElementById('sidepanel-svl').classList.remove('svl_unsaved');
     updateStreetsPreferenceValues();
@@ -2535,7 +2537,7 @@
       id,
       className: 'prefElement',
       type: 'checkbox',
-      title: 'True or False',
+      title: _('true_or_false'),
     });
 
     label.appendChild(input);
@@ -2576,7 +2578,7 @@
       max,
       step,
       type: 'number',
-      title: 'Insert a number',
+      title: _('insert_number'),
       className: 'prefElement form-control',
     });
 
@@ -2619,7 +2621,7 @@
       min,
       max,
       step,
-      title: 'Pick a value using the slider',
+      title: _('pick_a_value_slider'),
       className: 'prefElement form-control',
       type: 'range',
     });
@@ -2650,6 +2652,7 @@
     style['innerHTML'] = `
         <style>
         #sidepanel-svl details{margin-bottom:9pt;}
+        #sidepanel-svl i{font-size:small;}
         .svl_unsaved{background-color:#ffcc00}
         .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
         .prefLineSelect{width:100%; margin-bottom:1vh;}
@@ -2663,11 +2666,13 @@
         .prefLineSlider {width:100%; margin-bottom:1vh;}
         .prefLineSlider label{display:block;width:100%}
         .prefLineSlider input{float:right;}
-        .newOption::before {content:"New since v. " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
+        .newOption::before {content:"${_(
+          'new_since_version'
+        )} " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
         .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}
         .svl_logo {width:130px; display:inline-block; float:right}
-        #sidepanel-svl h5{text-transform: capitalize;}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
+        .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
         .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
@@ -2679,11 +2684,11 @@
     const logo = document.createElement('img');
     logo.className = 'svl_logo';
     logo.src = 'https://raw.githubusercontent.com/bedo2991/svl/master/logo.png';
-    logo.alt = 'Street Vector Layer Logo';
+    logo.alt = _('svl_logo');
     mainDiv.appendChild(logo);
 
     const spanThanks = document.createElement('span');
-    spanThanks.innerText = 'Thanks for using';
+    spanThanks.innerText = _('thanks_for_using');
     mainDiv.appendChild(spanThanks);
 
     const svlTitle = document.createElement('h4');
@@ -2691,15 +2696,42 @@
     mainDiv.appendChild(svlTitle);
 
     const spanVersion = document.createElement('span');
-    spanVersion.innerText = `Version ${SVL_VERSION}`;
+    spanVersion.innerText = `${_('version')} ${SVL_VERSION}`;
     mainDiv.appendChild(spanVersion);
 
     const supportForum = document.createElement('a');
-    supportForum.innerText = 'Something not working? Report it here.';
+    supportForum.innerText = `${_('something_not_working')} ${_(
+      'report_it_here'
+    )}.`;
     supportForum.href = GM_info.script.supportURL;
     supportForum.target = '_blank';
     supportForum.className = 'svl_support-link';
     mainDiv.appendChild(supportForum);
+
+    const translationMessage = document.createElement('div');
+    translationMessage.className = 'svl_translationblock';
+    if (_('language_code') === I18n.currentLocale()) {
+      //Translations are available for this language
+      const translationPercentage = _('completition_percentage');
+      if (translationPercentage === '100%') {
+        translationMessage.innerText = `${_('fully_translated_in')} ${_(
+          'translated_by'
+        )}`;
+      } else {
+        translationMessage.innerHTML = `${translationPercentage} ${_(
+          'translation_thanks'
+        )} ${_(
+          'translated_by'
+        )}. <a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">${_(
+          'would_you_like_to_help'
+        )}</a>`;
+      }
+    } else {
+      //Call for action
+      //No need to translate this.
+      translationMessage.innerHTML = `<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>`;
+    }
+    mainDiv.appendChild(translationMessage);
 
     // mainDiv.id = "svl_PrefDiv";
 
@@ -2707,22 +2739,22 @@
     saveButton.id = 'svl_saveNewPref';
     saveButton.type = 'button';
     saveButton.className = 'btn disabled waze-icon-save';
-    saveButton.innerText = 'Save';
-    saveButton.title = 'Save your edited settings';
+    saveButton.innerText = _('save');
+    saveButton.title = _('save_help');
 
     const rollbackButton = document.createElement('button');
     rollbackButton.id = 'svl_rollbackButton';
     rollbackButton.type = 'button';
     rollbackButton.className = 'btn btn-default disabled';
-    rollbackButton.innerText = 'Rollback';
-    rollbackButton.title = 'Discard your temporary changes';
+    rollbackButton.innerText = _('rollback');
+    rollbackButton.title = _('rollback_help');
 
     const resetButton = document.createElement('button');
     resetButton.id = 'svl_resetButton';
     resetButton.type = 'button';
     resetButton.className = 'btn btn-default';
-    resetButton.innerText = 'Reset';
-    resetButton.title = 'Overwrite your current settings with the default ones';
+    resetButton.innerText = _('reset');
+    resetButton.title = _('reset_help');
 
     const buttons = document.createElement('div');
     buttons.className = 'svl_buttons expand';
@@ -2732,14 +2764,13 @@
 
     mainDiv.appendChild(buttons);
 
-    const streets = createPreferencesSection('Roads Properties', true);
+    const streets = createPreferencesSection(_('roads_properties'), true);
 
     streets.appendChild(
       createCheckboxOption({
         id: 'realsize',
-        title: 'Use real-life Width',
-        description:
-          'When enabled, the segments thickness will be computed from the segments width instead of using the value set in the preferences',
+        title: _('use_reallife_width'),
+        description: _('use_reallife_width_descr'),
         isNew: '5.0.0',
       })
     );
@@ -2747,12 +2778,12 @@
     streets.appendChild(
       createDropdownOption({
         id: 'presets',
-        title: 'Road Themes',
-        description: 'Applies a predefined theme to your preferences',
+        title: _('road_themes_title'),
+        description: _('road_themes_descr'),
         options: [
           { 'text': '', 'value': '' },
-          { 'text': 'SVL Standard', 'value': 'svl_standard' },
-          { 'text': 'WME Colors', 'value': 'wme_colors' },
+          { 'text': _('svl_standard_layer'), 'value': 'svl_standard' },
+          { 'text': _('wme_colors_layer'), 'value': 'wme_colors' },
         ],
         isNew: '5.0.8',
       })
@@ -2766,15 +2797,15 @@
       }
     }
 
-    const decorations = createPreferencesSection('Segments Decorations');
+    const decorations = createPreferencesSection(_('segments_decorations'));
 
     const renderingParameters = createPreferencesSection(
-      'Rendering Parameters'
+      _('rendering_parameters')
     );
 
-    const performance = createPreferencesSection('Performance Tuning');
+    const performance = createPreferencesSection(_('performance_tuning'));
 
-    const speedLimits = createPreferencesSection('Speed Limits');
+    const speedLimits = createPreferencesSection(_('speed_limits'));
 
     const options = getOptions();
     options['streets'].forEach((o) => {
@@ -2864,9 +2895,8 @@
     streets.appendChild(
       createCheckboxOption({
         id: 'showANs',
-        title: 'Show Alternative Names',
-        description:
-          'When enabled, at most 2 ANs that differ from the primary name are shown under the street name.',
+        title: _('show_ans'),
+        description: _('show_ans_descr'),
       })
     );
 
@@ -2875,8 +2905,8 @@
     renderingParameters.appendChild(
       createIntegerOption({
         id: 'layerOpacity',
-        title: 'Layer Opacity',
-        description: '10: almost invisible, 100: opaque.',
+        title: _('layer_opacity'),
+        description: _('layer_opacity_descr'),
         min: 10,
         max: 100,
         step: 5,
@@ -2887,18 +2917,16 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'routingModeEnabled',
-        title: 'Enable Routing Mode',
-        description:
-          'When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.',
+        title: _('enable_routing_mode'),
+        description: _('enable_routing_mode_descr'),
       })
     );
 
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'hideRoutingModeBlock',
-        title: 'Hide the Routing Mode Panel',
-        description:
-          'When enabled, the overlay to temporarily disable the routing mode is not shown.',
+        title: _('hide_routing_mode_panel'),
+        description: _('hide_routing_mode_panel_descr'),
         isNew: '5.0.9',
       })
     );
@@ -2906,17 +2934,16 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'showUnderGPSPoints',
-        title: 'GPS Layer above Roads',
-        description:
-          'When enabled, the GPS layer gets shown above the road layer.',
+        title: _('gps_layer_above_roads'),
+        description: _('gps_layer_above_roads_descr'),
       })
     );
 
     streets.appendChild(
       createRangeOption({
         id: 'labelOutlineWidth',
-        title: 'Labels Outline Width',
-        description: 'How much border should the labels have?',
+        title: _('label_width'),
+        description: _('label_width_descr'),
         min: 0,
         max: 10,
         step: 1,
@@ -2926,26 +2953,24 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'disableRoadLayers',
-        title: 'Hide WME Road Layer',
-        description:
-          'When enabled, the WME standard road layer gets hidden automatically.',
+        title: _('hide_road_layer'),
+        description: _('hide_road_layer'),
       })
     );
 
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'startDisabled',
-        title: 'SVL Initially Disabled',
-        description:
-          'When enabled, the SVL does not get enabled automatically.',
+        title: _('svl_initially_disabled'),
+        description: _('svl_initially_disabled_descr'),
       })
     );
 
     renderingParameters.appendChild(
       createRangeOption({
         id: 'clutterConstant',
-        title: 'Street Names Density',
-        description: 'For an higher value, less elements will be shown.',
+        title: _('street_names_density'),
+        description: _('street_names_density_descr'),
         min: 1,
         max: clutterMax,
         step: 1,
@@ -2960,17 +2985,16 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'renderGeomNodes',
-        title: 'Render Geometry Nodes',
-        description: 'When enabled, the geometry nodes are drawn, too.',
+        title: _('render_geometry_nodes'),
+        description: _('render_geometry_nodes_descr'),
       })
     );
 
     renderingParameters.appendChild(
       createIntegerOption({
         id: 'fakelock',
-        title: 'Render Map as Level',
-        description:
-          'All segments locked above this level will be stroked through with a black line.',
+        title: _('render_as_level'),
+        description: _('render_as_level_descr'),
         min: 1,
         max: 7,
         step: 1,
@@ -2980,9 +3004,8 @@
     renderingParameters.appendChild(
       createRangeOption({
         id: 'closeZoomLabelSize',
-        title: 'Font Size (at close zoom)',
-        description:
-          "Increase this value if you can't read the street names because they are too small.",
+        title: _('font_size_close'),
+        description: _('font_size_close_descr'),
         min: 8,
         max: fontSizeMax,
         step: 1,
@@ -2992,9 +3015,8 @@
     renderingParameters.appendChild(
       createRangeOption({
         id: 'arrowDeclutter',
-        title: 'Limit Arrows',
-        description:
-          'Increase this value if you want less arrows to be shown on streets (it increases the performance).',
+        title: _('limit_arrows'),
+        description: _('limit_arrows_descr'),
         min: 1,
         max: 200,
         step: 1,
@@ -3002,15 +3024,14 @@
     );
 
     const farZoomTitle = document.createElement('h5');
-    farZoomTitle.innerText = 'Far-zoom only';
+    farZoomTitle.innerText = _('far_zoom_only');
     renderingParameters.appendChild(farZoomTitle);
 
     renderingParameters.appendChild(
       createRangeOption({
         id: 'farZoomLabelSize',
-        title: 'Font Size (at far zoom)',
-        description:
-          "Increase this value if you can't read the street names because they are too small.",
+        title: _('font_size_far'),
+        description: _('font_size_far_descr'),
         min: 8,
         max: fontSizeMax,
       })
@@ -3019,30 +3040,28 @@
     renderingParameters.appendChild(
       createCheckboxOption({
         id: 'hideMinorRoads',
-        title: 'Hide minor roads at zoom 3',
-        description:
-          "The WME loads some type of roads when they probably shouldn't be, check this option for avoid displaying them at higher zooms.",
+        title: _('hide_minor_roads'),
+        description: _('hide_minor_roads_descr'),
       })
     );
 
     mainDiv.appendChild(renderingParameters);
 
-    const utilities = createPreferencesSection('Utilities');
+    const utilities = createPreferencesSection(_('utilities'));
 
     utilities.appendChild(
       createCheckboxOption({
         id: 'autoReload_enabled',
-        title: 'Automatically Refresh the Map',
-        description:
-          "When enabled, SVL refreshes the map automatically after a certain timeout if you're not editing.",
+        title: _('automatically_refresh'),
+        description: _('automatically_refresh_descr'),
       })
     );
 
     utilities.appendChild(
       createIntegerOption({
         id: 'autoReload_interval',
-        title: 'Auto Reload Time Interval (in Seconds)',
-        description: 'How often should the WME be refreshed for new edits?',
+        title: _('autoreload_interval'),
+        description: _('autoreload_interval_descr'),
         min: 20,
         max: 3600,
         step: 1,
@@ -3055,9 +3074,8 @@
     performance.appendChild(
       createIntegerOption({
         id: 'useWMERoadLayerAtZoom',
-        title: 'Stop using SVL at zoom level',
-        description:
-          'When you reach this zoom level, the road layer gets automatically enabled.',
+        title: _('stop_svl_at_zoom'),
+        description: _('stop_svl_at_zoom_descr'),
         min: 0,
         max: 5,
         step: 1,
@@ -3067,9 +3085,8 @@
     performance.appendChild(
       createIntegerOption({
         id: 'switchZoom',
-        title: 'Close-zoom until level',
-        description:
-          'When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)',
+        title: _('close_zoom_until_level'),
+        description: _('close_zoom_until_level_descr'),
         min: 5,
         max: 9,
         step: 1,
@@ -3079,9 +3096,8 @@
     performance.appendChild(
       createIntegerOption({
         id: 'segmentsThreshold',
-        title: 'Segments threshold',
-        description:
-          'When the WME wants to draw more than this amount of segments, switch to the road layer',
+        title: _('segments_threshold'),
+        description: _('segments_threshold_descr'),
         min: 1000,
         max: 10000,
         step: 100,
@@ -3092,9 +3108,8 @@
     performance.appendChild(
       createIntegerOption({
         id: 'nodesThreshold',
-        title: 'Nodes threshold',
-        description:
-          'When the WME wants to draw more than this amount of nodes, switch to the road layer',
+        title: _('nodes_threshold'),
+        description: _('nodes_threshold_descr'),
         min: 1000,
         max: 10000,
         step: 100,
@@ -3106,17 +3121,16 @@
     speedLimits.appendChild(
       createCheckboxOption({
         id: 'showSLtext',
-        title: 'Show on the Street Name',
-        description:
-          'Show the speed limit as text at the end of the street name.',
+        title: _('show_sl_on_name'),
+        description: _('show_sl_on_name_descr'),
       })
     );
 
     speedLimits.appendChild(
       createCheckboxOption({
         id: 'showSLcolor',
-        title: 'Show using colors',
-        description: "Show the speed limit by coloring the segment's outline.",
+        title: _('show_sl_with_colors'),
+        description: _('show_sl_with_colors_descr'),
       })
     );
 
@@ -3137,9 +3151,8 @@
     speedLimits.appendChild(
       createCheckboxOption({
         id: 'showSLSinglecolor',
-        title: 'Show using Single Color',
-        description:
-          "Show the speed limit by coloring the segment's outline with a single color instead of a different color depending on the speed limit's value.",
+        title: _('show_sl_with_one_color'),
+        description: _('show_sl_with_one_color_descr'),
       })
     );
 
@@ -3153,9 +3166,8 @@
     speedLimits.appendChild(
       createCheckboxOption({
         id: 'showDashedUnverifiedSL',
-        title: 'Show unverified Speed Limits with a dashed Line',
-        description:
-          'If the speed limit is not verified, it will be shown with a different style.',
+        title: _('show_unverified_dashed'),
+        description: _('show_unverified_dashed_descr'),
       })
     );
 
@@ -3187,7 +3199,7 @@
     mainDiv.appendChild(speedLimits);
 
     const subTitle = document.createElement('h5');
-    subTitle.innerText = 'Settings Backup';
+    subTitle.innerText = _('settings_backup');
     mainDiv.appendChild(subTitle);
 
     const utilityButtons = document.createElement('div');
@@ -3196,13 +3208,13 @@
     const exportButton = document.createElement('button');
     exportButton.id = 'svl_exportButton';
     exportButton.type = 'button';
-    exportButton.innerText = 'Export';
+    exportButton.innerText = _('export');
     exportButton.className = 'btn btn-default';
 
     const importButton = document.createElement('button');
     importButton.id = 'svl_importButton';
     importButton.type = 'button';
-    importButton.innerText = 'Import';
+    importButton.innerText = _('import');
     importButton.className = 'btn btn-default';
 
     utilityButtons.appendChild(importButton);
@@ -3704,7 +3716,9 @@
     WazeWrap.Interface.ShowScriptUpdate(
       'Street Vector Layer',
       SVL_VERSION,
-      `<b>What's new?</b>
+      `<b>${_('whats_new')}</b>
+      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
+      <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
       <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes
       <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
       <br>- 5.0.7: New options are highlighted in the preference panel
@@ -3713,6 +3727,63 @@
       '',
       GM_info.script.supportURL
     );
+  }
+
+  function invalidTranslation(key) {
+    console.error('[SVL] Invalid translation key: ' + key);
+    return '<invalid translation key>';
+  }
+
+  /**
+   *
+   * @param {string} key
+   * @returns {string}
+   */
+  function _(key) {
+    const key_index = tr_keys[key];
+    if (typeof key_index === 'undefined') {
+      return invalidTranslation(key);
+    }
+    const locale = I18n.currentLocale();
+    if (tr[locale]) {
+      if (tr[locale][key_index] && tr[locale][key_index] !== '') {
+        return tr[locale][key_index];
+      }
+    }
+    return tr['en'][key_index];
+    //return tr[I18n.currentLocale()]?.[tr_keys[key]] ?? tr["en"]?.[tr_keys[key]] ?? invalidTranslation(key);
+  }
+  /**@type{!Object<string,Array<string>>} */
+  const tr = [];
+  /**@type{!Object<string,number>} */
+  const tr_keys = [];
+  function loadTranslations() {
+    console.debug('Loading translations...');
+    fetch(
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
+    )
+      .then((response) => {
+        //console.error("RESPONSE!");
+        if (response.ok && response.status === 200) {
+          return response.text();
+        }
+      })
+      .then((data) => {
+        let temp = data.split('\n');
+        for (const [i, line] of temp.entries()) {
+          if (i > 0) {
+            const [first, ...rest] = line.split('\t');
+            tr[first] = rest.map((e) => e.trim());
+          } else {
+            const [first, ...rest] = line.split('\t');
+            for (const [i, value] of rest.entries()) {
+              tr_keys[value.trim()] = i;
+            }
+            console.dir(tr_keys);
+          }
+        }
+        console.dir(tr);
+      });
   }
 
   /**
@@ -3736,10 +3807,7 @@
         return;
       }
       console.error(e);
-      safeAlert(
-        'error',
-        'Street Vector Layer failed to inizialize. Maybe the Editor has been updated or your connection/pc is really slow.'
-      );
+      safeAlert('error', _('init_error'));
       return;
     }
 
@@ -3749,13 +3817,14 @@
       // First run, or new broswer
       safeAlert(
         'info',
-        'This is the first time that you run Street Vector Layer in this browser.\n' +
-          'Some info about it:\n' +
-          'By default, use ALT+L to toggle the layer.\n' +
-          'You can change the streets color, thickness and style using the panel on the left sidebar.\n' +
-          'Your preferences will be saved for the next time in your browser.\n' +
-          'The other road layers will be automatically hidden (you can change this behaviour in the preference panel).\n' +
-          'Have fun and tell us on the Waze forum if you liked the script!'
+        `${_('first_time')}
+
+          ${_('some_info')}
+          ${_('default_shortcut_instruction')}
+          ${_('instructions_1')}
+          ${_('instructions_2')}
+          ${_('instructions_3')}
+          ${_('instructions_4')}`
       );
     }
 
@@ -3790,7 +3859,7 @@
       'accelerator': `toggle${layerName.replace(/\s+/g, '')}`,
       'visibility': !preferences['startDisabled'],
       'isVector': true,
-      'attribution': `SVL v. ${SVL_VERSION}`,
+      'attribution': `${_('svl_version')} ${SVL_VERSION}`,
       'rendererOptions': {
         'zIndexing': true,
       },
@@ -4140,10 +4209,7 @@
 
     // TODO remove in the next releases
     $('.olControlAttribution').click(() => {
-      safeAlert(
-        'info',
-        'The preferences have been moved to the sidebar on the left. Please look for the "SVL 🗺️" tab.'
-      );
+      safeAlert('info', _('preferences_moved'));
     });
 
     // eslint-disable-next-line no-underscore-dangle
@@ -4178,6 +4244,7 @@
     }
     clutterConstant = pref['clutterConstant'];
     streetVectorLayer.setOpacity(preferences['layerOpacity']);
+    updateRoutingModePanel();
     redrawAllSegments();
   }
 
@@ -4186,9 +4253,15 @@
    * @param {number} [trials=0]
    */
   function bootstrapSVL(trials = 0) {
+    if (trials === 0) {
+      loadTranslations();
+    }
     // Check all requisites for the script
-
-    if (W === undefined || W.map === undefined) {
+    if (
+      W === undefined ||
+      W.map === undefined ||
+      !(Object.keys(tr).length > 1)
+    ) {
       console.log('SVL not ready to start, retrying in 600ms');
       const attempts = trials + 1;
       if (attempts < 20) {
@@ -4196,10 +4269,15 @@
           bootstrapSVL(attempts);
         }, 600);
       } else {
-        safeAlert(
-          'error',
-          'Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!'
-        );
+        let error_message = _('bootstrap_error');
+        if (!error_message || error_message === '<invalid translation key>') {
+          safeAlert(
+            'error',
+            'Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!'
+          );
+        } else {
+          safeAlert('error', error_message);
+        }
       }
       return;
     }
