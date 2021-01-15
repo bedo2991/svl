@@ -1029,7 +1029,7 @@ Y("Object.values", function(m) {
       var c = g("completition_percentage");
       "100%" === c ? b.innerText = g("fully_translated_in") + " " + g("translated_by") : b.innerHTML = c + " " + g("translation_thanks") + " " + g("translated_by") + '. <a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">' + g("would_you_like_to_help") + "</a>";
     } else {
-      b.innerHTML = '<b>Unfortunately, SVL is currently not available in your language. Would you like to help translating? <a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>';
+      b.innerHTML = '<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>';
     }
     a.appendChild(b);
     b = document.createElement("button");

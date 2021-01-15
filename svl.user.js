@@ -2729,7 +2729,7 @@
     } else {
       //Call for action
       //No need to translate this.
-      translationMessage.innerHTML = `<b>Unfortunately, SVL is currently not available in your language. Would you like to help translating? <a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>`;
+      translationMessage.innerHTML = `<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>`;
     }
     mainDiv.appendChild(translationMessage);
 
