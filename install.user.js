@@ -213,7 +213,7 @@ Y("Object.values", function(m) {
   function Ca(a, b) {
     b = void 0 === b ? !0 : b;
     y("savePreferences");
-    a.version = "5.0.9";
+    a.version = "5.1.0";
     try {
       window.localStorage.setItem("svl", JSON.stringify(a)), b || x("success", g("preferences_saved"));
     } catch (c) {
@@ -1015,7 +1015,7 @@ Y("Object.values", function(m) {
     b.innerText = "Street Vector Layer";
     a.appendChild(b);
     b = document.createElement("span");
-    b.innerText = g("version") + " 5.0.9";
+    b.innerText = g("version") + " 5.1.0";
     a.appendChild(b);
     b = document.createElement("a");
     b.innerText = g("something_not_working") + " " + g("report_it_here") + ".";
@@ -1305,7 +1305,7 @@ Y("Object.values", function(m) {
     }
     d.startDisabled && N(1, !1);
     qi();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.0.9", "<b>" + g("whats_new") + "</b>\n      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes\n      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.\n      <br>- 5.0.7: New options are highlighted in the preference panel\n      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n      <br>- 5.0.5: Added a global Layer Opacity setting", 
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.1.0", "<b>" + g("whats_new") + "</b>\n      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!\n      <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.\n      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes\n      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.\n      <br>- 5.0.7: New options are highlighted in the preference panel\n      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n      <br>- 5.0.5: Added a global Layer Opacity setting", 
     "", GM_info.script.supportURL);
   }
   function g(a) {
@@ -1375,7 +1375,7 @@ Y("Object.values", function(m) {
     !1 === Ba() && x("info", g("first_time") + "\n\n          " + g("some_info") + "\n          " + g("default_shortcut_instruction") + "\n          " + g("instructions_1") + "\n          " + g("instructions_2") + "\n          " + g("instructions_3") + "\n          " + g("instructions_4"));
     a = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var c = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    A = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:g("svl_version") + " 5.0.9", rendererOptions:{zIndexing:!0, }, });
+    A = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:g("svl_version") + " 5.1.0", rendererOptions:{zIndexing:!0, }, });
     A.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
@@ -1484,7 +1484,7 @@ Y("Object.values", function(m) {
     });
     a = W.prefs._events;
     "object" === typeof a && a["change:isImperial"].push({callback:ba, });
-    console.log("[SVL] v. 5.0.9 initialized correctly.");
+    console.log("[SVL] v. 5.1.0 initialized correctly.");
   }
   function ba() {
     y("DrawAllSegments");
@@ -1523,7 +1523,7 @@ Y("Object.values", function(m) {
       b[c] = arguments[c];
     }
     for (c = 0; c < b.length; c += 1) {
-      "string" === typeof b[c] ? console.log("[SVL] 5.0.9: " + b[c]) : console.dir(b[c]);
+      "string" === typeof b[c] ? console.log("[SVL] 5.1.0: " + b[c]) : console.dir(b[c]);
     }
   } : function() {
   }, Yh = Ka ? console.group : function() {

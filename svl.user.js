@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.0.9';
+  const SVL_VERSION = '5.1.0';
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -3717,6 +3717,8 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
+      <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
       <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes
       <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
       <br>- 5.0.7: New options are highlighted in the preference panel
