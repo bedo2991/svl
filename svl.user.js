@@ -2251,7 +2251,7 @@
     showWidth = true,
     showOpacity = false,
   }) {
-    const title = document.createElement('h5');
+    const title = document.createElement('h6');
     title.innerText = getLocalisedString(i);
 
     const color = createInput({
