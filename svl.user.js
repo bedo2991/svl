@@ -1896,8 +1896,10 @@
 
   function updateValuesFromPreferences() {
     document.getElementById('svl_saveNewPref').classList.remove('disabled');
+    document.getElementById('svl_saveNewPref').disabled = false;
     document.getElementById('svl_saveNewPref').classList.add('btn-primary');
     document.getElementById('svl_rollbackButton').classList.remove('disabled');
+    document.getElementById('svl_rollbackButton').disabled = false;
     document.getElementById('sidepanel-svl').classList.add('svl_unsaved');
     // $("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
 
@@ -2390,7 +2392,9 @@
    */
   function updatePreferenceValues() {
     document.getElementById('svl_saveNewPref').classList.add('disabled');
+    document.getElementById('svl_saveNewPref').disabled = true;
     document.getElementById('svl_rollbackButton').classList.add('disabled');
+    document.getElementById('svl_rollbackButton').disabled = true;
     document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
     document.getElementById('sidepanel-svl').classList.remove('svl_unsaved');
     updateStreetsPreferenceValues();
