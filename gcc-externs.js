@@ -204,6 +204,10 @@ const I18n = {
   'translations': {},
   /** @type {string} */
   'locale': '',
+  /**
+   * @returns {string}
+   */
+  currentLocale: function () {},
 };
 const GM_info = {
   'script': {
