@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.1.0
+// @version    5.1.1
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -2954,7 +2954,7 @@
       createCheckboxOption({
         id: 'disableRoadLayers',
         title: _('hide_road_layer'),
-        description: _('hide_road_layer'),
+        description: _('hide_road_layer_descr'),
       })
     );
 
@@ -2978,7 +2978,7 @@
     );
 
     const closeZoomTitle = document.createElement('h5');
-    closeZoomTitle.innerText = 'Close-zoom only';
+    closeZoomTitle.innerText = _('close_zoom_only');
 
     renderingParameters.appendChild(closeZoomTitle);
 
