@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    5.1.1
+// @version    5.1.2
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @include    /^https:\/\/(www|beta)\.waze\.com(\/\w{2,3}|\/\w{2,3}-\w{2,3}|\/\w{2,3}-\w{2,3}-\w{2,3})?\/editor\b/
 // @updateURL  http://code.waze.tools/repository/475e72a8-9df5-4a82-928c-7cd78e21e88d.user.js
@@ -17,7 +17,7 @@
 
 (function svl() {
   /** @type {string} */
-  const SVL_VERSION = '5.1.0';
+  const SVL_VERSION = GM_info.script.version;
   /** @type {boolean} */
   const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
@@ -3717,13 +3717,11 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.1.1: Fixed some untranslated strings.
       <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
       <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
       <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes
-      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.
-      <br>- 5.0.7: New options are highlighted in the preference panel
-      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode
-      <br>- 5.0.5: Added a global Layer Opacity setting`,
+      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.`,
       '',
       GM_info.script.supportURL
     );

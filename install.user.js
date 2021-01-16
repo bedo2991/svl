@@ -1,4 +1,4 @@
-function Aa(m) {
+function Ba(m) {
   var p = 0;
   return function() {
     return p < m.length ? {done:!1, value:m[p++], } : {done:!0};
@@ -6,22 +6,22 @@ function Aa(m) {
 }
 function Q(m) {
   var p = "undefined" != typeof Symbol && Symbol.iterator && m[Symbol.iterator];
-  return p ? p.call(m) : {next:Aa(m)};
+  return p ? p.call(m) : {next:Ba(m)};
 }
-function La(m) {
+function Ma(m) {
   for (var p, t = []; !(p = m.next()).done;) {
     t.push(p.value);
   }
   return t;
 }
-var Ma = "function" == typeof Object.defineProperties ? Object.defineProperty : function(m, p, t) {
+var Na = "function" == typeof Object.defineProperties ? Object.defineProperty : function(m, p, t) {
   if (m == Array.prototype || m == Object.prototype) {
     return m;
   }
   m[p] = t.value;
   return m;
 };
-function Na(m) {
+function Oa(m) {
   m = ["object" == typeof globalThis && globalThis, m, "object" == typeof window && window, "object" == typeof self && self, "object" == typeof global && global, ];
   for (var p = 0; p < m.length; ++p) {
     var t = m[p];
@@ -31,11 +31,11 @@ function Na(m) {
   }
   throw Error("Cannot find global object");
 }
-var Oa = Na(this);
+var Pa = Oa(this);
 function Y(m, p) {
   if (p) {
     a: {
-      var t = Oa;
+      var t = Pa;
       m = m.split(".");
       for (var x = 0; x < m.length - 1; x++) {
         var I = m[x];
@@ -47,7 +47,7 @@ function Y(m, p) {
       m = m[m.length - 1];
       x = t[m];
       p = p(x);
-      p != x && null != p && Ma(t, m, {configurable:!0, writable:!0, value:p});
+      p != x && null != p && Na(t, m, {configurable:!0, writable:!0, value:p});
     }
   }
 }
@@ -60,7 +60,7 @@ Y("Symbol", function(m) {
   }
   function t(I, S) {
     this.o = I;
-    Ma(this, "description", {configurable:!0, writable:!0, value:S});
+    Na(this, "description", {configurable:!0, writable:!0, value:S});
   }
   if (m) {
     return m;
@@ -77,21 +77,21 @@ Y("Symbol.iterator", function(m) {
   }
   m = Symbol("Symbol.iterator");
   for (var p = "Array Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".split(" "), t = 0; t < p.length; t++) {
-    var x = Oa[p[t]];
-    "function" === typeof x && "function" != typeof x.prototype[m] && Ma(x.prototype, m, {configurable:!0, writable:!0, value:function() {
-      return di(Aa(this));
+    var x = Pa[p[t]];
+    "function" === typeof x && "function" != typeof x.prototype[m] && Na(x.prototype, m, {configurable:!0, writable:!0, value:function() {
+      return ei(Ba(this));
     }});
   }
   return m;
 });
-function di(m) {
+function ei(m) {
   m = {next:m};
   m[Symbol.iterator] = function() {
     return this;
   };
   return m;
 }
-function ei(m, p) {
+function fi(m, p) {
   m instanceof String && (m += "");
   var t = 0, x = !1, I = {next:function() {
     if (!x && t < m.length) {
@@ -108,7 +108,7 @@ function ei(m, p) {
 }
 Y("Array.prototype.keys", function(m) {
   return m ? m : function() {
-    return ei(this, function(p) {
+    return fi(this, function(p) {
       return p;
     });
   };
@@ -156,7 +156,7 @@ Y("String.prototype.includes", function(m) {
 });
 Y("Array.prototype.entries", function(m) {
   return m ? m : function() {
-    return ei(this, function(p, t) {
+    return fi(this, function(p, t) {
       return [p, t];
     });
   };
@@ -180,13 +180,13 @@ Y("Object.values", function(m) {
   function p() {
     y("resetting preferences");
     y("saveDefaultPreferences");
-    Ba(!0);
-    da(d);
-    ea();
+    Ca(!0);
+    ea(d);
+    fa();
     x("success", g("preferences_reset_message"));
   }
   function t() {
-    WazeWrap.Alerts.prompt(GM_info.script.name, g("preferences_import_prompt") + "\n\n" + g("preferences_import_prompt_2"), "", fi, null);
+    WazeWrap.Alerts.prompt(GM_info.script.name, g("preferences_import_prompt") + "\n\n" + g("preferences_import_prompt_2"), "", gi, null);
   }
   function x(a, b) {
     try {
@@ -203,29 +203,29 @@ Y("Object.values", function(m) {
     0 !== W.model.actionManager.unsavedActionsNum() || WazeWrap.hasSelectedFeatures() || 0 !== document.querySelectorAll(".place-update-edit.show").length || W.controller.reload();
   }
   function N(a, b) {
-    1 === a ? (y("Changing SVL Layer visibility to " + b), A.setVisibility(b)) : fa ? (y("Changing Road Layer visibility to " + b), fa.setVisibility(b)) : console.warn("SVL: cannot toggle the WME's road layer");
-    if (!va[a] && (y("Initialising layer " + a), va[a] = document.getElementById(1 === a ? "layer-switcher-item_street_vector_layer" : "layer-switcher-item_road"), !va[a])) {
+    1 === a ? (y("Changing SVL Layer visibility to " + b), A.setVisibility(b)) : ha ? (y("Changing Road Layer visibility to " + b), ha.setVisibility(b)) : console.warn("SVL: cannot toggle the WME's road layer");
+    if (!wa[a] && (y("Initialising layer " + a), wa[a] = document.getElementById(1 === a ? "layer-switcher-item_street_vector_layer" : "layer-switcher-item_road"), !wa[a])) {
       console.warn("SVL: cannot find checkbox for layer number " + a);
       return;
     }
-    va[a].checked = b;
+    wa[a].checked = b;
   }
-  function Ca(a, b) {
+  function Da(a, b) {
     b = void 0 === b ? !0 : b;
     y("savePreferences");
-    a.version = "5.1.0";
+    a.version = ba;
     try {
       window.localStorage.setItem("svl", JSON.stringify(a)), b || x("success", g("preferences_saved"));
     } catch (c) {
       console.error(c), x("error", g("preferences_saving_error"));
     }
   }
-  function gi(a) {
+  function hi(a) {
     var b = a.u, c = a.roadType;
     a = a.A;
-    return d.realsize ? b ? a ? b : 0.6 * b : a ? Pa[c] : 0.6 * Pa[c] : parseInt(O[c].strokeWidth, 10);
+    return d.realsize ? b ? a ? b : 0.6 * b : a ? Qa[c] : 0.6 * Qa[c] : parseInt(O[c].strokeWidth, 10);
   }
-  function Ba(a) {
+  function Ca(a) {
     a = void 0 === a ? !1 : a;
     var b = !0, c = null;
     if (!0 === a) {
@@ -250,214 +250,214 @@ Y("Object.values", function(m) {
     d.hideMinorRoads = null != (U = null == (M = c) ? void 0 : M.hideMinorRoads) ? U : !0;
     var K, C;
     d.showDashedUnverifiedSL = null != (C = null == (K = c) ? void 0 : K.showDashedUnverifiedSL) ? C : !0;
-    var Z, ha;
-    d.showSLcolor = null != (ha = null == (Z = c) ? void 0 : Z.showSLcolor) ? ha : !0;
-    var ia, ja;
-    d.showSLtext = null != (ja = null == (ia = c) ? void 0 : ia.showSLtext) ? ja : !0;
-    var ka, la;
-    d.disableRoadLayers = null != (la = null == (ka = c) ? void 0 : ka.disableRoadLayers) ? la : !0;
-    var ma, na;
-    d.startDisabled = null != (na = null == (ma = c) ? void 0 : ma.startDisabled) ? na : !1;
-    var oa, pa;
-    d.clutterConstant = null != (pa = null == (oa = c) ? void 0 : oa.clutterConstant) ? pa : 7;
-    var qa, ra;
-    d.labelOutlineWidth = null != (ra = null == (qa = c) ? void 0 : qa.labelOutlineWidth) ? ra : 3;
-    var sa, Qa;
-    d.closeZoomLabelSize = null != (Qa = null == (sa = c) ? void 0 : sa.closeZoomLabelSize) ? Qa : 14;
-    var Ra, Sa;
-    d.farZoomLabelSize = null != (Sa = null == (Ra = c) ? void 0 : Ra.farZoomLabelSize) ? Sa : 12;
-    var Ta, Ua;
-    d.useWMERoadLayerAtZoom = null != (Ua = null == (Ta = c) ? void 0 : Ta.useWMERoadLayerAtZoom) ? Ua : 1;
-    var Va, Wa;
-    d.switchZoom = null != (Wa = null == (Va = c) ? void 0 : Va.switchZoom) ? Wa : 5;
-    var Xa, Ya;
-    d.arrowDeclutter = null != (Ya = null == (Xa = c) ? void 0 : Xa.arrowDeclutter) ? Ya : 140;
-    var Za, $a;
-    d.segmentsThreshold = null != ($a = null == (Za = c) ? void 0 : Za.segmentsThreshold) ? $a : 3000;
-    var ab, bb;
-    d.nodesThreshold = null != (bb = null == (ab = c) ? void 0 : ab.nodesThreshold) ? bb : 4000;
-    var cb, db;
-    d.showUnderGPSPoints = null != (db = null == (cb = c) ? void 0 : cb.showUnderGPSPoints) ? db : !1;
-    var eb, fb;
-    d.routingModeEnabled = null != (fb = null == (eb = c) ? void 0 : eb.routingModeEnabled) ? fb : !1;
-    var gb, hb;
-    d.hideRoutingModeBlock = null != (hb = null == (gb = c) ? void 0 : gb.hideRoutingModeBlock) ? hb : !1;
-    var ib, jb;
-    d.realsize = null != (jb = null == (ib = c) ? void 0 : ib.realsize) ? jb : !0;
-    var kb, lb;
-    d.showANs = null != (lb = null == (kb = c) ? void 0 : kb.showANs) ? lb : !1;
-    var mb, nb;
-    d.renderGeomNodes = null != (nb = null == (mb = c) ? void 0 : mb.renderGeomNodes) ? nb : !1;
-    var ob, pb;
-    d.layerOpacity = null != (pb = null == (ob = c) ? void 0 : ob.layerOpacity) ? pb : 0.8;
+    var Z, ia;
+    d.showSLcolor = null != (ia = null == (Z = c) ? void 0 : Z.showSLcolor) ? ia : !0;
+    var ja, ka;
+    d.showSLtext = null != (ka = null == (ja = c) ? void 0 : ja.showSLtext) ? ka : !0;
+    var la, ma;
+    d.disableRoadLayers = null != (ma = null == (la = c) ? void 0 : la.disableRoadLayers) ? ma : !0;
+    var na, oa;
+    d.startDisabled = null != (oa = null == (na = c) ? void 0 : na.startDisabled) ? oa : !1;
+    var pa, qa;
+    d.clutterConstant = null != (qa = null == (pa = c) ? void 0 : pa.clutterConstant) ? qa : 7;
+    var ra, sa;
+    d.labelOutlineWidth = null != (sa = null == (ra = c) ? void 0 : ra.labelOutlineWidth) ? sa : 3;
+    var ta, Ra;
+    d.closeZoomLabelSize = null != (Ra = null == (ta = c) ? void 0 : ta.closeZoomLabelSize) ? Ra : 14;
+    var Sa, Ta;
+    d.farZoomLabelSize = null != (Ta = null == (Sa = c) ? void 0 : Sa.farZoomLabelSize) ? Ta : 12;
+    var Ua, Va;
+    d.useWMERoadLayerAtZoom = null != (Va = null == (Ua = c) ? void 0 : Ua.useWMERoadLayerAtZoom) ? Va : 1;
+    var Wa, Xa;
+    d.switchZoom = null != (Xa = null == (Wa = c) ? void 0 : Wa.switchZoom) ? Xa : 5;
+    var Ya, Za;
+    d.arrowDeclutter = null != (Za = null == (Ya = c) ? void 0 : Ya.arrowDeclutter) ? Za : 140;
+    var $a, ab;
+    d.segmentsThreshold = null != (ab = null == ($a = c) ? void 0 : $a.segmentsThreshold) ? ab : 3000;
+    var bb, cb;
+    d.nodesThreshold = null != (cb = null == (bb = c) ? void 0 : bb.nodesThreshold) ? cb : 4000;
+    var db, eb;
+    d.showUnderGPSPoints = null != (eb = null == (db = c) ? void 0 : db.showUnderGPSPoints) ? eb : !1;
+    var fb, gb;
+    d.routingModeEnabled = null != (gb = null == (fb = c) ? void 0 : fb.routingModeEnabled) ? gb : !1;
+    var hb, ib;
+    d.hideRoutingModeBlock = null != (ib = null == (hb = c) ? void 0 : hb.hideRoutingModeBlock) ? ib : !1;
+    var jb, kb;
+    d.realsize = null != (kb = null == (jb = c) ? void 0 : jb.realsize) ? kb : !0;
+    var lb, mb;
+    d.showANs = null != (mb = null == (lb = c) ? void 0 : lb.showANs) ? mb : !1;
+    var nb, ob;
+    d.renderGeomNodes = null != (ob = null == (nb = c) ? void 0 : nb.renderGeomNodes) ? ob : !1;
+    var pb, qb;
+    d.layerOpacity = null != (qb = null == (pb = c) ? void 0 : pb.layerOpacity) ? qb : 0.8;
     d.streets = [];
-    var qb, rb, sb, tb, ub, vb, wb, xb, yb;
-    d.streets[1] = {strokeColor:null != (wb = null == (qb = c) ? void 0 : null == (rb = qb.streets[1]) ? void 0 : rb.strokeColor) ? wb : "#FFFFFF", strokeWidth:null != (xb = null == (sb = c) ? void 0 : null == (tb = sb.streets[1]) ? void 0 : tb.strokeWidth) ? xb : 10, strokeDashstyle:null != (yb = null == (ub = c) ? void 0 : null == (vb = ub.streets[1]) ? void 0 : vb.strokeDashstyle) ? yb : "solid", };
-    var zb, Ab, Bb, Cb, Db, Eb, Fb, Gb, Hb;
-    d.streets[20] = {strokeColor:null != (Fb = null == (zb = c) ? void 0 : null == (Ab = zb.streets[20]) ? void 0 : Ab.strokeColor) ? Fb : "#2282AB", strokeWidth:null != (Gb = null == (Bb = c) ? void 0 : null == (Cb = Bb.streets[20]) ? void 0 : Cb.strokeWidth) ? Gb : 9, strokeDashstyle:null != (Hb = null == (Db = c) ? void 0 : null == (Eb = Db.streets[20]) ? void 0 : Eb.strokeDashstyle) ? Hb : "solid", };
-    var Ib, Jb, Kb, Lb, Mb, Nb, Ob, Pb, Qb;
-    d.streets[4] = {strokeColor:null != (Ob = null == (Ib = c) ? void 0 : null == (Jb = Ib.streets[4]) ? void 0 : Jb.strokeColor) ? Ob : "#3FC91C", strokeWidth:null != (Pb = null == (Kb = c) ? void 0 : null == (Lb = Kb.streets[4]) ? void 0 : Lb.strokeWidth) ? Pb : 11, strokeDashstyle:null != (Qb = null == (Mb = c) ? void 0 : null == (Nb = Mb.streets[4]) ? void 0 : Nb.strokeDashstyle) ? Qb : "solid", };
-    var Rb, Sb, Tb, Ub, Vb, Wb, Xb, Yb, Zb;
-    d.streets[3] = {strokeColor:null != (Xb = null == (Rb = c) ? void 0 : null == (Sb = Rb.streets[3]) ? void 0 : Sb.strokeColor) ? Xb : "#387FB8", strokeWidth:null != (Yb = null == (Tb = c) ? void 0 : null == (Ub = Tb.streets[3]) ? void 0 : Ub.strokeWidth) ? Yb : 18, strokeDashstyle:null != (Zb = null == (Vb = c) ? void 0 : null == (Wb = Vb.streets[3]) ? void 0 : Wb.strokeDashstyle) ? Zb : "solid", };
-    var $b, ac, bc, cc, dc, ec, fc, gc, hc;
-    d.streets[7] = {strokeColor:null != (fc = null == ($b = c) ? void 0 : null == (ac = $b.streets[7]) ? void 0 : ac.strokeColor) ? fc : "#ECE589", strokeWidth:null != (gc = null == (bc = c) ? void 0 : null == (cc = bc.streets[7]) ? void 0 : cc.strokeWidth) ? gc : 14, strokeDashstyle:null != (hc = null == (dc = c) ? void 0 : null == (ec = dc.streets[7]) ? void 0 : ec.strokeDashstyle) ? hc : "solid", };
-    var ic, jc, kc, lc, mc, nc, oc, pc, qc;
-    d.streets[6] = {strokeColor:null != (oc = null == (ic = c) ? void 0 : null == (jc = ic.streets[6]) ? void 0 : jc.strokeColor) ? oc : "#C13040", strokeWidth:null != (pc = null == (kc = c) ? void 0 : null == (lc = kc.streets[6]) ? void 0 : lc.strokeWidth) ? pc : 16, strokeDashstyle:null != (qc = null == (mc = c) ? void 0 : null == (nc = mc.streets[6]) ? void 0 : nc.strokeDashstyle) ? qc : "solid", };
-    var rc, sc, tc, uc, vc, wc, xc, yc, zc;
-    d.streets[16] = {strokeColor:null != (xc = null == (rc = c) ? void 0 : null == (sc = rc.streets[16]) ? void 0 : sc.strokeColor) ? xc : "#B700FF", strokeWidth:null != (yc = null == (tc = c) ? void 0 : null == (uc = tc.streets[16]) ? void 0 : uc.strokeWidth) ? yc : 5, strokeDashstyle:null != (zc = null == (vc = c) ? void 0 : null == (wc = vc.streets[16]) ? void 0 : wc.strokeDashstyle) ? zc : "dash", };
-    var Ac, Bc, Cc, Dc, Ec, Fc, Gc, Hc, Ic;
-    d.streets[5] = {strokeColor:null != (Gc = null == (Ac = c) ? void 0 : null == (Bc = Ac.streets[5]) ? void 0 : Bc.strokeColor) ? Gc : "#00FF00", strokeWidth:null != (Hc = null == (Cc = c) ? void 0 : null == (Dc = Cc.streets[5]) ? void 0 : Dc.strokeWidth) ? Hc : 5, strokeDashstyle:null != (Ic = null == (Ec = c) ? void 0 : null == (Fc = Ec.streets[5]) ? void 0 : Fc.strokeDashstyle) ? Ic : "dash", };
-    var Jc, Kc, Lc, Mc, Nc, Oc, Pc, Qc, Rc;
-    d.streets[8] = {strokeColor:null != (Pc = null == (Jc = c) ? void 0 : null == (Kc = Jc.streets[8]) ? void 0 : Kc.strokeColor) ? Pc : "#82614A", strokeWidth:null != (Qc = null == (Lc = c) ? void 0 : null == (Mc = Lc.streets[8]) ? void 0 : Mc.strokeWidth) ? Qc : 7, strokeDashstyle:null != (Rc = null == (Nc = c) ? void 0 : null == (Oc = Nc.streets[8]) ? void 0 : Oc.strokeDashstyle) ? Rc : "solid", };
-    var Sc, Tc, Uc, Vc, Wc, Xc, Yc, Zc, $c;
-    d.streets[15] = {strokeColor:null != (Yc = null == (Sc = c) ? void 0 : null == (Tc = Sc.streets[15]) ? void 0 : Tc.strokeColor) ? Yc : "#FF8000", strokeWidth:null != (Zc = null == (Uc = c) ? void 0 : null == (Vc = Uc.streets[15]) ? void 0 : Vc.strokeWidth) ? Zc : 5, strokeDashstyle:null != ($c = null == (Wc = c) ? void 0 : null == (Xc = Wc.streets[15]) ? void 0 : Xc.strokeDashstyle) ? $c : "dashdot", };
-    var ad, bd, cd, dd, ed, fd, gd, hd, id;
-    d.streets[18] = {strokeColor:null != (gd = null == (ad = c) ? void 0 : null == (bd = ad.streets[18]) ? void 0 : bd.strokeColor) ? gd : "#FFFFFF", strokeWidth:null != (hd = null == (cd = c) ? void 0 : null == (dd = cd.streets[18]) ? void 0 : dd.strokeWidth) ? hd : 8, strokeDashstyle:null != (id = null == (ed = c) ? void 0 : null == (fd = ed.streets[18]) ? void 0 : fd.strokeDashstyle) ? id : "dash", };
-    var jd, kd, ld, md, nd, od, pd, qd, rd;
-    d.streets[17] = {strokeColor:null != (pd = null == (jd = c) ? void 0 : null == (kd = jd.streets[17]) ? void 0 : kd.strokeColor) ? pd : "#00FFB3", strokeWidth:null != (qd = null == (ld = c) ? void 0 : null == (md = ld.streets[17]) ? void 0 : md.strokeWidth) ? qd : 7, strokeDashstyle:null != (rd = null == (nd = c) ? void 0 : null == (od = nd.streets[17]) ? void 0 : od.strokeDashstyle) ? rd : "solid", };
-    var sd, td, ud, vd, wd, xd, yd, zd, Ad;
-    d.streets[22] = {strokeColor:null != (yd = null == (sd = c) ? void 0 : null == (td = sd.streets[22]) ? void 0 : td.strokeColor) ? yd : "#C6C7FF", strokeWidth:null != (zd = null == (ud = c) ? void 0 : null == (vd = ud.streets[22]) ? void 0 : vd.strokeWidth) ? zd : 6, strokeDashstyle:null != (Ad = null == (wd = c) ? void 0 : null == (xd = wd.streets[22]) ? void 0 : xd.strokeDashstyle) ? Ad : "solid", };
-    var Bd, Cd, Dd, Ed, Fd, Gd, Hd, Id, Jd;
-    d.streets[19] = {strokeColor:null != (Hd = null == (Bd = c) ? void 0 : null == (Cd = Bd.streets[19]) ? void 0 : Cd.strokeColor) ? Hd : "#00FF00", strokeWidth:null != (Id = null == (Dd = c) ? void 0 : null == (Ed = Dd.streets[19]) ? void 0 : Ed.strokeWidth) ? Id : 5, strokeDashstyle:null != (Jd = null == (Fd = c) ? void 0 : null == (Gd = Fd.streets[19]) ? void 0 : Gd.strokeDashstyle) ? Jd : "dashdot", };
-    var Kd, Ld, Md, Nd, Od, Pd, Qd, Rd, Sd;
-    d.streets[2] = {strokeColor:null != (Qd = null == (Kd = c) ? void 0 : null == (Ld = Kd.streets[2]) ? void 0 : Ld.strokeColor) ? Qd : "#CBA12E", strokeWidth:null != (Rd = null == (Md = c) ? void 0 : null == (Nd = Md.streets[2]) ? void 0 : Nd.strokeWidth) ? Rd : 12, strokeDashstyle:null != (Sd = null == (Od = c) ? void 0 : null == (Pd = Od.streets[2]) ? void 0 : Pd.strokeDashstyle) ? Sd : "solid", };
-    var Td, Ud, Vd, Wd, Xd, Yd, Zd, $d, ae;
-    d.streets[10] = {strokeColor:null != (Zd = null == (Td = c) ? void 0 : null == (Ud = Td.streets[10]) ? void 0 : Ud.strokeColor) ? Zd : "#0000FF", strokeWidth:null != ($d = null == (Vd = c) ? void 0 : null == (Wd = Vd.streets[10]) ? void 0 : Wd.strokeWidth) ? $d : 5, strokeDashstyle:null != (ae = null == (Xd = c) ? void 0 : null == (Yd = Xd.streets[10]) ? void 0 : Yd.strokeDashstyle) ? ae : "dash", };
-    var be, ce, de, ee, fe, ge;
-    d.red = {strokeColor:null != (fe = null == (be = c) ? void 0 : null == (ce = be.red) ? void 0 : ce.strokeColor) ? fe : "#FF0000", strokeDashstyle:null != (ge = null == (de = c) ? void 0 : null == (ee = de.red) ? void 0 : ee.strokeDashstyle) ? ge : "solid", };
-    var he, ie, je, ke, le, me, ne, oe, pe;
-    d.roundabout = {strokeColor:null != (ne = null == (he = c) ? void 0 : null == (ie = he.roundabout) ? void 0 : ie.strokeColor) ? ne : "#111", strokeWidth:null != (oe = null == (je = c) ? void 0 : null == (ke = je.roundabout) ? void 0 : ke.strokeWidth) ? oe : 1, strokeDashstyle:null != (pe = null == (le = c) ? void 0 : null == (me = le.roundabout) ? void 0 : me.strokeDashstyle) ? pe : "dash", };
-    var qe, re, se, te, ue, ve, we, xe, ye;
-    d.lanes = {strokeColor:null != (we = null == (qe = c) ? void 0 : null == (re = qe.lanes) ? void 0 : re.strokeColor) ? we : "#454443", strokeDashstyle:null != (xe = null == (se = c) ? void 0 : null == (te = se.lanes) ? void 0 : te.strokeDashstyle) ? xe : "dash", strokeOpacity:null != (ye = null == (ue = c) ? void 0 : null == (ve = ue.lanes) ? void 0 : ve.strokeOpacity) ? ye : 0.9, };
-    var ze, Ae, Be, Ce, De, Ee, Fe, Ge, He;
-    d.toll = {strokeColor:null != (Fe = null == (ze = c) ? void 0 : null == (Ae = ze.toll) ? void 0 : Ae.strokeColor) ? Fe : "#00E1FF", strokeDashstyle:null != (Ge = null == (Be = c) ? void 0 : null == (Ce = Be.toll) ? void 0 : Ce.strokeDashstyle) ? Ge : "solid", strokeOpacity:null != (He = null == (De = c) ? void 0 : null == (Ee = De.toll) ? void 0 : Ee.strokeOpacity) ? He : 1.0, };
-    var Ie, Je, Ke, Le, Me, Ne, Oe, Pe, Qe;
-    d.closure = {strokeColor:null != (Oe = null == (Ie = c) ? void 0 : null == (Je = Ie.closure) ? void 0 : Je.strokeColor) ? Oe : "#FF00FF", strokeOpacity:null != (Pe = null == (Ke = c) ? void 0 : null == (Le = Ke.closure) ? void 0 : Le.strokeOpacity) ? Pe : 1.0, strokeDashstyle:null != (Qe = null == (Me = c) ? void 0 : null == (Ne = Me.closure) ? void 0 : Ne.strokeDashstyle) ? Qe : "dash", };
-    var Re, Se, Te, Ue, Ve, We, Xe, Ye, Ze;
-    d.headlights = {strokeColor:null != (Xe = null == (Re = c) ? void 0 : null == (Se = Re.headlights) ? void 0 : Se.strokeColor) ? Xe : "#bfff00", strokeOpacity:null != (Ye = null == (Te = c) ? void 0 : null == (Ue = Te.headlights) ? void 0 : Ue.strokeOpacity) ? Ye : 0.9, strokeDashstyle:null != (Ze = null == (Ve = c) ? void 0 : null == (We = Ve.headlights) ? void 0 : We.strokeDashstyle) ? Ze : "dot", };
-    var $e, af, bf, cf, df, ef, ff, gf, hf;
-    d.nearbyHOV = {strokeColor:null != (ff = null == ($e = c) ? void 0 : null == (af = $e.nearbyHOV) ? void 0 : af.strokeColor) ? ff : "#ff66ff", strokeOpacity:null != (gf = null == (bf = c) ? void 0 : null == (cf = bf.nearbyHOV) ? void 0 : cf.strokeOpacity) ? gf : 1.0, strokeDashstyle:null != (hf = null == (df = c) ? void 0 : null == (ef = df.nearbyHOV) ? void 0 : ef.strokeDashstyle) ? hf : "dash", };
-    var jf, kf, lf, mf, nf, of, pf, qf, rf;
-    d.restriction = {strokeColor:null != (pf = null == (jf = c) ? void 0 : null == (kf = jf.restriction) ? void 0 : kf.strokeColor) ? pf : "#F2FF00", strokeOpacity:null != (qf = null == (lf = c) ? void 0 : null == (mf = lf.restriction) ? void 0 : mf.strokeOpacity) ? qf : 1.0, strokeDashstyle:null != (rf = null == (nf = c) ? void 0 : null == (of = nf.restriction) ? void 0 : of.strokeDashstyle) ? rf : "dash", };
-    var sf, tf, uf, vf, wf, xf, yf, zf, Af;
-    d.dirty = {strokeColor:null != (yf = null == (sf = c) ? void 0 : null == (tf = sf.dirty) ? void 0 : tf.strokeColor) ? yf : "#82614A", strokeOpacity:null != (zf = null == (uf = c) ? void 0 : null == (vf = uf.dirty) ? void 0 : vf.strokeOpacity) ? zf : 0.6, strokeDashstyle:null != (Af = null == (wf = c) ? void 0 : null == (xf = wf.dirty) ? void 0 : xf.strokeDashstyle) ? Af : "longdash", };
+    var rb, sb, tb, ub, vb, wb, xb, yb, zb;
+    d.streets[1] = {strokeColor:null != (xb = null == (rb = c) ? void 0 : null == (sb = rb.streets[1]) ? void 0 : sb.strokeColor) ? xb : "#FFFFFF", strokeWidth:null != (yb = null == (tb = c) ? void 0 : null == (ub = tb.streets[1]) ? void 0 : ub.strokeWidth) ? yb : 10, strokeDashstyle:null != (zb = null == (vb = c) ? void 0 : null == (wb = vb.streets[1]) ? void 0 : wb.strokeDashstyle) ? zb : "solid", };
+    var Ab, Bb, Cb, Db, Eb, Fb, Gb, Hb, Ib;
+    d.streets[20] = {strokeColor:null != (Gb = null == (Ab = c) ? void 0 : null == (Bb = Ab.streets[20]) ? void 0 : Bb.strokeColor) ? Gb : "#2282AB", strokeWidth:null != (Hb = null == (Cb = c) ? void 0 : null == (Db = Cb.streets[20]) ? void 0 : Db.strokeWidth) ? Hb : 9, strokeDashstyle:null != (Ib = null == (Eb = c) ? void 0 : null == (Fb = Eb.streets[20]) ? void 0 : Fb.strokeDashstyle) ? Ib : "solid", };
+    var Jb, Kb, Lb, Mb, Nb, Ob, Pb, Qb, Rb;
+    d.streets[4] = {strokeColor:null != (Pb = null == (Jb = c) ? void 0 : null == (Kb = Jb.streets[4]) ? void 0 : Kb.strokeColor) ? Pb : "#3FC91C", strokeWidth:null != (Qb = null == (Lb = c) ? void 0 : null == (Mb = Lb.streets[4]) ? void 0 : Mb.strokeWidth) ? Qb : 11, strokeDashstyle:null != (Rb = null == (Nb = c) ? void 0 : null == (Ob = Nb.streets[4]) ? void 0 : Ob.strokeDashstyle) ? Rb : "solid", };
+    var Sb, Tb, Ub, Vb, Wb, Xb, Yb, Zb, $b;
+    d.streets[3] = {strokeColor:null != (Yb = null == (Sb = c) ? void 0 : null == (Tb = Sb.streets[3]) ? void 0 : Tb.strokeColor) ? Yb : "#387FB8", strokeWidth:null != (Zb = null == (Ub = c) ? void 0 : null == (Vb = Ub.streets[3]) ? void 0 : Vb.strokeWidth) ? Zb : 18, strokeDashstyle:null != ($b = null == (Wb = c) ? void 0 : null == (Xb = Wb.streets[3]) ? void 0 : Xb.strokeDashstyle) ? $b : "solid", };
+    var ac, bc, cc, dc, ec, fc, gc, hc, ic;
+    d.streets[7] = {strokeColor:null != (gc = null == (ac = c) ? void 0 : null == (bc = ac.streets[7]) ? void 0 : bc.strokeColor) ? gc : "#ECE589", strokeWidth:null != (hc = null == (cc = c) ? void 0 : null == (dc = cc.streets[7]) ? void 0 : dc.strokeWidth) ? hc : 14, strokeDashstyle:null != (ic = null == (ec = c) ? void 0 : null == (fc = ec.streets[7]) ? void 0 : fc.strokeDashstyle) ? ic : "solid", };
+    var jc, kc, lc, mc, nc, oc, pc, qc, rc;
+    d.streets[6] = {strokeColor:null != (pc = null == (jc = c) ? void 0 : null == (kc = jc.streets[6]) ? void 0 : kc.strokeColor) ? pc : "#C13040", strokeWidth:null != (qc = null == (lc = c) ? void 0 : null == (mc = lc.streets[6]) ? void 0 : mc.strokeWidth) ? qc : 16, strokeDashstyle:null != (rc = null == (nc = c) ? void 0 : null == (oc = nc.streets[6]) ? void 0 : oc.strokeDashstyle) ? rc : "solid", };
+    var sc, tc, uc, vc, wc, xc, yc, zc, Ac;
+    d.streets[16] = {strokeColor:null != (yc = null == (sc = c) ? void 0 : null == (tc = sc.streets[16]) ? void 0 : tc.strokeColor) ? yc : "#B700FF", strokeWidth:null != (zc = null == (uc = c) ? void 0 : null == (vc = uc.streets[16]) ? void 0 : vc.strokeWidth) ? zc : 5, strokeDashstyle:null != (Ac = null == (wc = c) ? void 0 : null == (xc = wc.streets[16]) ? void 0 : xc.strokeDashstyle) ? Ac : "dash", };
+    var Bc, Cc, Dc, Ec, Fc, Gc, Hc, Ic, Jc;
+    d.streets[5] = {strokeColor:null != (Hc = null == (Bc = c) ? void 0 : null == (Cc = Bc.streets[5]) ? void 0 : Cc.strokeColor) ? Hc : "#00FF00", strokeWidth:null != (Ic = null == (Dc = c) ? void 0 : null == (Ec = Dc.streets[5]) ? void 0 : Ec.strokeWidth) ? Ic : 5, strokeDashstyle:null != (Jc = null == (Fc = c) ? void 0 : null == (Gc = Fc.streets[5]) ? void 0 : Gc.strokeDashstyle) ? Jc : "dash", };
+    var Kc, Lc, Mc, Nc, Oc, Pc, Qc, Rc, Sc;
+    d.streets[8] = {strokeColor:null != (Qc = null == (Kc = c) ? void 0 : null == (Lc = Kc.streets[8]) ? void 0 : Lc.strokeColor) ? Qc : "#82614A", strokeWidth:null != (Rc = null == (Mc = c) ? void 0 : null == (Nc = Mc.streets[8]) ? void 0 : Nc.strokeWidth) ? Rc : 7, strokeDashstyle:null != (Sc = null == (Oc = c) ? void 0 : null == (Pc = Oc.streets[8]) ? void 0 : Pc.strokeDashstyle) ? Sc : "solid", };
+    var Tc, Uc, Vc, Wc, Xc, Yc, Zc, $c, ad;
+    d.streets[15] = {strokeColor:null != (Zc = null == (Tc = c) ? void 0 : null == (Uc = Tc.streets[15]) ? void 0 : Uc.strokeColor) ? Zc : "#FF8000", strokeWidth:null != ($c = null == (Vc = c) ? void 0 : null == (Wc = Vc.streets[15]) ? void 0 : Wc.strokeWidth) ? $c : 5, strokeDashstyle:null != (ad = null == (Xc = c) ? void 0 : null == (Yc = Xc.streets[15]) ? void 0 : Yc.strokeDashstyle) ? ad : "dashdot", };
+    var bd, cd, dd, ed, fd, gd, hd, id, jd;
+    d.streets[18] = {strokeColor:null != (hd = null == (bd = c) ? void 0 : null == (cd = bd.streets[18]) ? void 0 : cd.strokeColor) ? hd : "#FFFFFF", strokeWidth:null != (id = null == (dd = c) ? void 0 : null == (ed = dd.streets[18]) ? void 0 : ed.strokeWidth) ? id : 8, strokeDashstyle:null != (jd = null == (fd = c) ? void 0 : null == (gd = fd.streets[18]) ? void 0 : gd.strokeDashstyle) ? jd : "dash", };
+    var kd, ld, md, nd, od, pd, qd, rd, sd;
+    d.streets[17] = {strokeColor:null != (qd = null == (kd = c) ? void 0 : null == (ld = kd.streets[17]) ? void 0 : ld.strokeColor) ? qd : "#00FFB3", strokeWidth:null != (rd = null == (md = c) ? void 0 : null == (nd = md.streets[17]) ? void 0 : nd.strokeWidth) ? rd : 7, strokeDashstyle:null != (sd = null == (od = c) ? void 0 : null == (pd = od.streets[17]) ? void 0 : pd.strokeDashstyle) ? sd : "solid", };
+    var td, ud, vd, wd, xd, yd, zd, Ad, Bd;
+    d.streets[22] = {strokeColor:null != (zd = null == (td = c) ? void 0 : null == (ud = td.streets[22]) ? void 0 : ud.strokeColor) ? zd : "#C6C7FF", strokeWidth:null != (Ad = null == (vd = c) ? void 0 : null == (wd = vd.streets[22]) ? void 0 : wd.strokeWidth) ? Ad : 6, strokeDashstyle:null != (Bd = null == (xd = c) ? void 0 : null == (yd = xd.streets[22]) ? void 0 : yd.strokeDashstyle) ? Bd : "solid", };
+    var Cd, Dd, Ed, Fd, Gd, Hd, Id, Jd, Kd;
+    d.streets[19] = {strokeColor:null != (Id = null == (Cd = c) ? void 0 : null == (Dd = Cd.streets[19]) ? void 0 : Dd.strokeColor) ? Id : "#00FF00", strokeWidth:null != (Jd = null == (Ed = c) ? void 0 : null == (Fd = Ed.streets[19]) ? void 0 : Fd.strokeWidth) ? Jd : 5, strokeDashstyle:null != (Kd = null == (Gd = c) ? void 0 : null == (Hd = Gd.streets[19]) ? void 0 : Hd.strokeDashstyle) ? Kd : "dashdot", };
+    var Ld, Md, Nd, Od, Pd, Qd, Rd, Sd, Td;
+    d.streets[2] = {strokeColor:null != (Rd = null == (Ld = c) ? void 0 : null == (Md = Ld.streets[2]) ? void 0 : Md.strokeColor) ? Rd : "#CBA12E", strokeWidth:null != (Sd = null == (Nd = c) ? void 0 : null == (Od = Nd.streets[2]) ? void 0 : Od.strokeWidth) ? Sd : 12, strokeDashstyle:null != (Td = null == (Pd = c) ? void 0 : null == (Qd = Pd.streets[2]) ? void 0 : Qd.strokeDashstyle) ? Td : "solid", };
+    var Ud, Vd, Wd, Xd, Yd, Zd, $d, ae, be;
+    d.streets[10] = {strokeColor:null != ($d = null == (Ud = c) ? void 0 : null == (Vd = Ud.streets[10]) ? void 0 : Vd.strokeColor) ? $d : "#0000FF", strokeWidth:null != (ae = null == (Wd = c) ? void 0 : null == (Xd = Wd.streets[10]) ? void 0 : Xd.strokeWidth) ? ae : 5, strokeDashstyle:null != (be = null == (Yd = c) ? void 0 : null == (Zd = Yd.streets[10]) ? void 0 : Zd.strokeDashstyle) ? be : "dash", };
+    var ce, de, ee, fe, ge, he;
+    d.red = {strokeColor:null != (ge = null == (ce = c) ? void 0 : null == (de = ce.red) ? void 0 : de.strokeColor) ? ge : "#FF0000", strokeDashstyle:null != (he = null == (ee = c) ? void 0 : null == (fe = ee.red) ? void 0 : fe.strokeDashstyle) ? he : "solid", };
+    var ie, je, ke, le, me, ne, oe, pe, qe;
+    d.roundabout = {strokeColor:null != (oe = null == (ie = c) ? void 0 : null == (je = ie.roundabout) ? void 0 : je.strokeColor) ? oe : "#111", strokeWidth:null != (pe = null == (ke = c) ? void 0 : null == (le = ke.roundabout) ? void 0 : le.strokeWidth) ? pe : 1, strokeDashstyle:null != (qe = null == (me = c) ? void 0 : null == (ne = me.roundabout) ? void 0 : ne.strokeDashstyle) ? qe : "dash", };
+    var re, se, te, ue, ve, we, xe, ye, ze;
+    d.lanes = {strokeColor:null != (xe = null == (re = c) ? void 0 : null == (se = re.lanes) ? void 0 : se.strokeColor) ? xe : "#454443", strokeDashstyle:null != (ye = null == (te = c) ? void 0 : null == (ue = te.lanes) ? void 0 : ue.strokeDashstyle) ? ye : "dash", strokeOpacity:null != (ze = null == (ve = c) ? void 0 : null == (we = ve.lanes) ? void 0 : we.strokeOpacity) ? ze : 0.9, };
+    var Ae, Be, Ce, De, Ee, Fe, Ge, He, Ie;
+    d.toll = {strokeColor:null != (Ge = null == (Ae = c) ? void 0 : null == (Be = Ae.toll) ? void 0 : Be.strokeColor) ? Ge : "#00E1FF", strokeDashstyle:null != (He = null == (Ce = c) ? void 0 : null == (De = Ce.toll) ? void 0 : De.strokeDashstyle) ? He : "solid", strokeOpacity:null != (Ie = null == (Ee = c) ? void 0 : null == (Fe = Ee.toll) ? void 0 : Fe.strokeOpacity) ? Ie : 1.0, };
+    var Je, Ke, Le, Me, Ne, Oe, Pe, Qe, Re;
+    d.closure = {strokeColor:null != (Pe = null == (Je = c) ? void 0 : null == (Ke = Je.closure) ? void 0 : Ke.strokeColor) ? Pe : "#FF00FF", strokeOpacity:null != (Qe = null == (Le = c) ? void 0 : null == (Me = Le.closure) ? void 0 : Me.strokeOpacity) ? Qe : 1.0, strokeDashstyle:null != (Re = null == (Ne = c) ? void 0 : null == (Oe = Ne.closure) ? void 0 : Oe.strokeDashstyle) ? Re : "dash", };
+    var Se, Te, Ue, Ve, We, Xe, Ye, Ze, $e;
+    d.headlights = {strokeColor:null != (Ye = null == (Se = c) ? void 0 : null == (Te = Se.headlights) ? void 0 : Te.strokeColor) ? Ye : "#bfff00", strokeOpacity:null != (Ze = null == (Ue = c) ? void 0 : null == (Ve = Ue.headlights) ? void 0 : Ve.strokeOpacity) ? Ze : 0.9, strokeDashstyle:null != ($e = null == (We = c) ? void 0 : null == (Xe = We.headlights) ? void 0 : Xe.strokeDashstyle) ? $e : "dot", };
+    var af, bf, cf, df, ef, ff, gf, hf, jf;
+    d.nearbyHOV = {strokeColor:null != (gf = null == (af = c) ? void 0 : null == (bf = af.nearbyHOV) ? void 0 : bf.strokeColor) ? gf : "#ff66ff", strokeOpacity:null != (hf = null == (cf = c) ? void 0 : null == (df = cf.nearbyHOV) ? void 0 : df.strokeOpacity) ? hf : 1.0, strokeDashstyle:null != (jf = null == (ef = c) ? void 0 : null == (ff = ef.nearbyHOV) ? void 0 : ff.strokeDashstyle) ? jf : "dash", };
+    var kf, lf, mf, nf, of, pf, qf, rf, sf;
+    d.restriction = {strokeColor:null != (qf = null == (kf = c) ? void 0 : null == (lf = kf.restriction) ? void 0 : lf.strokeColor) ? qf : "#F2FF00", strokeOpacity:null != (rf = null == (mf = c) ? void 0 : null == (nf = mf.restriction) ? void 0 : nf.strokeOpacity) ? rf : 1.0, strokeDashstyle:null != (sf = null == (of = c) ? void 0 : null == (pf = of.restriction) ? void 0 : pf.strokeDashstyle) ? sf : "dash", };
+    var tf, uf, vf, wf, xf, yf, zf, Af, Bf;
+    d.dirty = {strokeColor:null != (zf = null == (tf = c) ? void 0 : null == (uf = tf.dirty) ? void 0 : uf.strokeColor) ? zf : "#82614A", strokeOpacity:null != (Af = null == (vf = c) ? void 0 : null == (wf = vf.dirty) ? void 0 : wf.strokeOpacity) ? Af : 0.6, strokeDashstyle:null != (Bf = null == (xf = c) ? void 0 : null == (yf = xf.dirty) ? void 0 : yf.strokeDashstyle) ? Bf : "longdash", };
     d.speeds = {};
-    var Bf, Cf, Df;
-    d.speeds["default"] = null != (Df = null == (Bf = c) ? void 0 : null == (Cf = Bf.speed) ? void 0 : Cf["default"]) ? Df : "#cc0000";
-    var Ef, Ff;
-    if (null == (Ef = c) ? 0 : null == (Ff = Ef.speeds) ? 0 : Ff.metric) {
+    var Cf, Df, Ef;
+    d.speeds["default"] = null != (Ef = null == (Cf = c) ? void 0 : null == (Df = Cf.speed) ? void 0 : Df["default"]) ? Ef : "#cc0000";
+    var Ff, Gf;
+    if (null == (Ff = c) ? 0 : null == (Gf = Ff.speeds) ? 0 : Gf.metric) {
       d.speeds.metric = c.speeds.metric;
     } else {
       d.speeds.metric = {};
-      var Gf, Hf, If;
-      d.speeds.metric[5] = null != (If = null == (Gf = c) ? void 0 : null == (Hf = Gf.speeds) ? void 0 : Hf.metric[5]) ? If : "#542344";
-      var Jf, Kf, Lf;
-      d.speeds.metric[7] = null != (Lf = null == (Jf = c) ? void 0 : null == (Kf = Jf.speeds) ? void 0 : Kf.metric[7]) ? Lf : "#ff5714";
-      var Mf, Nf, Of;
-      d.speeds.metric[10] = null != (Of = null == (Mf = c) ? void 0 : null == (Nf = Mf.speeds) ? void 0 : Nf.metric[10]) ? Of : "#ffbf00";
-      var Pf, Qf, Rf;
-      d.speeds.metric[20] = null != (Rf = null == (Pf = c) ? void 0 : null == (Qf = Pf.speeds) ? void 0 : Qf.metric[20]) ? Rf : "#ee0000";
-      var Sf, Tf, Uf;
-      d.speeds.metric[30] = null != (Uf = null == (Sf = c) ? void 0 : null == (Tf = Sf.speeds) ? void 0 : Tf.metric[30]) ? Uf : "#e4ff1a";
-      var Vf, Wf, Xf;
-      d.speeds.metric[40] = null != (Xf = null == (Vf = c) ? void 0 : null == (Wf = Vf.speeds) ? void 0 : Wf.metric[40]) ? Xf : "#993300";
-      var Yf, Zf, $f;
-      d.speeds.metric[50] = null != ($f = null == (Yf = c) ? void 0 : null == (Zf = Yf.speeds) ? void 0 : Zf.metric[50]) ? $f : "#33ff33";
-      var ag, bg, cg;
-      d.speeds.metric[60] = null != (cg = null == (ag = c) ? void 0 : null == (bg = ag.speeds) ? void 0 : bg.metric[60]) ? cg : "#639fab";
-      var dg, eg, fg;
-      d.speeds.metric[70] = null != (fg = null == (dg = c) ? void 0 : null == (eg = dg.speeds) ? void 0 : eg.metric[70]) ? fg : "#00ffff";
-      var gg, hg, ig;
-      d.speeds.metric[80] = null != (ig = null == (gg = c) ? void 0 : null == (hg = gg.speeds) ? void 0 : hg.metric[80]) ? ig : "#00bfff";
-      var jg, kg, lg;
-      d.speeds.metric[90] = null != (lg = null == (jg = c) ? void 0 : null == (kg = jg.speeds) ? void 0 : kg.metric[90]) ? lg : "#0066ff";
-      var mg, ng, og;
-      d.speeds.metric[100] = null != (og = null == (mg = c) ? void 0 : null == (ng = mg.speeds) ? void 0 : ng.metric[100]) ? og : "#ff00ff";
-      var pg, qg, rg;
-      d.speeds.metric[110] = null != (rg = null == (pg = c) ? void 0 : null == (qg = pg.speeds) ? void 0 : qg.metric[110]) ? rg : "#ff0080";
-      var sg, tg, ug;
-      d.speeds.metric[120] = null != (ug = null == (sg = c) ? void 0 : null == (tg = sg.speeds) ? void 0 : tg.metric[120]) ? ug : "#ff0000";
-      var vg, wg, xg;
-      d.speeds.metric[130] = null != (xg = null == (vg = c) ? void 0 : null == (wg = vg.speeds) ? void 0 : wg.metric[130]) ? xg : "#ff9000";
-      var yg, zg, Ag;
-      d.speeds.metric[140] = null != (Ag = null == (yg = c) ? void 0 : null == (zg = yg.speeds) ? void 0 : zg.metric[140]) ? Ag : "#ff4000";
-      var Bg, Cg, Dg;
-      d.speeds.metric[150] = null != (Dg = null == (Bg = c) ? void 0 : null == (Cg = Bg.speeds) ? void 0 : Cg.metric[150]) ? Dg : "#0040ff";
+      var Hf, If, Jf;
+      d.speeds.metric[5] = null != (Jf = null == (Hf = c) ? void 0 : null == (If = Hf.speeds) ? void 0 : If.metric[5]) ? Jf : "#542344";
+      var Kf, Lf, Mf;
+      d.speeds.metric[7] = null != (Mf = null == (Kf = c) ? void 0 : null == (Lf = Kf.speeds) ? void 0 : Lf.metric[7]) ? Mf : "#ff5714";
+      var Nf, Of, Pf;
+      d.speeds.metric[10] = null != (Pf = null == (Nf = c) ? void 0 : null == (Of = Nf.speeds) ? void 0 : Of.metric[10]) ? Pf : "#ffbf00";
+      var Qf, Rf, Sf;
+      d.speeds.metric[20] = null != (Sf = null == (Qf = c) ? void 0 : null == (Rf = Qf.speeds) ? void 0 : Rf.metric[20]) ? Sf : "#ee0000";
+      var Tf, Uf, Vf;
+      d.speeds.metric[30] = null != (Vf = null == (Tf = c) ? void 0 : null == (Uf = Tf.speeds) ? void 0 : Uf.metric[30]) ? Vf : "#e4ff1a";
+      var Wf, Xf, Yf;
+      d.speeds.metric[40] = null != (Yf = null == (Wf = c) ? void 0 : null == (Xf = Wf.speeds) ? void 0 : Xf.metric[40]) ? Yf : "#993300";
+      var Zf, $f, ag;
+      d.speeds.metric[50] = null != (ag = null == (Zf = c) ? void 0 : null == ($f = Zf.speeds) ? void 0 : $f.metric[50]) ? ag : "#33ff33";
+      var bg, cg, dg;
+      d.speeds.metric[60] = null != (dg = null == (bg = c) ? void 0 : null == (cg = bg.speeds) ? void 0 : cg.metric[60]) ? dg : "#639fab";
+      var eg, fg, gg;
+      d.speeds.metric[70] = null != (gg = null == (eg = c) ? void 0 : null == (fg = eg.speeds) ? void 0 : fg.metric[70]) ? gg : "#00ffff";
+      var hg, ig, jg;
+      d.speeds.metric[80] = null != (jg = null == (hg = c) ? void 0 : null == (ig = hg.speeds) ? void 0 : ig.metric[80]) ? jg : "#00bfff";
+      var kg, lg, mg;
+      d.speeds.metric[90] = null != (mg = null == (kg = c) ? void 0 : null == (lg = kg.speeds) ? void 0 : lg.metric[90]) ? mg : "#0066ff";
+      var ng, og, pg;
+      d.speeds.metric[100] = null != (pg = null == (ng = c) ? void 0 : null == (og = ng.speeds) ? void 0 : og.metric[100]) ? pg : "#ff00ff";
+      var qg, rg, sg;
+      d.speeds.metric[110] = null != (sg = null == (qg = c) ? void 0 : null == (rg = qg.speeds) ? void 0 : rg.metric[110]) ? sg : "#ff0080";
+      var tg, ug, vg;
+      d.speeds.metric[120] = null != (vg = null == (tg = c) ? void 0 : null == (ug = tg.speeds) ? void 0 : ug.metric[120]) ? vg : "#ff0000";
+      var wg, xg, yg;
+      d.speeds.metric[130] = null != (yg = null == (wg = c) ? void 0 : null == (xg = wg.speeds) ? void 0 : xg.metric[130]) ? yg : "#ff9000";
+      var zg, Ag, Bg;
+      d.speeds.metric[140] = null != (Bg = null == (zg = c) ? void 0 : null == (Ag = zg.speeds) ? void 0 : Ag.metric[140]) ? Bg : "#ff4000";
+      var Cg, Dg, Eg;
+      d.speeds.metric[150] = null != (Eg = null == (Cg = c) ? void 0 : null == (Dg = Cg.speeds) ? void 0 : Dg.metric[150]) ? Eg : "#0040ff";
     }
-    var Eg, Fg;
-    if (null == (Eg = c) ? 0 : null == (Fg = Eg.speeds) ? 0 : Fg.imperial) {
+    var Fg, Gg;
+    if (null == (Fg = c) ? 0 : null == (Gg = Fg.speeds) ? 0 : Gg.imperial) {
       d.speeds.imperial = c.speeds.imperial;
     } else {
       d.speeds.imperial = {};
-      var Gg, Hg, Ig;
-      d.speeds.imperial[5] = null != (Ig = null == (Gg = c) ? void 0 : null == (Hg = Gg.speeds) ? void 0 : Hg.imperial[5]) ? Ig : "#ff0000";
-      var Jg, Kg, Lg;
-      d.speeds.imperial[10] = null != (Lg = null == (Jg = c) ? void 0 : null == (Kg = Jg.speeds) ? void 0 : Kg.imperial[10]) ? Lg : "#ff8000";
-      var Mg, Ng, Og;
-      d.speeds.imperial[15] = null != (Og = null == (Mg = c) ? void 0 : null == (Ng = Mg.speeds) ? void 0 : Ng.imperial[15]) ? Og : "#ffb000";
-      var Pg, Qg, Rg;
-      d.speeds.imperial[20] = null != (Rg = null == (Pg = c) ? void 0 : null == (Qg = Pg.speeds) ? void 0 : Qg.imperial[20]) ? Rg : "#bfff00";
-      var Sg, Tg, Ug;
-      d.speeds.imperial[25] = null != (Ug = null == (Sg = c) ? void 0 : null == (Tg = Sg.speeds) ? void 0 : Tg.imperial[25]) ? Ug : "#993300";
-      var Vg, Wg, Xg;
-      d.speeds.imperial[30] = null != (Xg = null == (Vg = c) ? void 0 : null == (Wg = Vg.speeds) ? void 0 : Wg.imperial[30]) ? Xg : "#33ff33";
-      var Yg, Zg, $g;
-      d.speeds.imperial[35] = null != ($g = null == (Yg = c) ? void 0 : null == (Zg = Yg.speeds) ? void 0 : Zg.imperial[35]) ? $g : "#00ff90";
-      var ah, bh, ch;
-      d.speeds.imperial[40] = null != (ch = null == (ah = c) ? void 0 : null == (bh = ah.speeds) ? void 0 : bh.imperial[40]) ? ch : "#00ffff";
-      var dh, eh, fh;
-      d.speeds.imperial[45] = null != (fh = null == (dh = c) ? void 0 : null == (eh = dh.speeds) ? void 0 : eh.imperial[45]) ? fh : "#00bfff";
-      var gh, hh, ih;
-      d.speeds.imperial[50] = null != (ih = null == (gh = c) ? void 0 : null == (hh = gh.speeds) ? void 0 : hh.imperial[50]) ? ih : "#0066ff";
-      var jh, kh, lh;
-      d.speeds.imperial[55] = null != (lh = null == (jh = c) ? void 0 : null == (kh = jh.speeds) ? void 0 : kh.imperial[55]) ? lh : "#ff00ff";
-      var mh, nh, oh;
-      d.speeds.imperial[60] = null != (oh = null == (mh = c) ? void 0 : null == (nh = mh.speeds) ? void 0 : nh.imperial[60]) ? oh : "#ff0050";
-      var ph, qh, rh;
-      d.speeds.imperial[65] = null != (rh = null == (ph = c) ? void 0 : null == (qh = ph.speeds) ? void 0 : qh.imperial[65]) ? rh : "#ff9010";
-      var sh, th, uh;
-      d.speeds.imperial[70] = null != (uh = null == (sh = c) ? void 0 : null == (th = sh.speeds) ? void 0 : th.imperial[70]) ? uh : "#0040ff";
-      var vh, wh, xh;
-      d.speeds.imperial[75] = null != (xh = null == (vh = c) ? void 0 : null == (wh = vh.speeds) ? void 0 : wh.imperial[75]) ? xh : "#10ff10";
-      var yh, zh, Ah;
-      d.speeds.imperial[80] = null != (Ah = null == (yh = c) ? void 0 : null == (zh = yh.speeds) ? void 0 : zh.imperial[80]) ? Ah : "#ff4000";
-      var Bh, Ch, Dh;
-      d.speeds.imperial[85] = null != (Dh = null == (Bh = c) ? void 0 : null == (Ch = Bh.speeds) ? void 0 : Ch.imperial[85]) ? Dh : "#ff0000";
+      var Hg, Ig, Jg;
+      d.speeds.imperial[5] = null != (Jg = null == (Hg = c) ? void 0 : null == (Ig = Hg.speeds) ? void 0 : Ig.imperial[5]) ? Jg : "#ff0000";
+      var Kg, Lg, Mg;
+      d.speeds.imperial[10] = null != (Mg = null == (Kg = c) ? void 0 : null == (Lg = Kg.speeds) ? void 0 : Lg.imperial[10]) ? Mg : "#ff8000";
+      var Ng, Og, Pg;
+      d.speeds.imperial[15] = null != (Pg = null == (Ng = c) ? void 0 : null == (Og = Ng.speeds) ? void 0 : Og.imperial[15]) ? Pg : "#ffb000";
+      var Qg, Rg, Sg;
+      d.speeds.imperial[20] = null != (Sg = null == (Qg = c) ? void 0 : null == (Rg = Qg.speeds) ? void 0 : Rg.imperial[20]) ? Sg : "#bfff00";
+      var Tg, Ug, Vg;
+      d.speeds.imperial[25] = null != (Vg = null == (Tg = c) ? void 0 : null == (Ug = Tg.speeds) ? void 0 : Ug.imperial[25]) ? Vg : "#993300";
+      var Wg, Xg, Yg;
+      d.speeds.imperial[30] = null != (Yg = null == (Wg = c) ? void 0 : null == (Xg = Wg.speeds) ? void 0 : Xg.imperial[30]) ? Yg : "#33ff33";
+      var Zg, $g, ah;
+      d.speeds.imperial[35] = null != (ah = null == (Zg = c) ? void 0 : null == ($g = Zg.speeds) ? void 0 : $g.imperial[35]) ? ah : "#00ff90";
+      var bh, ch, dh;
+      d.speeds.imperial[40] = null != (dh = null == (bh = c) ? void 0 : null == (ch = bh.speeds) ? void 0 : ch.imperial[40]) ? dh : "#00ffff";
+      var eh, fh, gh;
+      d.speeds.imperial[45] = null != (gh = null == (eh = c) ? void 0 : null == (fh = eh.speeds) ? void 0 : fh.imperial[45]) ? gh : "#00bfff";
+      var hh, ih, jh;
+      d.speeds.imperial[50] = null != (jh = null == (hh = c) ? void 0 : null == (ih = hh.speeds) ? void 0 : ih.imperial[50]) ? jh : "#0066ff";
+      var kh, lh, mh;
+      d.speeds.imperial[55] = null != (mh = null == (kh = c) ? void 0 : null == (lh = kh.speeds) ? void 0 : lh.imperial[55]) ? mh : "#ff00ff";
+      var nh, oh, ph;
+      d.speeds.imperial[60] = null != (ph = null == (nh = c) ? void 0 : null == (oh = nh.speeds) ? void 0 : oh.imperial[60]) ? ph : "#ff0050";
+      var qh, rh, sh;
+      d.speeds.imperial[65] = null != (sh = null == (qh = c) ? void 0 : null == (rh = qh.speeds) ? void 0 : rh.imperial[65]) ? sh : "#ff9010";
+      var th, uh, vh;
+      d.speeds.imperial[70] = null != (vh = null == (th = c) ? void 0 : null == (uh = th.speeds) ? void 0 : uh.imperial[70]) ? vh : "#0040ff";
+      var wh, xh, yh;
+      d.speeds.imperial[75] = null != (yh = null == (wh = c) ? void 0 : null == (xh = wh.speeds) ? void 0 : xh.imperial[75]) ? yh : "#10ff10";
+      var zh, Ah, Bh;
+      d.speeds.imperial[80] = null != (Bh = null == (zh = c) ? void 0 : null == (Ah = zh.speeds) ? void 0 : Ah.imperial[80]) ? Bh : "#ff4000";
+      var Ch, Dh, Eh;
+      d.speeds.imperial[85] = null != (Eh = null == (Ch = c) ? void 0 : null == (Dh = Ch.speeds) ? void 0 : Dh.imperial[85]) ? Eh : "#ff0000";
     }
-    Ca(d);
+    Da(d);
     return b;
   }
-  function Da(a) {
+  function Ea(a) {
     if (d.showSLSinglecolor) {
       return d.SLColor;
     }
     var b;
     return null != (b = d.speeds[W.prefs.attributes.isImperial ? "imperial" : "metric"][W.prefs.attributes.isImperial ? Math.round(a / 1.609344) : a]) ? b : d.speeds["default"];
   }
-  function Eh(a, b, c) {
+  function Fh(a, b, c) {
     a ? (a = c.x - b.x, b = c.y - b.y) : (a = b.x - c.x, b = b.y - c.y);
     return 180 * Math.atan2(a, b) / Math.PI;
   }
-  function ta(a) {
+  function ua(a) {
     var b = "";
     if (a) {
       var c = a;
       !0 === W.prefs.attributes.isImperial && (c = Math.round(a / 1.609344));
       c = c.toString();
       for (a = 0; a < c.length; a += 1) {
-        b += hi[c.charAt(a)];
+        b += ii[c.charAt(a)];
       }
     }
     return b;
   }
-  function Fh(a, b, c) {
+  function Gh(a, b, c) {
     c = void 0 === c ? !1 : c;
     var e, f, k = [];
     var n = null;
     var h = a.getAttributes(), r = a.getAddress(), v = a.hasNonEmptyStreet();
     if (null !== h.primaryStreetID && void 0 === r.attributes.state) {
       y("Address not ready", r, h), setTimeout(function() {
-        Fh(a, b, !0);
+        Gh(a, b, !0);
       }, 500);
     } else {
       var q = r.attributes;
@@ -478,7 +478,7 @@ Y("Object.values", function(m) {
       }
       O[h.roadType] || (r += "\n!! UNSUPPORTED ROAD TYPE !!");
       q = "";
-      (null != (e = h.fwdMaxSpeed) ? e : h.revMaxSpeed) && d.showSLtext && (h.fwdMaxSpeed === h.revMaxSpeed ? q = ta(h.fwdMaxSpeed) : h.fwdMaxSpeed ? (q = ta(h.fwdMaxSpeed), h.revMaxSpeed && (q += "'" + ta(h.revMaxSpeed))) : (q = ta(h.revMaxSpeed), h.fwdMaxSpeed && (q += "'" + ta(h.fwdMaxSpeed))), h.fwdMaxSpeedUnverified || h.revMaxSpeedUnverified) && (q += "?");
+      (null != (e = h.fwdMaxSpeed) ? e : h.revMaxSpeed) && d.showSLtext && (h.fwdMaxSpeed === h.revMaxSpeed ? q = ua(h.fwdMaxSpeed) : h.fwdMaxSpeed ? (q = ua(h.fwdMaxSpeed), h.revMaxSpeed && (q += "'" + ua(h.revMaxSpeed))) : (q = ua(h.revMaxSpeed), h.fwdMaxSpeed && (q += "'" + ua(h.fwdMaxSpeed))), h.fwdMaxSpeedUnverified || h.revMaxSpeedUnverified) && (q += "?");
       e = r + " " + q;
       if (" " === e) {
         return [];
@@ -493,7 +493,7 @@ Y("Object.values", function(m) {
         return H.h > M.h ? -1 : H.h < M.h ? 1 : 0;
       });
       w = "" === r ? 1 : z.length;
-      l = Gh * e.length;
+      l = Hh * e.length;
       for (var D = 0; D < z.length && 0 < w && !(z[D].h < (0 < D ? l : l - 30)); D += 1) {
         var G = z[D].index;
         var E = f = 0;
@@ -516,15 +516,15 @@ Y("Object.values", function(m) {
     c && n && B.addFeatures(k, {silent:!0});
     return k;
   }
-  function Hh(a) {
+  function Ih(a) {
     var b = a.id, c = a.rev, e = a.l, f = a.m;
-    a = Eh(a.j, c ? f : e, c ? e : f);
+    a = Fh(a.j, c ? f : e, c ? e : f);
     return new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(e.x + 10 * Math.sin(a), e.y + 10 * Math.cos(a)), {myId:b, }, {rotation:a, externalGraphic:"https://raw.githubusercontent.com/bedo2991/svl/master/average.png", graphicWidth:36, graphicHeight:36, graphicZIndex:300, fillOpacity:1, pointerEvents:"none", });
   }
-  function ii(a) {
+  function ji(a) {
     var b = a.getAttributes();
     y("Drawing segment: " + b.id);
-    var c = b.geometry.components, e = b.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, k = [], n = 100 * b.level, h = b.fwdDirection && b.revDirection, r = a.isInRoundabout(), v = !1, q = !1, z = b.roadType, w = gi({u:b.width, roadType:z, A:h, });
+    var c = b.geometry.components, e = b.geometry.getVertices(), f = (new OpenLayers.Geometry.LineString(e)).simplify(1.5).components, k = [], n = 100 * b.level, h = b.fwdDirection && b.revDirection, r = a.isInRoundabout(), v = !1, q = !1, z = b.roadType, w = hi({u:b.width, roadType:z, A:h, });
     h = w;
     var l = null;
     if (null === b.primaryStreetID) {
@@ -544,7 +544,7 @@ Y("Object.values", function(m) {
       }
       if (q) {
         if (D = d.showDashedUnverifiedSL && (b.fwdMaxSpeedUnverified || b.revMaxSpeedUnverified) ? "dash" : "solid", d.showSLSinglecolor || !b.fwdMaxSpeed && !b.revMaxSpeed || b.fwdMaxSpeed === b.revMaxSpeed || a.isOneWay()) {
-          q = b.fwdMaxSpeed, a.isOneWay() && b.revDirection && (q = b.revMaxSpeed), q && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Da(q), width:v ? 0.8 * w : w, dash:D, a:!0, zIndex:n + 115, }), k.push(l));
+          q = b.fwdMaxSpeed, a.isOneWay() && b.revDirection && (q = b.revMaxSpeed), q && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Ea(q), width:v ? 0.8 * w : w, dash:D, a:!0, zIndex:n + 115, }), k.push(l));
         } else {
           q = [];
           for (var G = [], E = 0; E < e.length - 1; E += 1) {
@@ -574,9 +574,9 @@ Y("Object.values", function(m) {
                 G[1].move(-u / l, H / l * -u);
               }
             }
-            l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(q), {myId:b.id, color:Da(b.fwdMaxSpeed), width:h, dash:D, a:!0, zIndex:n + 105, });
+            l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(q), {myId:b.id, color:Ea(b.fwdMaxSpeed), width:h, dash:D, a:!0, zIndex:n + 105, });
             k.push(l);
-            l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(G), {myId:b.id, color:Da(b.revMaxSpeed), width:h, dash:D, a:!0, zIndex:n + 110, });
+            l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(G), {myId:b.id, color:Ea(b.revMaxSpeed), width:h, dash:D, a:!0, zIndex:n + 110, });
             k.push(l);
           }
         }
@@ -587,7 +587,7 @@ Y("Object.values", function(m) {
       v = a.getLockRank() + 1;
       var K, C;
       if (v > d.fakelock || v > (null == (K = WazeWrap) ? void 0 : null == (C = K.User) ? void 0 : C.Rank())) {
-        l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Ih.strokeColor, width:0.1 * h, dash:Ih.strokeDashstyle, zIndex:n + 147, }), k.push(l);
+        l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Jh.strokeColor, width:0.1 * h, dash:Jh.strokeDashstyle, zIndex:n + 147, }), k.push(l);
       }
       K = a.getFlagAttributes();
       K.unpaved && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:d.dirty.strokeColor, width:0.7 * h, opacity:d.dirty.strokeOpacity, dash:d.dirty.strokeDashstyle, zIndex:n + 135, }), k.push(l));
@@ -597,9 +597,9 @@ Y("Object.values", function(m) {
       })) {
         l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:d.toll.strokeColor, width:0.3 * h, dash:d.toll.strokeDashstyle, opacity:d.toll.strokeOpacity, zIndex:n + 145, }), k.push(l);
       }
-      r && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Ea.strokeColor, width:0.15 * h, dash:Ea.strokeDashstyle, opacity:Ea.strokeOpacity, a:!0, zIndex:n + 150, }), k.push(l));
+      r && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Fa.strokeColor, width:0.15 * h, dash:Fa.strokeDashstyle, opacity:Fa.strokeOpacity, a:!0, zIndex:n + 150, }), k.push(l));
       0 < b.restrictions.length && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:d.restriction.strokeColor, width:0.4 * h, dash:d.restriction.strokeDashstyle, opacity:d.restriction.strokeOpacity, a:!0, zIndex:n + 155, }), k.push(l));
-      !1 === b.validated && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Jh.strokeColor, width:0.5 * h, dash:Jh.strokeDashstyle, a:!0, zIndex:n + 160, }), k.push(l));
+      !1 === b.validated && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Kh.strokeColor, width:0.5 * h, dash:Kh.strokeDashstyle, a:!0, zIndex:n + 160, }), k.push(l));
       K.headlights && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:d.headlights.strokeColor, width:0.2 * h, dash:d.headlights.strokeDashstyle, opacity:d.headlights.strokeOpacity, a:!0, zIndex:n + 165, }));
       K.nearbyHOV && k.push(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:d.nearbyHOV.strokeColor, width:0.25 * h, dash:d.nearbyHOV.strokeDashstyle, opacity:d.nearbyHOV.strokeOpacity, a:!0, zIndex:n + 166, }));
       0 < b.fwdLaneCount && (C = e.slice(-2), C[0] = (new OpenLayers.Geometry.LineString([C[0], C[1], ])).getCentroid(!0), l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(C), {myId:b.id, color:d.lanes.strokeColor, width:0.3 * h, dash:d.lanes.strokeDashstyle, opacity:d.lanes.strokeOpacity, a:!0, zIndex:n + 170, }), k.push(l));
@@ -607,43 +607,43 @@ Y("Object.values", function(m) {
       if (!1 === b.fwdDirection || !1 === b.revDirection) {
         if (C = c, !r && b.length / c.length < d.arrowDeclutter && (C = f), !1 === (b.fwdDirection || b.revDirection)) {
           for (v = 0; v < C.length - 1; v += 1) {
-            k.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([C[v], C[v + 1], ])).getCentroid(!0), {myId:b.id, a:!0, i:!0, zIndex:n + 180, }, ji));
+            k.push(new OpenLayers.Feature.Vector((new OpenLayers.Geometry.LineString([C[v], C[v + 1], ])).getCentroid(!0), {myId:b.id, a:!0, i:!0, zIndex:n + 180, }, ki));
           }
         } else {
           for (v = r ? 3 : 1, z = v - 1; z < C.length - 1; z += v) {
-            w = Eh(b.fwdDirection, C[z], C[z + 1]), D = new OpenLayers.Geometry.LineString([C[z], C[z + 1], ]), k.push(new OpenLayers.Feature.Vector(D.getCentroid(!0), {myId:b.id, a:!0, i:!0, }, {graphicName:"myTriangle", rotation:w, stroke:!0, strokeColor:"#000", graphiczIndex:n + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
+            w = Fh(b.fwdDirection, C[z], C[z + 1]), D = new OpenLayers.Geometry.LineString([C[z], C[z + 1], ]), k.push(new OpenLayers.Feature.Vector(D.getCentroid(!0), {myId:b.id, a:!0, i:!0, }, {graphicName:"myTriangle", rotation:w, stroke:!0, strokeColor:"#000", graphiczIndex:n + 180, strokeWidth:1.5, fill:!0, fillColor:"#fff", fillOpacity:0.7, pointRadius:5, }));
           }
         }
       }
-      K.fwdSpeedCamera && k.push(Hh({id:b.id, rev:!1, j:b.fwdDirection, l:c[0], m:c[1], }));
-      K.revSpeedCamera && k.push(Hh({id:b.id, rev:!0, j:b.fwdDirection, l:c[c.length - 1], m:c[c.length - 2], }));
+      K.fwdSpeedCamera && k.push(Ih({id:b.id, rev:!1, j:b.fwdDirection, l:c[0], m:c[1], }));
+      K.revSpeedCamera && k.push(Ih({id:b.id, rev:!0, j:b.fwdDirection, l:c[c.length - 1], m:c[c.length - 2], }));
       if (!0 === d.renderGeomNodes && !r) {
         for (r = 1; r < c.length - 2; r += 1) {
-          k.push(new OpenLayers.Feature.Vector(c[r], {myId:b.id, zIndex:n + 200, a:!0, i:!0, }, ki));
+          k.push(new OpenLayers.Feature.Vector(c[r], {myId:b.id, zIndex:n + 200, a:!0, i:!0, }, li));
         }
       }
-      K.tunnel && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Fa.strokeColor, opacity:Fa.strokeOpacity, width:0.3 * h, dash:Fa.strokeDashstyle, zIndex:n + 177, }), k.push(l), l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Kh.strokeColor, width:0.1 * h, dash:Kh.strokeDashstyle, zIndex:n + 177, }), k.push(l));
+      K.tunnel && (l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Ga.strokeColor, opacity:Ga.strokeOpacity, width:0.3 * h, dash:Ga.strokeDashstyle, zIndex:n + 177, }), k.push(l), l = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(e), {myId:b.id, color:Lh.strokeColor, width:0.1 * h, dash:Lh.strokeDashstyle, zIndex:n + 177, }), k.push(l));
     }
-    a = Fh(a, f);
+    a = Gh(a, f);
     0 < a.length && B.addFeatures(a, {silent:!0});
     return k;
   }
-  function Lh(a) {
+  function Mh(a) {
     a = a.getAttributes();
     var b = new OpenLayers.Geometry.Point(a.geometry.x, a.geometry.y);
-    return new OpenLayers.Feature.Vector(b, {myid:a.id, }, Mh(a));
-  }
-  function li() {
-    Ba();
-    da(d);
-    ea();
-    x("info", g("preferences_rollback"));
+    return new OpenLayers.Feature.Vector(b, {myid:a.id, }, Nh(a));
   }
   function mi() {
+    Ca();
+    ea(d);
+    fa();
+    x("info", g("preferences_rollback"));
+  }
+  function ni() {
     GM_setClipboard(JSON.stringify(d));
     x("info", g("export_preferences_message"));
   }
-  function fi(a, b) {
+  function gi(a, b) {
     if (null !== b && "" !== b) {
       try {
         d = JSON.parse(b);
@@ -651,10 +651,10 @@ Y("Object.values", function(m) {
         x("error", g("preferences_parsing_error"));
         return;
       }
-      null !== d && d.streets ? (da(d), Ca(d), ea(), x("success", g("preferences_imported"))) : x("error", "preferences_importing_error");
+      null !== d && d.streets ? (ea(d), Da(d), fa(), x("success", g("preferences_imported"))) : x("error", "preferences_importing_error");
     }
   }
-  function Nh() {
+  function Oh() {
     var a = parseInt(W.map.getLayerByUniqueName("gps_points").getZIndex(), 10);
     d.showUnderGPSPoints ? (A.setZIndex(a - 2), F.setZIndex(a - 1)) : (A.setZIndex(a + 1), F.setZIndex(a + 2));
   }
@@ -669,22 +669,22 @@ Y("Object.values", function(m) {
     }
     return h;
   }
-  function Ga() {
+  function Ha() {
     var a = document.getElementById("svl_routingModeDiv");
     d.routingModeEnabled && !0 !== d.hideRoutingModeBlock ? null === a && (a = document.createElement("div"), a.id = "svl_routingModeDiv", a.className = "routingDiv", a.innerHTML = g("routing_mode_panel_title") + "<br><small>" + g("routing_mode_panel_body") + "<small>", a.addEventListener("mouseenter", function() {
       d.routingModeEnabled = !1;
-      ba();
+      ca();
     }), a.addEventListener("mouseleave", function() {
       d.routingModeEnabled = !0;
-      ba();
+      ca();
     }), document.getElementById("map").appendChild(a)) : null == a || a.remove();
   }
-  function Oh() {
-    clearInterval(Ha);
-    Ha = null;
-    d.autoReload && d.autoReload.enabled && (Ha = setInterval(S, d.autoReload.interval));
-  }
   function Ph() {
+    clearInterval(Ia);
+    Ia = null;
+    d.autoReload && d.autoReload.enabled && (Ia = setInterval(S, d.autoReload.interval));
+  }
+  function Qh() {
     document.getElementById("svl_saveNewPref").classList.remove("disabled");
     document.getElementById("svl_saveNewPref").disabled = !1;
     document.getElementById("svl_saveNewPref").classList.add("btn-primary");
@@ -692,10 +692,10 @@ Y("Object.values", function(m) {
     document.getElementById("svl_rollbackButton").disabled = !1;
     document.getElementById("sidepanel-svl").classList.add("svl_unsaved");
     var a = document.getElementById("svl_presets"), b = document.getElementById("svl_presets").value, c = !1;
-    "wme_colors" === b && (c = !0, d.streets = Qh[b].streets);
-    "svl_standard" === b && (c = !0, d.streets = Qh[b].streets);
+    "wme_colors" === b && (c = !0, d.streets = Rh[b].streets);
+    "svl_standard" === b && (c = !0, d.streets = Rh[b].streets);
     if (c) {
-      Rh(), a.value = "", x("info", g("preset_applied"));
+      Sh(), a.value = "", x("info", g("preset_applied"));
     } else {
       for (a = 0; a < d.streets.length; a += 1) {
         d.streets[a] && (d.streets[a] = {}, d.streets[a].strokeColor = document.getElementById("svl_streetColor_" + a).value, d.streets[a].strokeWidth = document.getElementById("svl_streetWidth_" + a).value, d.streets[a].strokeDashstyle = document.querySelector("#svl_strokeDashstyle_" + a + " option:checked").value);
@@ -760,28 +760,28 @@ Y("Object.values", function(m) {
     d.nodesThreshold = document.getElementById("svl_nodesThreshold").value;
     d.segmentsThreshold = document.getElementById("svl_segmentsThreshold").value;
     d.layerOpacity = document.getElementById("svl_layerOpacity").value / 100.0;
-    d.showUnderGPSPoints !== document.getElementById("svl_showUnderGPSPoints").checked ? (d.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked, Nh()) : d.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked;
+    d.showUnderGPSPoints !== document.getElementById("svl_showUnderGPSPoints").checked ? (d.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked, Oh()) : d.showUnderGPSPoints = document.getElementById("svl_showUnderGPSPoints").checked;
     d.routingModeEnabled = document.getElementById("svl_routingModeEnabled").checked;
     d.hideRoutingModeBlock = document.getElementById("svl_hideRoutingModeBlock").checked;
-    Ga();
+    Ha();
     d.useWMERoadLayerAtZoom = document.getElementById("svl_useWMERoadLayerAtZoom").value;
     d.switchZoom = document.getElementById("svl_switchZoom").value;
     d.showANs = document.getElementById("svl_showANs").checked;
     d.realsize = document.getElementById("svl_realsize").checked;
     d.realsize ? $("input.segmentsWidth").prop("disabled", !0) : $("input.segmentsWidth").prop("disabled", !1);
-    da(d);
-    Oh();
-  }
-  function ni() {
+    ea(d);
     Ph();
-    Ca(d, !1);
-    ea();
   }
   function oi() {
+    Qh();
+    Da(d, !1);
+    fa();
+  }
+  function pi() {
     y("rollbackDefault");
     WazeWrap.Alerts.confirm(GM_info.script.name, g("preferences_reset_question") + "\n" + g("preferences_reset_question_2"), p, null, g("preferences_reset_yes"), g("preferences_reset_cancel"));
   }
-  function pi(a) {
+  function qi(a) {
     var b = a.id, c = a.title, e = a.description, f = a.options, k = a.g;
     a = document.createElement("div");
     a.className = "prefLineSelect";
@@ -804,7 +804,7 @@ Y("Object.values", function(m) {
     a.appendChild(n);
     return a;
   }
-  function Sh(a) {
+  function Th(a) {
     var b = I18n.translations[I18n.locale];
     switch(a) {
       case "red":
@@ -826,22 +826,22 @@ Y("Object.values", function(m) {
         var M, U, K, C;
         return null != (C = null == b ? void 0 : null == (M = b.edit) ? void 0 : null == (U = M.segment) ? void 0 : null == (K = U.fields) ? void 0 : K.headlights) ? C : a;
       case "lanes":
-        var Z, ha, ia;
-        return null != (ia = null == b ? void 0 : null == (Z = b.objects) ? void 0 : null == (ha = Z.lanes) ? void 0 : ha.title) ? ia : a;
+        var Z, ia, ja;
+        return null != (ja = null == b ? void 0 : null == (Z = b.objects) ? void 0 : null == (ia = Z.lanes) ? void 0 : ia.title) ? ja : a;
       case "speed limit":
-        var ja, ka, la, ma;
-        return null != (ma = null == b ? void 0 : null == (ja = b.edit) ? void 0 : null == (ka = ja.segment) ? void 0 : null == (la = ka.fields) ? void 0 : la.speed_limit) ? ma : a;
+        var ka, la, ma, na;
+        return null != (na = null == b ? void 0 : null == (ka = b.edit) ? void 0 : null == (la = ka.segment) ? void 0 : null == (ma = la.fields) ? void 0 : ma.speed_limit) ? na : a;
       case "nearbyHOV":
-        var na, oa, pa, qa;
-        return null != (qa = null == b ? void 0 : null == (na = b.edit) ? void 0 : null == (oa = na.segment) ? void 0 : null == (pa = oa.fields) ? void 0 : pa.nearbyHOV) ? qa : a;
+        var oa, pa, qa, ra;
+        return null != (ra = null == b ? void 0 : null == (oa = b.edit) ? void 0 : null == (pa = oa.segment) ? void 0 : null == (qa = pa.fields) ? void 0 : qa.nearbyHOV) ? ra : a;
     }
-    var ra, sa;
-    return null != (sa = null == b ? void 0 : null == (ra = b.segment) ? void 0 : ra.road_types[a]) ? sa : a;
+    var sa, ta;
+    return null != (ta = null == b ? void 0 : null == (sa = b.segment) ? void 0 : sa.road_types[a]) ? ta : a;
   }
   function R(a) {
     var b = a.f, c = void 0 === a.c ? !0 : a.c, e = void 0 === a.b ? !1 : a.b;
     a = document.createElement("h6");
-    a.innerText = Sh(b);
+    a.innerText = Th(b);
     var f = T({id:"streetColor_" + b, className:"prefElement form-control", title:g("color"), type:"color", });
     f.style.width = "55pt";
     var k = document.createElement("div");
@@ -862,7 +862,7 @@ Y("Object.values", function(m) {
     b.appendChild(k);
     return b;
   }
-  function wa(a, b) {
+  function xa(a, b) {
     var c = (b = void 0 === b ? !0 : b) ? "metric" : "imperial", e = document.createElement("label");
     e.innerText = -1 !== a ? a : "Default";
     var f = document.createElement("div");
@@ -877,23 +877,23 @@ Y("Object.values", function(m) {
     a.appendChild(f);
     return a;
   }
-  function Th() {
+  function Uh() {
     return {streets:["red"], decorations:"lanes toll restriction closure headlights dirty nearbyHOV".split(" "), };
   }
-  function Rh() {
+  function Sh() {
     for (var a = 0; a < d.streets.length; a += 1) {
       d.streets[a] && (document.getElementById("svl_streetWidth_" + a).value = d.streets[a].strokeWidth, document.getElementById("svl_streetColor_" + a).value = d.streets[a].strokeColor, document.getElementById("svl_strokeDashstyle_" + a).value = d.streets[a].strokeDashstyle);
     }
   }
-  function ea() {
+  function fa() {
     document.getElementById("svl_saveNewPref").classList.add("disabled");
     document.getElementById("svl_saveNewPref").disabled = !0;
     document.getElementById("svl_rollbackButton").classList.add("disabled");
     document.getElementById("svl_rollbackButton").disabled = !0;
     document.getElementById("svl_saveNewPref").classList.remove("btn-primary");
     document.getElementById("sidepanel-svl").classList.remove("svl_unsaved");
-    Rh();
-    var a = Th();
+    Sh();
+    var a = Uh();
     a.streets.forEach(function(f) {
       "red" !== f && (document.getElementById("svl_streetWidth_" + f).value = d[f].strokeWidth);
       document.getElementById("svl_streetColor_" + f).value = d[f].strokeColor;
@@ -976,7 +976,7 @@ Y("Object.values", function(m) {
     e && (b = document.createElement("i"), b.innerText = e, a.appendChild(b));
     return a;
   }
-  function ua(a) {
+  function va(a) {
     var b = a.id, c = a.title, e = a.description, f = a.min, k = a.max, n = a.step, h = a.g;
     a = document.createElement("div");
     a.className = "prefLineSlider";
@@ -989,7 +989,7 @@ Y("Object.values", function(m) {
     e && (b = document.createElement("i"), b.innerText = e, a.appendChild(b));
     return a;
   }
-  function ca(a, b) {
+  function da(a, b) {
     var c = document.createElement("details");
     c.open = void 0 === b ? !1 : b;
     b = document.createElement("summary");
@@ -997,7 +997,7 @@ Y("Object.values", function(m) {
     c.appendChild(b);
     return c;
   }
-  function qi() {
+  function ri() {
     var a = document.createElement("style");
     a.innerHTML = '\n        <style>\n        #sidepanel-svl details{margin-bottom:9pt;}\n        #sidepanel-svl i{font-size:small;}\n        .svl_unsaved{background-color:#ffcc00}\n        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}\n        .prefLineSelect{width:100%; margin-bottom:1vh;}\n        .prefLineSelect label{display:block;width:100%}\n        .prefLineCheckbox{width:100%; margin-bottom:1vh;}\n        .prefLineCheckbox label{display:block;width:100%}\n        .prefLineCheckbox input{float:right;}\n        .prefLineInteger{width:100%; margin-bottom:1vh;}\n        .prefLineInteger label{display:block;width:100%}\n        .prefLineInteger input{float:right;}\n        .prefLineSlider {width:100%; margin-bottom:1vh;}\n        .prefLineSlider label{display:block;width:100%}\n        .prefLineSlider input{float:right;}\n        .newOption::before {content:"' + 
     g("new_since_version") + ' " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}\n        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}\n        .svl_logo {width:130px; display:inline-block; float:right}\n        .svl_support-link{display:inline-block; width:100%; text-align:center;}\n        .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}\n        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }\n        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}\n        .routingDiv:hover{background-color:#ff3377;}\n        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>';
@@ -1015,7 +1015,7 @@ Y("Object.values", function(m) {
     b.innerText = "Street Vector Layer";
     a.appendChild(b);
     b = document.createElement("span");
-    b.innerText = g("version") + " 5.1.0";
+    b.innerText = g("version") + " " + ba;
     a.appendChild(b);
     b = document.createElement("a");
     b.innerText = g("something_not_working") + " " + g("report_it_here") + ".";
@@ -1056,17 +1056,17 @@ Y("Object.values", function(m) {
     f.appendChild(c);
     f.appendChild(e);
     a.appendChild(f);
-    var k = ca(g("roads_properties"), !0);
+    var k = da(g("roads_properties"), !0);
     k.appendChild(L({id:"realsize", title:g("use_reallife_width"), description:g("use_reallife_width_descr"), g:"5.0.0", }));
-    k.appendChild(pi({id:"presets", title:g("road_themes_title"), description:g("road_themes_descr"), options:[{text:"", value:""}, {text:g("svl_standard_layer"), value:"svl_standard"}, {text:g("wme_colors_layer"), value:"wme_colors"}, ], g:"5.0.8", }));
+    k.appendChild(qi({id:"presets", title:g("road_themes_title"), description:g("road_themes_descr"), options:[{text:"", value:""}, {text:g("svl_standard_layer"), value:"svl_standard"}, {text:g("wme_colors_layer"), value:"wme_colors"}, ], g:"5.0.8", }));
     for (b = 0; b < d.streets.length; b += 1) {
       d.streets[b] && k.appendChild(R({f:b, c:!0, b:!1}));
     }
-    f = ca(g("segments_decorations"));
-    e = ca(g("rendering_parameters"));
-    c = ca(g("performance_tuning"));
-    b = ca(g("speed_limits"));
-    Th().streets.forEach(function(n) {
+    f = da(g("segments_decorations"));
+    e = da(g("rendering_parameters"));
+    c = da(g("performance_tuning"));
+    b = da(g("speed_limits"));
+    Uh().streets.forEach(function(n) {
       "red" !== n ? k.appendChild(R({f:n, c:!0, b:!1, })) : k.appendChild(R({f:n, c:!1, b:!1, }));
     });
     f.appendChild(R({f:"lanes", c:!1, b:!0, }));
@@ -1083,24 +1083,24 @@ Y("Object.values", function(m) {
     e.appendChild(L({id:"routingModeEnabled", title:g("enable_routing_mode"), description:g("enable_routing_mode_descr"), }));
     e.appendChild(L({id:"hideRoutingModeBlock", title:g("hide_routing_mode_panel"), description:g("hide_routing_mode_panel_descr"), g:"5.0.9", }));
     e.appendChild(L({id:"showUnderGPSPoints", title:g("gps_layer_above_roads"), description:g("gps_layer_above_roads_descr"), }));
-    k.appendChild(ua({id:"labelOutlineWidth", title:g("label_width"), description:g("label_width_descr"), min:0, max:10, step:1, }));
+    k.appendChild(va({id:"labelOutlineWidth", title:g("label_width"), description:g("label_width_descr"), min:0, max:10, step:1, }));
     e.appendChild(L({id:"disableRoadLayers", title:g("hide_road_layer"), description:g("hide_road_layer_descr"), }));
     e.appendChild(L({id:"startDisabled", title:g("svl_initially_disabled"), description:g("svl_initially_disabled_descr"), }));
-    e.appendChild(ua({id:"clutterConstant", title:g("street_names_density"), description:g("street_names_density_descr"), min:1, max:20, step:1, }));
+    e.appendChild(va({id:"clutterConstant", title:g("street_names_density"), description:g("street_names_density_descr"), min:1, max:20, step:1, }));
     f = document.createElement("h5");
     f.innerText = g("close_zoom_only");
     e.appendChild(f);
     e.appendChild(L({id:"renderGeomNodes", title:g("render_geometry_nodes"), description:g("render_geometry_nodes_descr"), }));
     e.appendChild(aa({id:"fakelock", title:g("render_as_level"), description:g("render_as_level_descr"), min:1, max:7, step:1, }));
-    e.appendChild(ua({id:"closeZoomLabelSize", title:g("font_size_close"), description:g("font_size_close_descr"), min:8, max:32, step:1, }));
-    e.appendChild(ua({id:"arrowDeclutter", title:g("limit_arrows"), description:g("limit_arrows_descr"), min:1, max:200, step:1, }));
+    e.appendChild(va({id:"closeZoomLabelSize", title:g("font_size_close"), description:g("font_size_close_descr"), min:8, max:32, step:1, }));
+    e.appendChild(va({id:"arrowDeclutter", title:g("limit_arrows"), description:g("limit_arrows_descr"), min:1, max:200, step:1, }));
     f = document.createElement("h5");
     f.innerText = g("far_zoom_only");
     e.appendChild(f);
-    e.appendChild(ua({id:"farZoomLabelSize", title:g("font_size_far"), description:g("font_size_far_descr"), min:8, max:32, }));
+    e.appendChild(va({id:"farZoomLabelSize", title:g("font_size_far"), description:g("font_size_far_descr"), min:8, max:32, }));
     e.appendChild(L({id:"hideMinorRoads", title:g("hide_minor_roads"), description:g("hide_minor_roads_descr"), }));
     a.appendChild(e);
-    e = ca(g("utilities"));
+    e = da(g("utilities"));
     e.appendChild(L({id:"autoReload_enabled", title:g("automatically_refresh"), description:g("automatically_refresh_descr"), }));
     e.appendChild(aa({id:"autoReload_interval", title:g("autoreload_interval"), description:g("autoreload_interval_descr"), min:20, max:3600, step:1, }));
     a.appendChild(e);
@@ -1116,17 +1116,17 @@ Y("Object.values", function(m) {
     b.appendChild(c);
     b.appendChild(L({id:"showDashedUnverifiedSL", title:g("show_unverified_dashed"), description:g("show_unverified_dashed_descr"), }));
     c = document.createElement("h6");
-    c.innerText = Sh("speed limit");
+    c.innerText = Th("speed limit");
     b.appendChild(c);
     c = "metric";
-    b.appendChild(wa("Default", !0));
+    b.appendChild(xa("Default", !0));
     for (e = 1; e < Object.keys(d.speeds[c]).length + 1; e += 1) {
-      b.appendChild(wa(e, !0));
+      b.appendChild(xa(e, !0));
     }
     c = "imperial";
-    b.appendChild(wa("Default", !1));
+    b.appendChild(xa("Default", !1));
     for (e = 1; e < Object.keys(d.speeds[c]).length + 1; e += 1) {
-      b.appendChild(wa(e, !1));
+      b.appendChild(xa(e, !1));
     }
     a.appendChild(b);
     b = document.createElement("h5");
@@ -1147,66 +1147,66 @@ Y("Object.values", function(m) {
     b.appendChild(e);
     b.appendChild(c);
     a.appendChild(b);
-    new WazeWrap.Interface.Tab("SVL \ud83d\uddfa\ufe0f", a.innerHTML, ea);
+    new WazeWrap.Interface.Tab("SVL \ud83d\uddfa\ufe0f", a.innerHTML, fa);
     document.querySelectorAll(".prefElement").forEach(function(n) {
-      n.addEventListener("change", Ph);
+      n.addEventListener("change", Qh);
     });
-    document.getElementById("svl_saveNewPref").addEventListener("click", ni);
-    document.getElementById("svl_rollbackButton").addEventListener("click", li);
-    document.getElementById("svl_resetButton").addEventListener("click", oi);
+    document.getElementById("svl_saveNewPref").addEventListener("click", oi);
+    document.getElementById("svl_rollbackButton").addEventListener("click", mi);
+    document.getElementById("svl_resetButton").addEventListener("click", pi);
     document.getElementById("svl_importButton").addEventListener("click", t);
-    document.getElementById("svl_exportButton").addEventListener("click", mi);
+    document.getElementById("svl_exportButton").addEventListener("click", ni);
   }
-  function Uh(a) {
+  function Vh(a) {
     F.destroyFeatures(F.getFeaturesByAttribute("myid", a), {silent:!0});
   }
-  function ri(a) {
+  function si(a) {
     y("Removing " + a.length + " nodes");
     if (J.zoom <= d.useWMERoadLayerAtZoom) {
       y("Destroy all nodes"), F.destroyFeatures(F.features, {silent:!0});
     } else {
       if (P || a.length > d.nodesThreshold) {
-        P || xa();
+        P || ya();
       } else {
         var b;
         for (b = 0; b < a.length; b += 1) {
-          Uh(a[b].attributes.id);
+          Vh(a[b].attributes.id);
         }
       }
     }
   }
-  function Mh(a) {
+  function Nh(a) {
     var b;
-    return 1 === (null == (b = a.segIDs) ? void 0 : b.length) ? si : ti;
+    return 1 === (null == (b = a.segIDs) ? void 0 : b.length) ? ti : ui;
   }
-  function ui(a) {
+  function vi(a) {
     y("Change nodes");
     a.forEach(function(b) {
       var c = b.attributes, e = F.getFeaturesByAttribute("myid", c.id)[0];
-      e ? (e.style = Mh(c), e.move(new OpenLayers.LonLat(c.geometry.x, c.geometry.y))) : 0 < c.id && F.addFeatures([Lh(b)], {silent:!0});
+      e ? (e.style = Nh(c), e.move(new OpenLayers.LonLat(c.geometry.x, c.geometry.y))) : 0 < c.id && F.addFeatures([Mh(b)], {silent:!0});
     });
   }
-  function vi(a) {
+  function wi(a) {
     y("Node state deleted");
     for (var b = 0; b < a.length; b += 1) {
-      Uh(a[b].getID());
+      Vh(a[b].getID());
     }
   }
-  function wi(a) {
+  function xi(a) {
     for (var b = 0; b < a.length; b += 1) {
-      ya(a[b].getID());
+      za(a[b].getID());
     }
   }
-  function Vh(a) {
+  function Wh(a) {
     y("Adding " + a.length + " nodes");
     if (P || a.length > d.nodesThreshold) {
-      P || xa();
+      P || ya();
     } else {
       if (J.zoom <= d.useWMERoadLayerAtZoom) {
         y("Not adding them because of the zoom");
       } else {
         for (var b = [], c = 0; c < a.length; c += 1) {
-          void 0 !== a[c].attributes.geometry ? 0 < a[c].attributes.id && b.push(Lh(a[c])) : console.warn("[SVL] Geometry of node is undefined");
+          void 0 !== a[c].attributes.geometry ? 0 < a[c].attributes.id && b.push(Mh(a[c])) : console.warn("[SVL] Geometry of node is undefined");
         }
         F.addFeatures(b, {silent:!0});
         return !0;
@@ -1216,78 +1216,78 @@ Y("Object.values", function(m) {
   function V(a) {
     return !a.svl;
   }
-  function Wh() {
+  function Xh() {
     y("updateStatusBasedOnZoom running");
     var a = !0;
-    P && (Object.keys(W.model.segments.objects).length < d.segmentsThreshold && Object.keys(W.model.nodes.objects).length < d.nodesThreshold ? (P = !1, N(1, !0), N(0, !1), ba()) : console.warn("[SVL] Still too many elements to draw: Segments: " + Object.keys(W.model.segments.objects).length + "/" + d.segmentsThreshold + ", Nodes: " + Object.keys(W.model.nodes.objects).length + "/" + d.nodesThreshold + " - You can change these thresholds in the preference panel."));
-    J.zoom <= d.useWMERoadLayerAtZoom ? (y("Road layer automatically enabled because of zoom out"), !0 === A.visibility && (za = !0, N(0, !0), N(1, !1)), a = !1) : za && (y("Re-enabling SVL after zoom in"), N(1, !0), N(0, !1), za = !1);
+    P && (Object.keys(W.model.segments.objects).length < d.segmentsThreshold && Object.keys(W.model.nodes.objects).length < d.nodesThreshold ? (P = !1, N(1, !0), N(0, !1), ca()) : console.warn("[SVL] Still too many elements to draw: Segments: " + Object.keys(W.model.segments.objects).length + "/" + d.segmentsThreshold + ", Nodes: " + Object.keys(W.model.nodes.objects).length + "/" + d.nodesThreshold + " - You can change these thresholds in the preference panel."));
+    J.zoom <= d.useWMERoadLayerAtZoom ? (y("Road layer automatically enabled because of zoom out"), !0 === A.visibility && (Aa = !0, N(0, !0), N(1, !1)), a = !1) : Aa && (y("Re-enabling SVL after zoom in"), N(1, !0), N(0, !1), Aa = !1);
     return a;
   }
-  function xi() {
-    clearTimeout(Xh);
+  function yi() {
+    clearTimeout(Yh);
     y("manageZoom clearing timer");
-    Xh = setTimeout(Wh, 800);
+    Yh = setTimeout(Xh, 800);
   }
-  function xa() {
+  function ya() {
     console.warn("[SVL] Abort drawing, too many elements");
     P = !0;
     N(0, !0);
     N(1, !1);
     m();
   }
-  function Ia(a) {
+  function Ja(a) {
     y("Adding " + a.length + " segments");
     if (P || a.length > d.segmentsThreshold) {
-      P || xa();
+      P || ya();
     } else {
       if (J.zoom <= d.useWMERoadLayerAtZoom) {
         y("Not adding them because of the zoom");
       } else {
-        Yh();
+        Zh();
         var b = [];
         a.forEach(function(c) {
-          null !== c && (b = b.concat(ii(c)));
+          null !== c && (b = b.concat(ji(c)));
         });
         0 < b.length ? (y(b.length + " features added to the street layer"), A.addFeatures(b, {silent:!0})) : console.warn("[SVL] no features drawn");
-        Zh();
+        $h();
       }
     }
   }
-  function ya(a) {
+  function za(a) {
     y("RemoveSegmentById: " + a);
     A.destroyFeatures(A.getFeaturesByAttribute("myId", a), {silent:!0});
     B.destroyFeatures(B.getFeaturesByAttribute("myId", a), {silent:!0});
   }
-  function yi(a) {
+  function zi(a) {
     y("Edit " + a.length + " segments");
     a.forEach(function(b) {
       var c = b.getOldID();
-      c && ya(parseInt(c, 10));
-      ya(b.getID());
-      "Delete" !== b.state && Ia([b]);
+      c && za(parseInt(c, 10));
+      za(b.getID());
+      "Delete" !== b.state && Ja([b]);
     });
   }
-  function zi(a) {
+  function Ai(a) {
     y("Removing " + a.length + " segments");
-    J.zoom <= d.useWMERoadLayerAtZoom ? (y("Destroy all segments and labels because of zoom out"), A.destroyFeatures(A.features, {silent:!0, }), B.destroyFeatures(B.features, {silent:!0})) : P || a.length > d.segmentsThreshold ? P || xa() : (Yh(), a.forEach(function(b) {
-      ya(b.attributes.id);
-    }), Zh());
+    J.zoom <= d.useWMERoadLayerAtZoom ? (y("Destroy all segments and labels because of zoom out"), A.destroyFeatures(A.features, {silent:!0, }), B.destroyFeatures(B.features, {silent:!0})) : P || a.length > d.segmentsThreshold ? P || ya() : (Zh(), a.forEach(function(b) {
+      za(b.attributes.id);
+    }), $h());
   }
-  function $h(a) {
+  function ai(a) {
     y("ManageVisibilityChanged", a);
     F.setVisibility(a.object.visibility);
     B.setVisibility(a.object.visibility);
-    a.object.visibility ? (y("enabled: registering events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded.push({context:A, callback:Ia, svl:!0, }), a.objectschanged.push({context:A, callback:yi, svl:!0, }), a.objectsremoved.push({context:A, callback:zi, svl:!0, }), a["objects-state-deleted"].push({context:A, callback:wi, svl:!0, })), y("SVL: Registering node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved.push({context:F, callback:ri, svl:!0, 
-    }), a.objectsadded.push({context:F, callback:Vh, svl:!0, }), a.objectschanged.push({context:F, callback:ui, svl:!0, }), a["objects-state-deleted"].push({context:F, callback:vi, svl:!0, })), !0 === Wh() && ba()) : (y("disabled: unregistering events"), y("SVL: Removing segments events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded = a.objectsadded.filter(V), a.objectschanged = a.objectschanged.filter(V), a.objectsremoved = a.objectsremoved.filter(V), a["objects-state-deleted"] = 
+    a.object.visibility ? (y("enabled: registering events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded.push({context:A, callback:Ja, svl:!0, }), a.objectschanged.push({context:A, callback:zi, svl:!0, }), a.objectsremoved.push({context:A, callback:Ai, svl:!0, }), a["objects-state-deleted"].push({context:A, callback:xi, svl:!0, })), y("SVL: Registering node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved.push({context:F, callback:si, svl:!0, 
+    }), a.objectsadded.push({context:F, callback:Wh, svl:!0, }), a.objectschanged.push({context:F, callback:vi, svl:!0, }), a["objects-state-deleted"].push({context:F, callback:wi, svl:!0, })), !0 === Xh() && ca()) : (y("disabled: unregistering events"), y("SVL: Removing segments events"), a = W.model.segments._events, "object" === typeof a && (a.objectsadded = a.objectsadded.filter(V), a.objectschanged = a.objectschanged.filter(V), a.objectsremoved = a.objectsremoved.filter(V), a["objects-state-deleted"] = 
     a["objects-state-deleted"].filter(V)), y("SVL: Removing node events"), a = W.model.nodes._events, "object" === typeof a && (a.objectsremoved = a.objectsremoved.filter(V), a.objectsadded = a.objectsadded.filter(V), a.objectschanged = a.objectschanged.filter(V), a["objects-state-deleted"] = a["objects-state-deleted"].filter(V)), m());
   }
-  function ai(a) {
+  function bi(a) {
     a = void 0 === a ? 1 : a;
-    30 < a ? console.error("SVL: could not initialize WazeWrap") : WazeWrap && WazeWrap.Ready && WazeWrap.Interface && WazeWrap.Alerts ? Ai() : (console.log("SVL: WazeWrap not ready, retrying in 800ms"), setTimeout(function() {
-      ai(a + 1);
+    30 < a ? console.error("SVL: could not initialize WazeWrap") : WazeWrap && WazeWrap.Ready && WazeWrap.Interface && WazeWrap.Alerts ? Bi() : (console.log("SVL: WazeWrap not ready, retrying in 800ms"), setTimeout(function() {
+      bi(a + 1);
     }, 800));
   }
-  function Ai() {
+  function Bi() {
     console.log("SVL: initializing WazeWrap");
     try {
       (new WazeWrap.Interface.Shortcut("SVLToggleLayer", "Toggle SVL", "svl", "Street Vector Layer", "A+l", function() {
@@ -1304,19 +1304,19 @@ Y("Object.values", function(m) {
       console.error("SVL: could not add layer checkbox");
     }
     d.startDisabled && N(1, !1);
-    qi();
-    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", "5.1.0", "<b>" + g("whats_new") + "</b>\n      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!\n      <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.\n      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes\n      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.\n      <br>- 5.0.7: New options are highlighted in the preference panel\n      <br>- 5.0.6: Fixed a bug that was showing metric colors for speed limits while in imperial mode\n      <br>- 5.0.5: Added a global Layer Opacity setting", 
+    ri();
+    WazeWrap.Interface.ShowScriptUpdate("Street Vector Layer", ba, "<b>" + g("whats_new") + "</b>\n      <br>- 5.1.1: Fixed some untranslated strings.\n      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!\n      <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.\n      <br>- 5.0.9: Added an option to hide the routing panel - Code refactoring, bug fixes\n      <br>- 5.0.8: Styles preset. Switch to the WME standard colors, if you like.", 
     "", GM_info.script.supportURL);
   }
   function g(a) {
-    var b = Ja[a];
+    var b = Ka[a];
     if ("undefined" === typeof b) {
       return console.error("[SVL] Invalid translation key: " + a), "<invalid translation key>";
     }
     a = I18n.currentLocale();
     return X[a] && X[a][b] && "" !== X[a][b] ? X[a][b] : X.en[b];
   }
-  function Bi() {
+  function Ci() {
     console.debug("Loading translations...");
     fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv").then(function(a) {
       if (a.ok && 200 === a.status) {
@@ -1329,27 +1329,27 @@ Y("Object.values", function(m) {
         b = c.next().value;
         c = c.next().value;
         if (0 < b) {
-          c = Q(c.split("\t")), b = c.next().value, c = La(c), X[b] = c.map(function(f) {
+          c = Q(c.split("\t")), b = c.next().value, c = Ma(c), X[b] = c.map(function(f) {
             return f.trim();
           });
         } else {
           b = Q(c.split("\t"));
           b.next();
-          b = La(b);
+          b = Ma(b);
           b = Q(b.entries());
           for (c = b.next(); !c.done; c = b.next()) {
             var e = Q(c.value);
             c = e.next().value;
             e = e.next().value;
-            Ja[e.trim()] = c;
+            Ka[e.trim()] = c;
           }
-          console.dir(Ja);
+          console.dir(Ka);
         }
       }
       console.dir(X);
     });
   }
-  function bi(a) {
+  function ci(a) {
     a = void 0 === a ? 0 : a;
     try {
       if (void 0 === W || void 0 === W.map || void 0 === W.model) {
@@ -1361,7 +1361,7 @@ Y("Object.values", function(m) {
         console.warn(e);
         console.warn("Could not initialize SVL correctly. Maybe the Waze model was not ready. Retrying in 500ms...");
         setTimeout(function() {
-          bi(b);
+          ci(b);
         }, 500);
         return;
       }
@@ -1372,10 +1372,10 @@ Y("Object.values", function(m) {
     J = W.map.getOLMap();
     d = null;
     OpenLayers.Renderer.symbol.myTriangle = [-2, 0, 2, 0, 0, -6, -2, 0];
-    !1 === Ba() && x("info", g("first_time") + "\n\n          " + g("some_info") + "\n          " + g("default_shortcut_instruction") + "\n          " + g("instructions_1") + "\n          " + g("instructions_2") + "\n          " + g("instructions_3") + "\n          " + g("instructions_4"));
+    !1 === Ca() && x("info", g("first_time") + "\n\n          " + g("some_info") + "\n          " + g("default_shortcut_instruction") + "\n          " + g("instructions_1") + "\n          " + g("instructions_2") + "\n          " + g("instructions_3") + "\n          " + g("instructions_4"));
     a = new OpenLayers.StyleMap({pointerEvents:"none", strokeColor:"${color}", strokeWidth:"${width}", strokeOpacity:"${opacity}", strokeDashstyle:"${dash}", graphicZIndex:"${zIndex}", });
     var c = new OpenLayers.StyleMap({fontFamily:"Rubik, Open Sans, Alef, helvetica, sans-serif", fontWeight:"800", fontColor:"${color}", labelOutlineColor:"${outlinecolor}", labelOutlineWidth:"${outlinewidth}", label:"${label}", visibility:!d.startDisabled, angle:"${angle}", pointerEvents:"none", labelAlign:"cm", });
-    A = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:g("svl_version") + " 5.1.0", rendererOptions:{zIndexing:!0, }, });
+    A = new OpenLayers.Layer.Vector("Street Vector Layer", {styleMap:a, uniqueName:"vectorStreet", accelerator:"toggle" + "Street Vector Layer".replace(/\s+/g, ""), visibility:!d.startDisabled, isVector:!0, attribution:g("svl_version") + " " + ba, rendererOptions:{zIndexing:!0, }, });
     A.renderer.drawFeature = function(e, f) {
       null == f && (f = e.style);
       if (e.geometry) {
@@ -1462,37 +1462,37 @@ Y("Object.values", function(m) {
       }
       r.parentNode || B.renderer.textRoot.appendChild(r);
     };
-    da(d);
+    ea(d);
     J.addLayer(A);
     J.addLayer(B);
     J.addLayer(F);
     "true" === window.localStorage.getItem("svlDebugOn") && (document.sv = A, document.lv = B, document.nv = F, document.svl_pref = d);
     a = J.getLayersBy("uniqueName", "roads");
-    fa = null;
-    1 === a.length && (fa = Q(a).next().value);
-    za = !1;
-    d.showUnderGPSPoints && Nh();
-    Ga();
-    Oh();
-    J.events.register("zoomend", null, xi, !0);
-    ai();
-    J.zoom <= d.useWMERoadLayerAtZoom ? N(0, !0) : fa.getVisibility() && d.disableRoadLayers && (N(0, !1), console.log("SVL: WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel."));
-    A.events.register("visibilitychanged", A, $h);
-    $h({object:A, });
+    ha = null;
+    1 === a.length && (ha = Q(a).next().value);
+    Aa = !1;
+    d.showUnderGPSPoints && Oh();
+    Ha();
+    Ph();
+    J.events.register("zoomend", null, yi, !0);
+    bi();
+    J.zoom <= d.useWMERoadLayerAtZoom ? N(0, !0) : ha.getVisibility() && d.disableRoadLayers && (N(0, !1), console.log("SVL: WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel."));
+    A.events.register("visibilitychanged", A, ai);
+    ai({object:A, });
     $(".olControlAttribution").click(function() {
       x("info", g("preferences_moved"));
     });
     a = W.prefs._events;
-    "object" === typeof a && a["change:isImperial"].push({callback:ba, });
-    console.log("[SVL] v. 5.1.0 initialized correctly.");
+    "object" === typeof a && a["change:isImperial"].push({callback:ca, });
+    console.log("[SVL] v. " + ba + " initialized correctly.");
   }
-  function ba() {
+  function ca() {
     y("DrawAllSegments");
     m();
-    Ia(Object.values(W.model.segments.objects));
-    Vh(Object.values(W.model.nodes.objects));
+    Ja(Object.values(W.model.segments.objects));
+    Wh(Object.values(W.model.nodes.objects));
   }
-  function da(a) {
+  function ea(a) {
     O = [];
     for (var b = 0; b < a.streets.length; b += 1) {
       if (a.streets[b]) {
@@ -1500,41 +1500,41 @@ Y("Object.values", function(m) {
         O[b] = {strokeColor:a.streets[b].strokeColor, strokeWidth:a.streets[b].strokeWidth, strokeDashstyle:a.streets[b].strokeDashstyle, outlineColor:127 > 0.299 * parseInt(c.substring(1, 3), 16) + 0.587 * parseInt(c.substring(3, 5), 16) + 0.114 * parseInt(c.substring(5, 7), 16) ? "#FFF" : "#000", };
       }
     }
-    Gh = a.clutterConstant;
+    Hh = a.clutterConstant;
     A.setOpacity(d.layerOpacity);
-    Ga();
-    ba();
+    Ha();
+    ca();
   }
-  function ci(a) {
+  function di(a) {
     a = void 0 === a ? 0 : a;
-    0 === a && Bi();
+    0 === a && Ci();
     if (void 0 !== W && void 0 !== W.map && 1 < Object.keys(X).length) {
-      bi();
+      ci();
     } else {
       console.log("SVL not ready to start, retrying in 600ms");
       var b = a + 1;
       20 > b ? setTimeout(function() {
-        ci(b);
+        di(b);
       }, 600) : (a = g("bootstrap_error")) && "<invalid translation key>" !== a ? x("error", a) : x("error", "Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!");
     }
   }
-  var Ka = "true" === window.localStorage.getItem("svlDebugOn"), y = Ka ? function(a) {
+  var ba = GM_info.script.version, La = "true" === window.localStorage.getItem("svlDebugOn"), y = La ? function(a) {
     for (var b = [], c = 0; c < arguments.length; ++c) {
       b[c] = arguments[c];
     }
     for (c = 0; c < b.length; c += 1) {
-      "string" === typeof b[c] ? console.log("[SVL] 5.1.0: " + b[c]) : console.dir(b[c]);
+      "string" === typeof b[c] ? console.log("[SVL] " + ba + ": " + b[c]) : console.dir(b[c]);
     }
   } : function() {
-  }, Yh = Ka ? console.group : function() {
-  }, Zh = Ka ? console.groupEnd : function() {
-  }, Ha = null, Gh, O = [], A, F, B, P = !1, d, fa, za, J, va = {ROAD_LAYER:null, SVL_LAYER:null, }, hi = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079".split(""), Jh = {strokeColor:"#F53BFF", strokeWidth:3, strokeDashstyle:"solid", }, Ea = {strokeColor:"#111111", strokeWidth:1, strokeDashstyle:"dash", strokeOpacity:0.6, }, ti = {stroke:!1, fillColor:"#0015FF", fillOpacity:0.9, pointRadius:3, pointerEvents:"none", }, si = {stroke:!1, fillColor:"#C31CFF", fillOpacity:0.9, pointRadius:3, 
-  pointerEvents:"none", }, ji = {graphicName:"x", strokeColor:"#f00", strokeWidth:1.5, fillColor:"#FFFF40", fillOpacity:0.7, pointRadius:7, pointerEvents:"none", }, ki = {stroke:!1, fillColor:"#000", fillOpacity:0.5, pointRadius:3.5, graphicZIndex:179, pointerEvents:"none", }, Ih = {strokeColor:"#000", strokeDashstyle:"solid", }, Kh = {strokeColor:"#C90", strokeDashstyle:"longdash", }, Fa = {strokeColor:"#fff", strokeOpacity:0.8, strokeDashstyle:"longdash", }, Pa = {1:5.0, 2:5.5, 3:22.5, 4:6.0, 5:2.0, 
-  6:10.0, 7:9.0, 8:4.0, 10:2.0, 15:8.0, 16:2.0, 17:5.0, 18:6.0, 19:5.0, 20:5.0, 22:3.0, }, Qh = {svl_standard:{streets:[null, {strokeColor:"#FFFFFF", strokeWidth:10, strokeDashstyle:"solid", }, {strokeColor:"#CBA12E", strokeWidth:12, strokeDashstyle:"solid", }, {strokeColor:"#387FB8", strokeWidth:18, strokeDashstyle:"solid", }, {strokeColor:"#3FC91C", strokeWidth:11, strokeDashstyle:"solid", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#C13040", strokeWidth:16, 
+  }, Zh = La ? console.group : function() {
+  }, $h = La ? console.groupEnd : function() {
+  }, Ia = null, Hh, O = [], A, F, B, P = !1, d, ha, Aa, J, wa = {ROAD_LAYER:null, SVL_LAYER:null, }, ii = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079".split(""), Kh = {strokeColor:"#F53BFF", strokeWidth:3, strokeDashstyle:"solid", }, Fa = {strokeColor:"#111111", strokeWidth:1, strokeDashstyle:"dash", strokeOpacity:0.6, }, ui = {stroke:!1, fillColor:"#0015FF", fillOpacity:0.9, pointRadius:3, pointerEvents:"none", }, ti = {stroke:!1, fillColor:"#C31CFF", fillOpacity:0.9, pointRadius:3, 
+  pointerEvents:"none", }, ki = {graphicName:"x", strokeColor:"#f00", strokeWidth:1.5, fillColor:"#FFFF40", fillOpacity:0.7, pointRadius:7, pointerEvents:"none", }, li = {stroke:!1, fillColor:"#000", fillOpacity:0.5, pointRadius:3.5, graphicZIndex:179, pointerEvents:"none", }, Jh = {strokeColor:"#000", strokeDashstyle:"solid", }, Lh = {strokeColor:"#C90", strokeDashstyle:"longdash", }, Ga = {strokeColor:"#fff", strokeOpacity:0.8, strokeDashstyle:"longdash", }, Qa = {1:5.0, 2:5.5, 3:22.5, 4:6.0, 5:2.0, 
+  6:10.0, 7:9.0, 8:4.0, 10:2.0, 15:8.0, 16:2.0, 17:5.0, 18:6.0, 19:5.0, 20:5.0, 22:3.0, }, Rh = {svl_standard:{streets:[null, {strokeColor:"#FFFFFF", strokeWidth:10, strokeDashstyle:"solid", }, {strokeColor:"#CBA12E", strokeWidth:12, strokeDashstyle:"solid", }, {strokeColor:"#387FB8", strokeWidth:18, strokeDashstyle:"solid", }, {strokeColor:"#3FC91C", strokeWidth:11, strokeDashstyle:"solid", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#C13040", strokeWidth:16, 
   strokeDashstyle:"solid", }, {strokeColor:"#ECE589", strokeWidth:14, strokeDashstyle:"solid", }, {strokeColor:"#82614A", strokeWidth:7, strokeDashstyle:"solid", }, null, {strokeColor:"#0000FF", strokeWidth:5, strokeDashstyle:"dash", }, null, null, null, null, {strokeColor:"#FF8000", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#B700FF", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#00FFB3", strokeWidth:7, strokeDashstyle:"solid", }, {strokeColor:"#FFFFFF", strokeWidth:8, 
   strokeDashstyle:"dash", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#2282AB", strokeWidth:9, strokeDashstyle:"solid", }, null, {strokeColor:"#C6C7FF", strokeWidth:6, strokeDashstyle:"solid", }, ], }, wme_colors:{streets:[null, {strokeColor:"#FFFFDD", strokeWidth:10, strokeDashstyle:"solid", }, {strokeColor:"#FDFAA7", strokeWidth:12, strokeDashstyle:"solid", }, {strokeColor:"#6870C3", strokeWidth:18, strokeDashstyle:"solid", }, {strokeColor:"#B3BFB3", strokeWidth:11, 
   strokeDashstyle:"solid", }, {strokeColor:"#00FF00", strokeWidth:5, strokeDashstyle:"dash", }, {strokeColor:"#469FBB", strokeWidth:16, strokeDashstyle:"solid", }, {strokeColor:"#69BF88", strokeWidth:14, strokeDashstyle:"solid", }, {strokeColor:"#867342", strokeWidth:7, strokeDashstyle:"solid", }, null, {strokeColor:"#9A9A9A", strokeWidth:5, strokeDashstyle:"dash", }, null, null, null, null, {strokeColor:"#6FB6BE", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#9A9A9A", strokeWidth:5, 
-  strokeDashstyle:"dash", }, {strokeColor:"#BEBA6C", strokeWidth:7, strokeDashstyle:"solid", }, {strokeColor:"#D8D8F9", strokeWidth:8, strokeDashstyle:"dash", }, {strokeColor:"#222222", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#ABABAB", strokeWidth:9, strokeDashstyle:"solid", }, null, {strokeColor:"#64799A", strokeWidth:6, strokeDashstyle:"solid", }, ], }, }, Xh = null, X = [], Ja = [];
-  ci();
+  strokeDashstyle:"dash", }, {strokeColor:"#BEBA6C", strokeWidth:7, strokeDashstyle:"solid", }, {strokeColor:"#D8D8F9", strokeWidth:8, strokeDashstyle:"dash", }, {strokeColor:"#222222", strokeWidth:5, strokeDashstyle:"dashdot", }, {strokeColor:"#ABABAB", strokeWidth:9, strokeDashstyle:"solid", }, null, {strokeColor:"#64799A", strokeWidth:6, strokeDashstyle:"solid", }, ], }, }, Yh = null, X = [], Ka = [];
+  di();
 })();
 
