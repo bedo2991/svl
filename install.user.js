@@ -1084,11 +1084,11 @@ Y("Object.values", function(m) {
     e.appendChild(L({id:"hideRoutingModeBlock", title:g("hide_routing_mode_panel"), description:g("hide_routing_mode_panel_descr"), g:"5.0.9", }));
     e.appendChild(L({id:"showUnderGPSPoints", title:g("gps_layer_above_roads"), description:g("gps_layer_above_roads_descr"), }));
     k.appendChild(ua({id:"labelOutlineWidth", title:g("label_width"), description:g("label_width_descr"), min:0, max:10, step:1, }));
-    e.appendChild(L({id:"disableRoadLayers", title:g("hide_road_layer"), description:g("hide_road_layer"), }));
+    e.appendChild(L({id:"disableRoadLayers", title:g("hide_road_layer"), description:g("hide_road_layer_descr"), }));
     e.appendChild(L({id:"startDisabled", title:g("svl_initially_disabled"), description:g("svl_initially_disabled_descr"), }));
     e.appendChild(ua({id:"clutterConstant", title:g("street_names_density"), description:g("street_names_density_descr"), min:1, max:20, step:1, }));
     f = document.createElement("h5");
-    f.innerText = "Close-zoom only";
+    f.innerText = g("close_zoom_only");
     e.appendChild(f);
     e.appendChild(L({id:"renderGeomNodes", title:g("render_geometry_nodes"), description:g("render_geometry_nodes_descr"), }));
     e.appendChild(aa({id:"fakelock", title:g("render_as_level"), description:g("render_as_level_descr"), min:1, max:7, step:1, }));
