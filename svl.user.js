@@ -3717,6 +3717,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.1.3: SVL initialises faster and in a more reliable way. English strings are inclued in the script in case the connection to the translations is not possible.
       <br>- 5.1.1: Fixed some untranslated strings.
       <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
       <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
