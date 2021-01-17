@@ -26,6 +26,9 @@
   /** @type{number} */
   const MAX_NODES = 4000;
 
+  /** @type{boolean} */
+  let onlineTranslations = false;
+
   let autoLoadInterval = null;
 
   let clutterConstant;
@@ -157,19 +160,6 @@
     OLMap = W.map.getOLMap();
     preferences = null;
     OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
-  }
-
-  function svlWazeBits() {
-    /// /Utilities variable to avoid writing long names
-    if (W !== undefined) {
-      // wazeMap = unsafeWindow.W.map;
-      if (W.map !== undefined) {
-        if (W.model !== undefined) {
-          return;
-        }
-      }
-    }
-    throw new Error('Model Not ready');
   }
 
   function refreshWME() {
@@ -2631,6 +2621,7 @@
   }
 
   function initPreferencePanel() {
+    //console.debug('Init Preference Panel');
     const style = document.createElement('style');
     style['innerHTML'] = `
         <style>
@@ -2710,9 +2701,13 @@
         )}</a>`;
       }
     } else {
-      //Call for action
-      //No need to translate this.
-      translationMessage.innerHTML = `<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>`;
+      if (onlineTranslations) {
+        //Call for action
+        //No need to translate this.
+        translationMessage.innerHTML = `<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">Please contact bedo2991</a>.</b>`;
+      } else {
+        translationMessage.innerHTML = `<b style="color:#8b0000">An error occurred while fetching the translations. If it persists, please report it on the Waze forum.</b>`;
+      }
     }
     mainDiv.appendChild(translationMessage);
 
@@ -3232,6 +3227,10 @@
       .addEventListener('click', exportPreferences);
   }
 
+  /**
+   *
+   * @param {number} id
+   */
   function removeNodeById(id) {
     nodesVector.destroyFeatures(
       nodesVector.getFeaturesByAttribute('myid', id),
@@ -3634,27 +3633,44 @@
 
   /**
    *
-   * @param {number} [trial=1]
+   * @param {number} ms
    */
-  function initWazeWrap(trial = 1) {
-    if (trial > 30) {
-      console.error('SVL: could not initialize WazeWrap');
-      return;
-    }
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
-    if (
-      !WazeWrap ||
-      !WazeWrap.Ready ||
-      !WazeWrap.Interface ||
-      !WazeWrap.Alerts
-    ) {
-      console.log('SVL: WazeWrap not ready, retrying in 800ms');
-      setTimeout(() => {
-        initWazeWrap(trial + 1);
-      }, 800);
-      return;
-    }
-    initWazeWrapElements();
+  async function waitForWazeModel() {
+    let trials = 1;
+    let sleepTime = 150;
+    do {
+      if (!W || !W.map || !W.model) {
+        console.log('SVL: Waze model not ready, retrying in 800ms');
+        await sleep(sleepTime * trials);
+      } else {
+        return true;
+      }
+    } while (trials++ <= 30);
+    throw new Error('SVL: could not find the Waze Model');
+  }
+
+  async function waitForWazeWrap() {
+    let trials = 1;
+    let sleepTime = 150;
+    do {
+      if (
+        !WazeWrap ||
+        !WazeWrap.Ready ||
+        !WazeWrap.Interface ||
+        !WazeWrap.Alerts
+      ) {
+        console.log('SVL: WazeWrap not ready, retrying in 800ms');
+        await sleep(trials * sleepTime);
+      } else {
+        return true;
+      }
+    } while (trials++ <= 30);
+    console.error('SVL: could not initialize WazeWrap');
+    throw new Error('SVL: could not initialize WazeWrap');
   }
 
   function initWazeWrapElements() {
@@ -3695,7 +3711,8 @@
     if (preferences['startDisabled']) {
       setLayerVisibility(SVL_LAYER, false);
     }
-    initPreferencePanel();
+    loadTranslations().then(() => initPreferencePanel());
+    //initPreferencePanel();
     WazeWrap.Interface.ShowScriptUpdate(
       'Street Vector Layer',
       SVL_VERSION,
@@ -3722,7 +3739,7 @@
    */
   function _(key) {
     const key_index = tr_keys[key];
-    if (typeof key_index === 'undefined') {
+    if (typeof key_index === 'undefined' && Object.keys(tr).length > 0) {
       return invalidTranslation(key);
     }
     const locale = I18n.currentLocale();
@@ -3731,40 +3748,43 @@
         return tr[locale][key_index];
       }
     }
-    return tr['en'][key_index];
+    if (tr['en'] && tr['en'][key_index]) {
+      return tr['en'][key_index];
+    }
+    return fallback[key];
     //return tr[I18n.currentLocale()]?.[tr_keys[key]] ?? tr["en"]?.[tr_keys[key]] ?? invalidTranslation(key);
   }
   /**@type{!Object<string,Array<string>>} */
   const tr = [];
   /**@type{!Object<string,number>} */
   const tr_keys = [];
-  function loadTranslations() {
-    console.debug('Loading translations...');
-    fetch(
+  async function loadTranslations() {
+    //console.debug('Loading translations...');
+    const response = await fetch(
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
-    )
-      .then((response) => {
-        //console.error("RESPONSE!");
-        if (response.ok && response.status === 200) {
-          return response.text();
-        }
-      })
-      .then((data) => {
-        let temp = data.split('\n');
-        for (const [i, line] of temp.entries()) {
-          if (i > 0) {
-            const [first, ...rest] = line.split('\t');
-            tr[first] = rest.map((e) => e.trim());
-          } else {
-            const [first, ...rest] = line.split('\t');
-            for (const [i, value] of rest.entries()) {
-              tr_keys[value.trim()] = i;
-            }
-            console.dir(tr_keys);
+    );
+
+    //console.error("RESPONSE!");
+    if (response.ok && response.status === 200) {
+      const data = await response.text();
+      let temp = data.split('\n');
+      for (const [i, line] of temp.entries()) {
+        if (i > 0) {
+          const [first, ...rest] = line.split('\t');
+          tr[first] = rest.map((e) => e.trim());
+        } else {
+          const [, ...rest] = line.split('\t');
+          for (const [j, value] of rest.entries()) {
+            tr_keys[value.trim()] = parseInt(j, 10);
           }
+          console.dir(tr_keys);
         }
-        console.dir(tr);
-      });
+      }
+      onlineTranslations = true;
+      console.dir(tr);
+      return true;
+    }
+    throw new Error('Network response for SVL translations was not ok');
   }
 
   /**
@@ -3773,25 +3793,6 @@
    */
   function initSVL(svlAttempts = 0) {
     // Initialize variables
-    try {
-      svlWazeBits();
-    } catch (e) {
-      const attempts = svlAttempts + 1;
-      if (svlAttempts < 20) {
-        console.warn(e);
-        console.warn(
-          'Could not initialize SVL correctly. Maybe the Waze model was not ready. Retrying in 500ms...'
-        );
-        setTimeout(() => {
-          initSVL(attempts);
-        }, 500);
-        return;
-      }
-      console.error(e);
-      safeAlert('error', _('init_error'));
-      return;
-    }
-
     svlGlobals();
 
     if (loadPreferences() === false) {
@@ -4164,7 +4165,11 @@
 
     OLMap.events.register('zoomend', null, manageZoom, true);
 
-    initWazeWrap();
+    waitForWazeWrap().then((result) => {
+      if (result === true) {
+        initWazeWrapElements();
+      }
+    });
 
     if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
       setLayerVisibility(ROAD_LAYER, true);
@@ -4233,23 +4238,15 @@
    *
    * @param {number} [trials=0]
    */
-  function bootstrapSVL(trials = 0) {
-    if (trials === 0) {
-      loadTranslations();
-    }
+  async function bootstrapSVL(trials = 0) {
     // Check all requisites for the script
-    if (
-      W === undefined ||
-      W.map === undefined ||
-      !(Object.keys(tr).length > 1)
-    ) {
-      console.log('SVL not ready to start, retrying in 600ms');
-      const attempts = trials + 1;
-      if (attempts < 20) {
-        setTimeout(() => {
-          bootstrapSVL(attempts);
-        }, 600);
-      } else {
+    await waitForWazeModel()
+      .then((res) => {
+        if (res === true) {
+          initSVL();
+        }
+      })
+      .catch(() => {
         let error_message = _('bootstrap_error');
         if (!error_message || error_message === '<invalid translation key>') {
           safeAlert(
@@ -4259,12 +4256,239 @@
         } else {
           safeAlert('error', error_message);
         }
-      }
-      return;
-    }
-    /* begin running the code! */
-    initSVL();
+      });
   }
+
+  /**
+   * @type {!Object<string,string>}
+   */
+  const fallback = [];
+  fallback[`completition_percentage`] = `100%`;
+  fallback[`language_code`] = `en`;
+  fallback[`translation_thanks`] = `translated in your language thanks to:`;
+  fallback[`would_you_like_to_help`] = `Would you like to help?`;
+  fallback[
+    `fully_translated_in`
+  ] = `Fully translated in your language thanks to:`;
+  fallback[`translated_by`] = `bedo2991`;
+  fallback[`routing_mode_panel_title`] = `SVL's Routing Mode`;
+  fallback[`routing_mode_panel_body`] = `Hover to temporary disable it`;
+  fallback[`thanks_for_using`] = `Thanks for using`;
+  fallback[`version`] = `Version`;
+  fallback[`something_not_working`] = `Something not working?`;
+  fallback[`report_it_here`] = `Report it here`;
+  fallback[`reset`] = `Reset`;
+  fallback[
+    `reset_help`
+  ] = `Overwrite your current settings with the default ones`;
+  fallback[`rollback`] = `Rollback`;
+  fallback[`rollback_help`] = `Discard your temporary changes`;
+  fallback[`save`] = `Save`;
+  fallback[`save_help`] = `Save your edited settings`;
+  fallback[`settings_backup`] = `Settings Backup`;
+  fallback[`import`] = `Import`;
+  fallback[`export`] = `Export`;
+  fallback[`new_since_version`] = `New since v.`;
+  fallback[`whats_new`] = `What's new?`;
+  fallback[
+    `first_time`
+  ] = `This is the first time that you run Street Vector Layer in this browser.`;
+  fallback[`some_info`] = `Some info about it:`;
+  fallback[
+    `default_shortcut_instruction`
+  ] = `By default, use ALT+L to toggle the layer.`;
+  fallback[
+    `instructions_1`
+  ] = `You can change the streets color, thickness and style using the panel on the left sidebar.`;
+  fallback[
+    `instructions_2`
+  ] = `Your preferences will be saved for the next time in your browser.`;
+  fallback[
+    `instructions_3`
+  ] = `The other road layers will be automatically hidden (you can change this behaviour in the preference panel).`;
+  fallback[
+    `instructions_4`
+  ] = `Have fun and tell us on the Waze forum if you liked the script!`;
+  fallback[`roads_properties`] = `Roads Properties`;
+  fallback[`segments_decorations`] = `Segments Decorations`;
+  fallback[`rendering_parameters`] = `Rendering Parameters`;
+  fallback[`speed_limits`] = `Speed Limits`;
+  fallback[`performance_tuning`] = `Performance Tuning`;
+  fallback[`utilities`] = `Utilities`;
+  fallback[`svl_standard_layer`] = `SVL Standard`;
+  fallback[`wme_colors_layer`] = `WME Colors`;
+  fallback[
+    `preset_applied`
+  ] = `Preset applied, don't forget to save your changes!`;
+  fallback[`line_solid`] = `Solid`;
+  fallback[`line_dash`] = `Dashed`;
+  fallback[`line_dashdot`] = `Dash Dot`;
+  fallback[`line_longdash`] = `Long Dash`;
+  fallback[`line_longdashdot`] = `Long Dash Dot`;
+  fallback[`line_dot`] = `Dot`;
+  fallback[`color`] = `Color`;
+  fallback[`opacity`] = `Opacity`;
+  fallback[`width`] = `Width`;
+  fallback[`width_disabled`] = `disabled if using real-size width`;
+  fallback[`svl_logo`] = `Street Vector Layer Logo`;
+  fallback[`preferences_saved`] = `Preferences saved!`;
+  fallback[
+    `preferences_saving_error`
+  ] = `Could not save the preferences, your browser local storage seems to be full.`;
+  fallback[
+    `preferences_rollback`
+  ] = `All's well that ends well! Now it's everything as it was before.`;
+  fallback[
+    `export_preferences_message`
+  ] = `The configuration has been copied to your clipboard.
+Please paste it in a file (CTRL+V) to store it.`;
+  fallback[
+    `preferences_parsing_error`
+  ] = `Your string seems to be somehow wrong. Please check that is a valid JSON string`;
+  fallback[`preferences_imported`] = `Done, preferences imported!`;
+  fallback[
+    `preferences_importing_error`
+  ] = `Something went wrong. Is your string correct?`;
+  fallback[
+    `preferences_import_prompt`
+  ] = `N.B: your current preferences will be overwritten with the new ones. Export them first in case you want to go back to the previous status!`;
+  fallback[`preferences_import_prompt_2`] = `Paste your string here:`;
+  fallback[
+    `preferences_reset_message`
+  ] = `Preferences have been reset to the default values`;
+  fallback[
+    `preferences_reset_question`
+  ] = `Are you sure you want to rollback to the default settings?`;
+  fallback[
+    `preferences_reset_question_2`
+  ] = `ANY CHANGE YOU MADE TO YOUR PREFERENCES WILL BE LOST!`;
+  fallback[`preferences_reset_yes`] = `Yes, I want to reset`;
+  fallback[`preferences_reset_cancel`] = `No, cancel`;
+  fallback[`cancel`] = `Cancel`;
+  fallback[`speed_limit_value`] = `Speed Limit Value`;
+  fallback[`kmh`] = `km/h`;
+  fallback[`mph`] = `mph`;
+  fallback[`true_or_false`] = `True or False`;
+  fallback[`insert_number`] = `Insert a number`;
+  fallback[`pick_a_value_slider`] = `Pick a value using the slider`;
+  fallback[`svl_version`] = `SVL v.`;
+  fallback[
+    `preferences_moved`
+  ] = `The preferences have been moved to the sidebar on the left. Please look for the ""SVL 🗺️"" tab.`;
+  fallback[
+    `init_error`
+  ] = `Street Vector Layer failed to inizialize. Maybe the Editor has been updated or your connection/pc is really slow.`;
+  fallback[
+    `bootstrap_error`
+  ] = `Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!`;
+  fallback[`use_reallife_width`] = `Use real-life Width`;
+  fallback[
+    `use_reallife_width_descr`
+  ] = `When enabled, the segments thickness will be computed from the road's width instead of using the value set in the preferences`;
+  fallback[`road_themes_title`] = `Road Themes`;
+  fallback[
+    `road_themes_descr`
+  ] = `Applies a predefined theme to your preferences`;
+  fallback[`show_ans`] = `Show Alternative Names`;
+  fallback[
+    `show_ans_descr`
+  ] = `When enabled, at most 2 ANs that differ from the primary name are shown under the street name.`;
+  fallback[`layer_opacity`] = `Layer Opacity`;
+  fallback[`layer_opacity_descr`] = `10: almost invisible, 100: opaque.`;
+  fallback[`enable_routing_mode`] = `Enable Routing Mode`;
+  fallback[
+    `enable_routing_mode_descr`
+  ] = `When enabled, roads are rendered by taking into consideration their routing attribute. E.g. a preferred Minor Highway is shown as a Major Highway.`;
+  fallback[`hide_routing_mode_panel`] = `Hide the Routing Mode Panel`;
+  fallback[
+    `hide_routing_mode_panel_descr`
+  ] = `When enabled, the overlay to temporarily disable the routing mode is not shown.`;
+  fallback[`gps_layer_above_roads`] = `GPS Layer above Roads`;
+  fallback[
+    `gps_layer_above_roads_descr`
+  ] = `When enabled, the GPS tracks layer gets shown above the road layer.`;
+  fallback[`label_width`] = `Labels Outline Width`;
+  fallback[`label_width_descr`] = `How much border should the labels have?`;
+  fallback[`hide_road_layer`] = `Hide WME Road Layer`;
+  fallback[
+    `hide_road_layer_descr`
+  ] = `When enabled, the WME standard road layer gets hidden automatically.`;
+  fallback[`svl_initially_disabled`] = `SVL Initially Disabled`;
+  fallback[
+    `svl_initially_disabled_descr`
+  ] = `When enabled, the SVL does not get enabled automatically.`;
+  fallback[`street_names_density`] = `Street Names Density`;
+  fallback[
+    `street_names_density_descr`
+  ] = `For a higher value, less elements will be shown.`;
+  fallback[`render_geometry_nodes`] = `Render Geometry Nodes`;
+  fallback[
+    `render_geometry_nodes_descr`
+  ] = `When enabled, the geometry nodes are drawn, too.`;
+  fallback[`render_as_level`] = `Render Map as Level`;
+  fallback[
+    `render_as_level_descr`
+  ] = `All segments locked above this level will be stroked through with a black line.`;
+  fallback[`font_size_close`] = `Font Size (at close zoom)`;
+  fallback[
+    `font_size_close_descr`
+  ] = `Increase this value if you can't read the street names because they are too small.`;
+  fallback[`limit_arrows`] = `Limit Arrows`;
+  fallback[
+    `limit_arrows_descr`
+  ] = `Increase this value if you want less arrows to be shown on streets (this may increase the script's performance).`;
+  fallback[`far_zoom_only`] = `Far-zoom only`;
+  fallback[`close_zoom_only`] = `Close-zoom only`;
+  fallback[`font_size_far`] = `Font Size (at far zoom)`;
+  fallback[
+    `font_size_far_descr`
+  ] = `Increase this value if you can't read the street names because they are too small.`;
+  fallback[`hide_minor_roads`] = `Hide minor roads at zoom 3`;
+  fallback[
+    `hide_minor_roads_descr`
+  ] = `The WME loads some type of roads when they probably shouldn't be there, check this option for avoid displaying them at higher zooms.`;
+  fallback[`automatically_refresh`] = `Automatically Refresh the Map`;
+  fallback[
+    `automatically_refresh_descr`
+  ] = `When enabled, SVL refreshes the map automatically after a certain timeout if you're not editing.`;
+  fallback[`autoreload_interval`] = `Auto Reload Time Interval (in Seconds)`;
+  fallback[
+    `autoreload_interval_descr`
+  ] = `How often should the WME be refreshed for new edits?`;
+  fallback[`stop_svl_at_zoom`] = `Stop using SVL at zoom level`;
+  fallback[
+    `stop_svl_at_zoom_descr`
+  ] = `When you reach this zoom level, the WME's road layer gets automatically enabled.`;
+  fallback[`close_zoom_until_level`] = `Close-zoom until zoom level`;
+  fallback[
+    `close_zoom_until_level_descr`
+  ] = `When the zoom is lower then this value, it will switch to far-zoom mode (rendering less details)`;
+  fallback[`segments_threshold`] = `Segments threshold`;
+  fallback[
+    `segments_threshold_descr`
+  ] = `When the WME wants to draw more than this amount of segments, switch to the WME's road layer`;
+  fallback[`nodes_threshold`] = `Nodes threshold`;
+  fallback[
+    `nodes_threshold_descr`
+  ] = `When the WME wants to draw more than this amount of nodes, switch to the WME's road layer`;
+  fallback[`show_sl_on_name`] = `Show on the Street Name`;
+  fallback[
+    `show_sl_on_name_descr`
+  ] = `Show the speed limit as text at the end of the street name.`;
+  fallback[`show_sl_with_colors`] = `Show using colors`;
+  fallback[
+    `show_sl_with_colors_descr`
+  ] = `Show the speed limit by coloring the segment's outline.`;
+  fallback[`show_sl_with_one_color`] = `Show using Single Color`;
+  fallback[
+    `show_sl_with_one_color_descr`
+  ] = `Show the speed limit by coloring the segment's outline with a single color instead of a different color depending on the speed limit's value.`;
+  fallback[
+    `show_unverified_dashed`
+  ] = `Show unverified Speed Limits with a dashed Line`;
+  fallback[
+    `show_unverified_dashed_descr`
+  ] = `If the speed limit is not verified, it will be shown with a different style.`;
 
   bootstrapSVL();
 })();
