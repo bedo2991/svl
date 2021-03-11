@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "npx google-closure-compiler --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS",
     "compile-pp": "npx google-closure-compiler --formatting=pretty_print --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS",
-    "concat": "cross-var concat -o releases\\release-$npm_package_version.js header.js install.user.js",
+    "concat": "cross-var concat -o releases\\release-$npm_package_version.user.js header.js install.user.js",
     "build": "npm run compile && npm run concat",
     "release": "cross-var replace-in-files --regex='\\d+\\.\\d+\\.\\d+' --replacement=$npm_package_version header.js && git add header.js && npm run build",
     "watch": "npm-watch"
