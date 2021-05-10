@@ -1123,9 +1123,11 @@
     let hasSpeedLimitDrawn = false;
     // eslint-disable-next-line prefer-destructuring
     let roadType = attributes.roadType;
-
+    // TODO
+    //const lanes = 1;
+    //const laneWidth = 1.435;
     const totalSegmentWidth = getWidth({
-      segmentWidth: attributes.width,
+      //segmentWidth: lanes * laneWidth,
       roadType,
       twoWay: isTwoWay,
     });
@@ -3874,7 +3876,9 @@
             style['pointerEvents'] = 'none';
             if (!farZoom) {
               if (!feature.attributes.isArrow && preferences['realsize']) {
+                console.dir(style['strokeWidth']);
                 style['strokeWidth'] /= OLMap.resolution;
+                console.dir(style['strokeWidth']);
               }
             }
           }
