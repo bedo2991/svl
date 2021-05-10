@@ -1,16 +1,16 @@
 {
   "name": "svl",
-  "version": "5.1.5",
+  "version": "5.1.6",
   "description": "Street Vector Layer (SVL)\r The Road layer for the Waze editors, made by editors.",
   "main": "svl.user.js",
-  "watch":{
-    "compile":"svl.user.js"
+  "watch": {
+    "compile": "svl.user.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "npx google-closure-compiler --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS",
     "compile-pp": "npx google-closure-compiler --formatting=pretty_print --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS",
-    "concat": "cross-var concat -o releases\\release-$npm_package_version.js header.js install.user.js",
+    "concat": "cross-var concat -o releases\\release-$npm_package_version.user.js header.js install.user.js",
     "build": "npm run compile && npm run concat",
     "release": "cross-var replace-in-files --regex='\\d+\\.\\d+\\.\\d+' --replacement=$npm_package_version header.js && git add header.js && npm run build",
     "watch": "npm-watch"
@@ -38,6 +38,7 @@
     "eslint-config-airbnb-base": "^14.2.0",
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-import": "^2.22.1",
+    "google-closure-compiler": "^20210505.0.0",
     "npm-watch": "^0.7.0",
     "replace-in-files-cli": "^1.0.0"
   }
