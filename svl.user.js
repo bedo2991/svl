@@ -443,20 +443,21 @@
     },
   };
 
-  function getWidth({ segmentWidth, roadType, twoWay }) {
+  /**
+   *
+   * @param {number} roadType
+   * @param {boolean} twoWay
+   * @returns {number}
+   */
+  function getWidth(roadType, twoWay) {
     // If in close zoom and user enabled the realsize mode
     if (preferences['realsize']) {
-      // If the segment has a widht set, use it
-      if (segmentWidth) {
-        //Ignore if it's one or twoway if the width is given
-        return segmentWidth; // twoWay ? segmentWidth : segmentWidth * 0.6;
-      }
       return twoWay
         ? defaultSegmentWidthMeters[roadType]
         : defaultSegmentWidthMeters[roadType] * 0.5;
     }
-    // Use the value stored in the preferences //'TODO': parseInt should not be needed
-    return parseInt(streetStyles[roadType].strokeWidth, 10);
+    // Use the value stored in the preferences
+    streetStyles[roadType].strokeWidth;
   }
 
   function loadPreferences(overwrite = false) {
@@ -1162,15 +1163,12 @@
       //TODO, what to do when the 2 are different?
       segmentWidth = segmentWidthFrom + segmentWidthTo;
       console.warn('Different segment width');
-    } else {
-      //Segment has the same widht in both directions, just return one, twice
+    } else if (segmentWidthFrom) {
+      //Segment has the same non-null width in both directions, just return one, twice
       segmentWidth = segmentWidthFrom * 2.0;
     }
-    const totalSegmentWidth = getWidth({
-      segmentWidth,
-      roadType,
-      twoWay: isTwoWay,
-    });
+
+    const totalSegmentWidth = segmentWidth ?? getWidth(roadType, isTwoWay);
     let roadWidth = totalSegmentWidth;
     let lineFeature = null;
     if (attributes.primaryStreetID === null) {
@@ -3679,8 +3677,7 @@
     let trials = 1;
     let sleepTime = 150;
     do {
-      //TODO: wating for topCountry makes the script bootstrap much slower than needed.
-      if (!W || !W.map || !W.model || !W.model.topCountry) {
+      if (!W || !W.map || !W.model) {
         console.log('SVL: Waze model not ready, retrying in 800ms');
         await sleep(sleepTime * trials);
       } else {
