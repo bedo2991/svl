@@ -33,6 +33,9 @@
 
   let clutterConstant;
 
+  /** @type{number|null} */
+  let countryID = null;
+
   let streetStyles = [];
   /** @type {OpenLayers.Layer.Vector} */
   let streetVectorLayer;
@@ -156,6 +159,14 @@
     return zoom < preferences['switchZoom'];
   }
 
+  function mergeEndCallback() {
+    if (W.model.topCountry.id !== countryID) {
+      countryID = W.model.topCountry.id;
+      console.log('SVL: Init new country ' + countryID);
+      initCountry();
+    }
+  }
+
   function svlGlobals() {
     OLMap = W.map.getOLMap();
     preferences = null;
@@ -228,23 +239,23 @@
     loadPreferences(true);
   }
 
-  const defaultSegmentWidhtMeters = {
-    '1': 5.0, // "Street",
-    '2': 5.5, // "Primary Street",
-    '3': 22.5, // "Freeway",
-    '4': 6.0, // "Ramp",
-    '5': 2.0, // "Walking Trail",
-    '6': 10.0, // "Major Highway",
-    '7': 9.0, // "Minor Highway",
-    '8': 4.0, // "Dirt Road",
-    '10': 2.0, // "Pedestrian Boardwalk",
-    '15': 8.0, // "Ferry",
-    '16': 2.0, // "Stairway",
-    '17': 5.0, // "Private Road",
-    '18': 6.0, // "Railroad",
-    '19': 5.0, // "Runway",
-    '20': 5.0, // "Parking Lot Road",
-    '22': 3.0, // "Alley"
+  const defaultSegmentWidthMeters = {
+    '1': 6.2, // "Street",
+    '2': 7, // "Primary Street",
+    '3': 9, // "Freeway",
+    '4': 7, // "Ramp",
+    '5': 2, // "Walking Trail",
+    '6': 8.4, // "Major Highway",
+    '7': 8, // "Minor Highway",
+    '8': 8, // "Dirt Road",
+    '10': 2, // "Pedestrian Boardwalk",
+    '15': 8, // "Ferry",
+    '16': 2, // "Stairway",
+    '17': 7, // "Private Road",
+    '18': 6, // "Railroad",
+    '19': 5, // "Runway",
+    '20': 6, // "Parking Lot Road",
+    '22': 5, // "Alley"
     // "service": 21,
   };
   const presets = {
@@ -437,11 +448,12 @@
     if (preferences['realsize']) {
       // If the segment has a widht set, use it
       if (segmentWidth) {
-        return twoWay ? segmentWidth : segmentWidth * 0.6;
+        //Ignore if it's one or twoway if the width is given
+        return segmentWidth; // twoWay ? segmentWidth : segmentWidth * 0.6;
       }
       return twoWay
-        ? defaultSegmentWidhtMeters[roadType]
-        : defaultSegmentWidhtMeters[roadType] * 0.6;
+        ? defaultSegmentWidthMeters[roadType]
+        : defaultSegmentWidthMeters[roadType] * 0.5;
     }
     // Use the value stored in the preferences //'TODO': parseInt should not be needed
     return parseInt(streetStyles[roadType].strokeWidth, 10);
@@ -1123,11 +1135,39 @@
     let hasSpeedLimitDrawn = false;
     // eslint-disable-next-line prefer-destructuring
     let roadType = attributes.roadType;
-    // TODO
-    //const lanes = 1;
-    //const laneWidth = 1.435;
+
+    let segmentWidthFrom = null;
+    let segmentWidthTo = null;
+    if (attributes.fromLanesInfo) {
+      const laneWidth =
+        (attributes.fromLanesInfo.laneWidth
+          ? attributes.fromLanesInfo.laneWidth
+          : 300) / 100;
+      segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * laneWidth;
+    }
+
+    if (attributes.toLanesInfo) {
+      const laneWidth =
+        (attributes.toLanesInfo.laneWidth
+          ? attributes.toLanesInfo.laneWidth
+          : 300) / 100;
+      segmentWidthTo = attributes.toLanesInfo.numberOfLanes * laneWidth;
+    }
+    let segmentWidth = null;
+    if (!isTwoWay) {
+      segmentWidth = attributes.fwdDirection
+        ? segmentWidthFrom
+        : segmentWidthTo;
+    } else if (segmentWidthTo != segmentWidthFrom) {
+      //TODO, what to do when the 2 are different?
+      segmentWidth = segmentWidthFrom + segmentWidthTo;
+      console.warn('Different segment width');
+    } else {
+      //Segment has the same widht in both directions, just return one, twice
+      segmentWidth = segmentWidthFrom * 2.0;
+    }
     const totalSegmentWidth = getWidth({
-      //segmentWidth: lanes * laneWidth,
+      segmentWidth,
       roadType,
       twoWay: isTwoWay,
     });
@@ -2024,33 +2064,28 @@
       'svl_clutterConstant'
     ).value;
 
-    preferences['arrowDeclutter'] = document.getElementById(
-      'svl_arrowDeclutter'
-    ).value;
+    preferences['arrowDeclutter'] =
+      document.getElementById('svl_arrowDeclutter').value;
     preferences['labelOutlineWidth'] = document.getElementById(
       'svl_labelOutlineWidth'
     ).value;
     preferences['disableRoadLayers'] = document.getElementById(
       'svl_disableRoadLayers'
     ).checked;
-    preferences['startDisabled'] = document.getElementById(
-      'svl_startDisabled'
-    ).checked;
+    preferences['startDisabled'] =
+      document.getElementById('svl_startDisabled').checked;
 
-    preferences['showSLtext'] = document.getElementById(
-      'svl_showSLtext'
-    ).checked;
-    preferences['showSLcolor'] = document.getElementById(
-      'svl_showSLcolor'
-    ).checked;
+    preferences['showSLtext'] =
+      document.getElementById('svl_showSLtext').checked;
+    preferences['showSLcolor'] =
+      document.getElementById('svl_showSLcolor').checked;
     preferences['showSLSinglecolor'] = document.getElementById(
       'svl_showSLSinglecolor'
     ).checked;
     preferences['SLColor'] = document.getElementById('svl_SLColor').value;
 
-    preferences['hideMinorRoads'] = document.getElementById(
-      'svl_hideMinorRoads'
-    ).checked;
+    preferences['hideMinorRoads'] =
+      document.getElementById('svl_hideMinorRoads').checked;
     preferences['showDashedUnverifiedSL'] = document.getElementById(
       'svl_showDashedUnverifiedSL'
     ).checked;
@@ -2065,9 +2100,8 @@
       'svl_renderGeomNodes'
     ).checked;
 
-    preferences['nodesThreshold'] = document.getElementById(
-      'svl_nodesThreshold'
-    ).value;
+    preferences['nodesThreshold'] =
+      document.getElementById('svl_nodesThreshold').value;
     preferences['segmentsThreshold'] = document.getElementById(
       'svl_segmentsThreshold'
     ).value;
@@ -3430,6 +3464,7 @@
         'svl': true,
       });
     }
+    W.model.events.register('mergeend', null, mergeEndCallback);
   }
 
   function removeSegmentsEvents() {
@@ -3440,10 +3475,10 @@
       events.objectsadded = events.objectsadded.filter(removeSVLEvents);
       events.objectschanged = events.objectschanged.filter(removeSVLEvents);
       events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
-      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-        removeSVLEvents
-      );
+      events['objects-state-deleted'] =
+        events['objects-state-deleted'].filter(removeSVLEvents);
     }
+    W.model.events.unregister('mergeend', null, mergeEndCallback);
   }
 
   function removeNodeEvents() {
@@ -3454,9 +3489,8 @@
       events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
       events.objectsadded = events.objectsadded.filter(removeSVLEvents);
       events.objectschanged = events.objectschanged.filter(removeSVLEvents);
-      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-        removeSVLEvents
-      );
+      events['objects-state-deleted'] =
+        events['objects-state-deleted'].filter(removeSVLEvents);
     }
   }
 
@@ -3645,7 +3679,8 @@
     let trials = 1;
     let sleepTime = 150;
     do {
-      if (!W || !W.map || !W.model) {
+      //TODO: wating for topCountry makes the script bootstrap much slower than needed.
+      if (!W || !W.map || !W.model || !W.model.topCountry) {
         console.log('SVL: Waze model not ready, retrying in 800ms');
         await sleep(sleepTime * trials);
       } else {
@@ -3791,6 +3826,30 @@
   }
 
   /**
+   * Returns the geodetic pixel size in meters, optimized for the Waze Map
+   * @returns {number}
+   */
+  function getGeodesicPixelSizeSVL() {
+    const lonlat = OLMap.getCachedCenter();
+    const res = OLMap.resolution;
+    const left = lonlat.add(-res / 2, 0);
+    const right = lonlat.add(res / 2, 0);
+    //const bottom = lonlat.add(0, -res / 2);
+    //const top = lonlat.add(0, res / 2);
+    const dest = new OpenLayers.Projection('EPSG:4326');
+    const source = OLMap.projection;
+    left.transform(source, dest);
+    right.transform(source, dest);
+    // bottom.transform(source, dest);
+    //top.transform(source, dest);
+
+    //return new OpenLayers.Size(
+    return OpenLayers.Util.distVincenty(left, right) * 1000;
+    //  OpenLayers.Util.distVincenty(bottom, top)
+    //);
+  }
+
+  /**
    *
    * @param {number} [svlAttempts=0]
    */
@@ -3876,9 +3935,9 @@
             style['pointerEvents'] = 'none';
             if (!farZoom) {
               if (!feature.attributes.isArrow && preferences['realsize']) {
-                console.dir(style['strokeWidth']);
-                style['strokeWidth'] /= OLMap.resolution;
-                console.dir(style['strokeWidth']);
+                //console.dir(style['strokeWidth']);
+                style['strokeWidth'] /= getGeodesicPixelSizeSVL();
+                //console.dir(style['strokeWidth']);
               }
             }
           }
@@ -4198,11 +4257,6 @@
       'object': streetVectorLayer,
     });
 
-    // TODO remove in the next releases
-    $('.olControlAttribution').click(() => {
-      safeAlert('info', _('preferences_moved'));
-    });
-
     // eslint-disable-next-line no-underscore-dangle
     const events = W.prefs._events;
     if (typeof events === 'object') {
@@ -4239,6 +4293,23 @@
     redrawAllSegments();
   }
 
+  function initCountry() {
+    document.defaultSegmentWidthMeters = defaultSegmentWidthMeters;
+    if (!W.model.topCountry) {
+      console.error('SVL: could not find topCountry');
+      return;
+    }
+    const defaultLaneWidth = W.model.topCountry.defaultLaneWidthPerRoadType;
+    if (defaultLaneWidth) {
+      Object.keys(defaultLaneWidth).forEach((e) => {
+        defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
+      });
+      redrawAllSegments();
+    } else {
+      console.warn('SVL: could not find default lane width in Waze data model');
+    }
+  }
+
   /**
    *
    * @param {number} [trials=0]
@@ -4251,7 +4322,8 @@
           initSVL();
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error(e);
         let error_message = _('bootstrap_error');
         if (!error_message || error_message === '<invalid translation key>') {
           safeAlert(
@@ -4377,9 +4449,6 @@ Please paste it in a file (CTRL+V) to store it.`;
   fallback[`insert_number`] = `Insert a number`;
   fallback[`pick_a_value_slider`] = `Pick a value using the slider`;
   fallback[`svl_version`] = `SVL v.`;
-  fallback[
-    `preferences_moved`
-  ] = `The preferences have been moved to the sidebar on the left. Please look for the ""SVL 🗺️"" tab.`;
   fallback[
     `init_error`
   ] = `Street Vector Layer failed to inizialize. Maybe the Editor has been updated or your connection/pc is really slow.`;
