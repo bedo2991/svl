@@ -160,8 +160,9 @@
   }
 
   function mergeEndCallback() {
-    if (W.model.topCountry.id !== countryID) {
-      countryID = W.model.topCountry.id;
+    const tc = W.model.topCountry;
+    if (tc && tc?.id !== countryID) {
+      countryID = tc.id;
       console.log('SVL: Init new country ' + countryID);
       initCountry();
     }
@@ -457,7 +458,7 @@
         : defaultSegmentWidthMeters[roadType] * 0.5;
     }
     // Use the value stored in the preferences
-    streetStyles[roadType].strokeWidth;
+    return streetStyles[roadType].strokeWidth;
   }
 
   function loadPreferences(overwrite = false) {
@@ -4262,6 +4263,7 @@
       });
     }
 
+    mergeEndCallback();
     console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
   }
 
