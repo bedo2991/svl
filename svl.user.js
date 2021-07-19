@@ -1255,7 +1255,7 @@
             right[1] = pk1.clone();
             let offset = isBridge
               ? totalSegmentWidth * 0.14
-              : totalSegmentWidth * 0.17;
+              : totalSegmentWidth * 0.22;
             // offset = (totalSegmentWidth / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
             // of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
             // console.error(of2);
