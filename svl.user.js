@@ -519,8 +519,8 @@
     preferences['farZoomLabelSize'] =
       loadedPreferences?.['farZoomLabelSize'] ?? 12;
     preferences['useWMERoadLayerAtZoom'] =
-      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 1;
-    preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 5;
+      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 13;
+    preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 17;
 
     preferences['arrowDeclutter'] =
       loadedPreferences?.['arrowDeclutter'] ?? 140;
@@ -1141,25 +1141,26 @@
     let segmentWidthFrom = null;
     let segmentWidthTo = null;
     if (attributes.fromLanesInfo) {
-      const laneWidth =
-        (attributes.fromLanesInfo.laneWidth
-          ? attributes.fromLanesInfo.laneWidth
-          : 300) / 100;
-      segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * laneWidth;
+          if(attributes.fromLanesInfo.laneWidth){
+            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * attributes.fromLanesInfo.laneWidth /100.0;
+          }else{
+            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+          }
     }
 
     if (attributes.toLanesInfo) {
-      const laneWidth =
-        (attributes.toLanesInfo.laneWidth
-          ? attributes.toLanesInfo.laneWidth
-          : 300) / 100;
-      segmentWidthTo = attributes.toLanesInfo.numberOfLanes * laneWidth;
+      if(attributes.toLanesInfo.laneWidth){
+        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * attributes.toLanesInfo.laneWidth /100.0;
+      }else{
+        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+      }
     }
     let segmentWidth = null;
     if (!isTwoWay) {
       segmentWidth = attributes.fwdDirection
         ? segmentWidthFrom
         : segmentWidthTo;
+        console.log(segmentWidth);
     } else if (segmentWidthTo != segmentWidthFrom) {
       //TODO, what to do when the 2 are different?
       segmentWidth = segmentWidthFrom + segmentWidthTo;
@@ -1969,7 +1970,7 @@
 
   function updateLayerPosition() {
     const gpsLayerIndex = parseInt(
-      W.map.getLayerByUniqueName('gps_points').getZIndex(),
+      W.map.getLayerByName('gps_points').getZIndex(),
       10
     );
 
@@ -3234,8 +3235,8 @@
         id: 'useWMERoadLayerAtZoom',
         title: _('stop_svl_at_zoom'),
         description: _('stop_svl_at_zoom_descr'),
-        min: 0,
-        max: 5,
+        min: 12,
+        max: 17,
         step: 1,
       })
     );
@@ -3245,8 +3246,8 @@
         id: 'switchZoom',
         title: _('close_zoom_until_level'),
         description: _('close_zoom_until_level_descr'),
-        min: 5,
-        max: 9,
+        min: 17,
+        max: 21,
         step: 1,
       })
     );
@@ -3822,7 +3823,7 @@
     let trials = 1;
     let sleepTime = 150;
     do {
-      if (!W || !W.map || !W.model) {
+      if (typeof W === "undefined" || typeof W.map === "undefined"  || typeof W.model === "undefined") {
         console.log('SVL: Waze model not ready, retrying in 800ms');
         await sleep(sleepTime * trials);
       } else {
@@ -4041,7 +4042,7 @@
 
     streetVectorLayer = new OpenLayers.Layer.Vector(layerName, {
       'styleMap': roadStyleMap,
-      'uniqueName': 'vectorStreet',
+      'name': 'vectorStreet',
       'accelerator': `toggle${layerName.replace(/\s+/g, '')}`,
       'visibility': !preferences['startDisabled'],
       'isVector': true,
@@ -4096,7 +4097,7 @@
     };
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
-      'uniqueName': 'vectorNodes',
+      'name': 'vectorNodes',
       'visibility': !preferences['startDisabled'],
     });
 
@@ -4143,7 +4144,7 @@
     };
 
     labelsVector = new OpenLayers.Layer.Vector('Labels Vector', {
-      'uniqueName': 'vectorLabels',
+      'name': 'vectorLabels',
       'styleMap': labelStyleMap,
       'visibility': !preferences['startDisabled'],
     });
@@ -4354,7 +4355,7 @@
     }
 
     // initialisation
-    const layers = OLMap.getLayersBy('uniqueName', 'roads');
+    const layers = OLMap.getLayersBy('name', 'roads');
     WMERoadLayer = null;
     if (layers.length === 1) {
       [WMERoadLayer] = layers;

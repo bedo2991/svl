@@ -1,6 +1,6 @@
 {
   "name": "svl",
-  "version": "5.1.6",
+  "version": "5.1.7",
   "description": "Street Vector Layer (SVL)\r The Road layer for the Waze editors, made by editors.",
   "main": "svl.user.js",
   "watch": {
@@ -39,7 +39,7 @@
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-import": "^2.22.1",
     "google-closure-compiler": "^20210505.0.0",
-    "npm-watch": "^0.7.0",
+    "npm-watch": "n^0.7.0",
     "replace-in-files-cli": "^1.0.0"
   }
 }

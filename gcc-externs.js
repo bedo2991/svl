@@ -165,8 +165,15 @@ const W = {
      *
      * @param {string} uniqueName
      * @return {OpenLayers.Layer.Vector}
+     * @deprecated
      */
     'getLayerByUniqueName': function (uniqueName) {},
+        /**
+     *
+     * @param {string} uniqueName
+     * @return {OpenLayers.Layer.Vector}
+     */
+     'getLayerByName': function (uniqueName) {},
   },
   'model': {
     'events': {
