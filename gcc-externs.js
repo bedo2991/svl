@@ -57,10 +57,20 @@ const Restriction = class {
  * rank:number,
  * fwdLaneCount:number,
  * revLaneCount:number,
- * width:(number|undefined)
+ * width:(number|undefined),
+ * fromLanesInfo:LaneWidthInfos,
+ * toLanesInfo:LaneWidthInfos
  * }}
  */
 let SegmentAttributes;
+
+/**
+ * @typedef {{
+ * laneWidth:(number|null),
+ * numberOfLanes:number
+ * }}
+ */
+let LaneWidthInfos;
 
 /**
  * @typedef {{
@@ -155,15 +165,48 @@ const W = {
      *
      * @param {string} uniqueName
      * @return {OpenLayers.Layer.Vector}
+     * @deprecated
      */
     'getLayerByUniqueName': function (uniqueName) {},
+        /**
+     *
+     * @param {string} uniqueName
+     * @return {OpenLayers.Layer.Vector}
+     */
+     'getLayerByName': function (uniqueName) {},
   },
   'model': {
+    'events': {
+      /**
+       *
+       * @param {string} event_name
+       * @param {(*|null)} context
+       * @param {Function} callback
+       */
+      'register': function (event_name, context, callback) {},
+      /**
+       *
+       * @param {string} event_name
+       * @param {(*|null)} context
+       * @param {Function} callback
+       */
+      'unregister': function (event_name, context, callback) {},
+    },
     'actionManager': {
       /**
        * @return {number}
        */
       'unsavedActionsNum': function () {},
+    },
+    'topCountry': {
+      /**@type{string} */
+      'abbr': '',
+      /**@type{string} */
+      'env': '',
+      /**@type{number} */
+      'id': 0,
+      /** @type{Object.<string, number>} */
+      'defaultLaneWidthPerRoadType': {},
     },
     'streets': {
       /** @type{Object.<number, StreetAttributes>} */
@@ -234,6 +277,19 @@ const OpenLayers = {
      */
     intersectsBounds(extend) {}
   },
+  'Projection': class {
+    /**
+     *
+     * @param {string} projCode
+     * @param {Object=} object
+     */
+    constructor(projCode, object) {
+      this.proj;
+      /**@type{string} */
+      this.projCode = projCode;
+      this.titleRegEx;
+    }
+  },
   'LonLat': class {
     /**
      *
@@ -241,6 +297,22 @@ const OpenLayers = {
      * @param {number} lat
      */
     constructor(lon, lat) {}
+
+    /**
+     *
+     * @param {number} lon
+     * @param {number} lat
+     * @return {OpenLayers.LonLat}
+     */
+    add(lon, lat) {}
+
+    /**
+     *
+     * @param {OpenLayers.Projection} source
+     * @param {OpenLayers.Projection} dest
+     * @return {OpenLayers.LonLat}
+     */
+    transform(source, dest) {}
   },
   'Pixel': class {
     /**
@@ -250,12 +322,22 @@ const OpenLayers = {
      */
     constructor(x, y) {}
   },
+  'Size': class {
+    constructor() {
+      /** @type {number} */
+      this.w;
+      /** @type {number} */
+      this.h;
+    }
+  },
   'Map': class {
     constructor() {
       /** @type {number} */
       this.zoom;
       /** @type {number} */
       this.resolution;
+      /** @type {OpenLayers.Projection} */
+      this.projection;
       this.events = {
         /**
          *
@@ -267,6 +349,11 @@ const OpenLayers = {
         'register': function (eventName, a, callback, priority) {},
       };
     }
+
+    /**
+     * @return {OpenLayers.LonLat}
+     */
+    getCachedCenter() {}
 
     /**
      *
@@ -281,6 +368,12 @@ const OpenLayers = {
      * @return {Array.<OpenLayers.Layer.Vector>}
      */
     getLayersBy(attr, value) {}
+
+    /**
+     * @param {OpenLayers.Pixel=} pixel
+     * @return {OpenLayers.Size}
+     */
+    getGeodesicPixelSize(pixel) {}
   },
   'StyleMap': class {
     /**
@@ -379,6 +472,7 @@ const OpenLayers = {
   'IS_GECKO': true,
   'Util': {
     'extend': function (a, b) {},
+    'distVincenty': function (a, b) {},
   },
   /** @typedef Feature
    */
