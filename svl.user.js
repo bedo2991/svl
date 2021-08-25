@@ -33,6 +33,9 @@
 
   let clutterConstant;
 
+  /** @type{number|null} */
+  let countryID = null;
+
   let streetStyles = [];
   /** @type {OpenLayers.Layer.Vector} */
   let streetVectorLayer;
@@ -156,6 +159,15 @@
     return zoom < preferences['switchZoom'];
   }
 
+  function mergeEndCallback() {
+    const tc = W.model.topCountry;
+    if (tc && tc?.id !== countryID) {
+      countryID = tc.id;
+      console.log('SVL: Init new country ' + countryID);
+      initCountry();
+    }
+  }
+
   function svlGlobals() {
     OLMap = W.map.getOLMap();
     preferences = null;
@@ -228,23 +240,23 @@
     loadPreferences(true);
   }
 
-  const defaultSegmentWidhtMeters = {
-    '1': 5.0, // "Street",
-    '2': 5.5, // "Primary Street",
-    '3': 22.5, // "Freeway",
-    '4': 6.0, // "Ramp",
-    '5': 2.0, // "Walking Trail",
-    '6': 10.0, // "Major Highway",
-    '7': 9.0, // "Minor Highway",
-    '8': 4.0, // "Dirt Road",
-    '10': 2.0, // "Pedestrian Boardwalk",
-    '15': 8.0, // "Ferry",
-    '16': 2.0, // "Stairway",
-    '17': 5.0, // "Private Road",
-    '18': 6.0, // "Railroad",
-    '19': 5.0, // "Runway",
-    '20': 5.0, // "Parking Lot Road",
-    '22': 3.0, // "Alley"
+  const defaultSegmentWidthMeters = {
+    '1': 6.2, // "Street",
+    '2': 7, // "Primary Street",
+    '3': 9, // "Freeway",
+    '4': 7, // "Ramp",
+    '5': 2, // "Walking Trail",
+    '6': 8.4, // "Major Highway",
+    '7': 8, // "Minor Highway",
+    '8': 8, // "Dirt Road",
+    '10': 2, // "Pedestrian Boardwalk",
+    '15': 8, // "Ferry",
+    '16': 2, // "Stairway",
+    '17': 7, // "Private Road",
+    '18': 6, // "Railroad",
+    '19': 5, // "Runway",
+    '20': 6, // "Parking Lot Road",
+    '22': 5, // "Alley"
     // "service": 21,
   };
   const presets = {
@@ -432,19 +444,21 @@
     },
   };
 
-  function getWidth({ segmentWidth, roadType, twoWay }) {
+  /**
+   *
+   * @param {number} roadType
+   * @param {boolean} twoWay
+   * @returns {number}
+   */
+  function getWidth(roadType, twoWay) {
     // If in close zoom and user enabled the realsize mode
     if (preferences['realsize']) {
-      // If the segment has a widht set, use it
-      if (segmentWidth) {
-        return twoWay ? segmentWidth : segmentWidth * 0.6;
-      }
       return twoWay
-        ? defaultSegmentWidhtMeters[roadType]
-        : defaultSegmentWidhtMeters[roadType] * 0.6;
+        ? defaultSegmentWidthMeters[roadType]
+        : defaultSegmentWidthMeters[roadType] * 0.5;
     }
-    // Use the value stored in the preferences //'TODO': parseInt should not be needed
-    return parseInt(streetStyles[roadType].strokeWidth, 10);
+    // Use the value stored in the preferences
+    return streetStyles[roadType].strokeWidth;
   }
 
   function loadPreferences(overwrite = false) {
@@ -505,8 +519,8 @@
     preferences['farZoomLabelSize'] =
       loadedPreferences?.['farZoomLabelSize'] ?? 12;
     preferences['useWMERoadLayerAtZoom'] =
-      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 1;
-    preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 5;
+      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 13;
+    preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 17;
 
     preferences['arrowDeclutter'] =
       loadedPreferences?.['arrowDeclutter'] ?? 140;
@@ -976,7 +990,7 @@
 
       const roadTypeID = attributes.roadType;
       const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
-        'myId': attributes.id,
+        'sID': attributes.id,
         'color': streetStyles[roadTypeID]
           ? streetStyles[roadTypeID]['strokeColor']
           : '#f00',
@@ -1087,7 +1101,7 @@
         p0.y + Math.cos(degrees) * 10
       ),
       {
-        'myId': id,
+        'sID': id,
       },
       {
         'rotation': degrees,
@@ -1124,11 +1138,38 @@
     // eslint-disable-next-line prefer-destructuring
     let roadType = attributes.roadType;
 
-    const totalSegmentWidth = getWidth({
-      segmentWidth: attributes.width,
-      roadType,
-      twoWay: isTwoWay,
-    });
+    let segmentWidthFrom = null;
+    let segmentWidthTo = null;
+    if (attributes.fromLanesInfo) {
+          if(attributes.fromLanesInfo.laneWidth){
+            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * attributes.fromLanesInfo.laneWidth /100.0;
+          }else{
+            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+          }
+    }
+
+    if (attributes.toLanesInfo) {
+      if(attributes.toLanesInfo.laneWidth){
+        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * attributes.toLanesInfo.laneWidth /100.0;
+      }else{
+        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+      }
+    }
+    let segmentWidth = null;
+    if (!isTwoWay) {
+      segmentWidth = attributes.fwdDirection
+        ? segmentWidthFrom
+        : segmentWidthTo;
+    } else if (segmentWidthTo != segmentWidthFrom) {
+      //TODO, what to do when the 2 are different?
+      segmentWidth = segmentWidthFrom + segmentWidthTo;
+      //console.warn('Different segment width');
+    } else if (segmentWidthFrom) {
+      //Segment has the same non-null width in both directions, just return one, twice
+      segmentWidth = segmentWidthFrom * 2.0;
+    }
+
+    const totalSegmentWidth = segmentWidth ?? getWidth(roadType, isTwoWay);
     let roadWidth = totalSegmentWidth;
     let lineFeature = null;
     if (attributes.primaryStreetID === null) {
@@ -1136,7 +1177,7 @@
       lineFeature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.LineString(pointList),
         {
-          'myId': attributes.id,
+          'sID': attributes.id,
           'color': preferences['red']['strokeColor'],
           'width': totalSegmentWidth,
           'dash': preferences['red']['strokeDashstyle'],
@@ -1164,7 +1205,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': '#000000',
             'zIndex': baselevel + 100,
             'width': totalSegmentWidth,
@@ -1201,8 +1242,13 @@
         ) {
           // consoleDebug("The segment has 2 different speed limits");
           // It has 2 different speeds:
+          const offset = isBridge
+            ? totalSegmentWidth * 0.14
+            : totalSegmentWidth * 0.22;
+          //let { leftGeometry, rightGeometry } = shiftLR(pointList, offset);
           const left = [];
           const right = [];
+          //For each pair of points...
           for (let k = 0; k < pointList.length - 1; k += 1) {
             const pk = pointList[k];
             const pk1 = pointList[k + 1];
@@ -1212,9 +1258,8 @@
             right[0] = pk.clone();
             left[1] = pk1.clone();
             right[1] = pk1.clone();
-            let offset = isBridge
-              ? totalSegmentWidth * 0.14
-              : totalSegmentWidth * 0.17;
+
+            //console.log(offset);
             // offset = (totalSegmentWidth / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
             // of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
             // console.error(of2);
@@ -1254,28 +1299,37 @@
                   right[1].move(0, offset);
                 }
               } else {
+                let appliedOffset = offset;
                 if ((dy > 0 && dx > 0) || (dx < 0 && dy > 0)) {
                   // 1st and 4th q.
-                  offset *= -1;
+                  appliedOffset = -offset;
                 }
                 // console.log(offset);
                 const temp = Math.sqrt(1 + mb * mb);
                 // console.error("E");
                 // console.dir(left[0]);
-                left[0].move(offset / temp, offset * (mb / temp));
+                left[0].move(appliedOffset / temp, appliedOffset * (mb / temp));
                 // console.dir(left[0]);
-                left[1].move(offset / temp, offset * (mb / temp));
-                right[0].move(-offset / temp, -offset * (mb / temp));
-                right[1].move(-offset / temp, -offset * (mb / temp));
+                left[1].move(appliedOffset / temp, appliedOffset * (mb / temp));
+                right[0].move(
+                  -appliedOffset / temp,
+                  -appliedOffset * (mb / temp)
+                );
+                right[1].move(
+                  -appliedOffset / temp,
+                  -appliedOffset * (mb / temp)
+                );
               }
             }
             // consoleDebug("Adding 2 speeds");
             // consoleDebug(left);
             // consoleDebug(right);
+            // N.B.: even if it looks inefficient, it is correct
+            // that this is done for each section of the segment.
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(left),
               {
-                'myId': attributes.id,
+                'sID': attributes.id,
                 'color': getColorStringFromSpeed(attributes.fwdMaxSpeed),
                 'width': roadWidth,
                 'dash': speedStrokeStyle,
@@ -1287,7 +1341,7 @@
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(right),
               {
-                'myId': attributes.id,
+                'sID': attributes.id,
                 'color': getColorStringFromSpeed(attributes.revMaxSpeed),
                 'width': roadWidth,
                 'dash': speedStrokeStyle,
@@ -1309,7 +1363,7 @@
             lineFeature = new OpenLayers.Feature.Vector(
               new OpenLayers.Geometry.LineString(pointList),
               {
-                'myId': attributes.id,
+                'sID': attributes.id,
                 'color': getColorStringFromSpeed(speedValue),
                 'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
                 'dash': speedStrokeStyle,
@@ -1326,7 +1380,7 @@
       lineFeature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.LineString(pointList),
         {
-          'myId': attributes.id,
+          'sID': attributes.id,
           'color': streetStyles[roadType]['strokeColor'],
           'width': roadWidth,
           'dash': streetStyles[roadType]['strokeDashstyle'],
@@ -1340,7 +1394,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': '#000000',
             'width': roadWidth,
             'opacity': 0.3,
@@ -1359,7 +1413,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': nonEditableStyle.strokeColor,
             'width': roadWidth * 0.1,
             'dash': nonEditableStyle.strokeDashstyle,
@@ -1376,7 +1430,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['dirty']['strokeColor'],
             'width': roadWidth * 0.7,
             'opacity': preferences['dirty']['strokeOpacity'],
@@ -1394,7 +1448,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['closure']['strokeColor'],
             'width': roadWidth * 0.6,
             'dash': preferences['closure']['strokeDashstyle'],
@@ -1416,7 +1470,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['toll']['strokeColor'],
             'width': roadWidth * 0.3, // TODO preferences['toll']['strokeWidth'],
             'dash': preferences['toll']['strokeDashstyle'],
@@ -1433,7 +1487,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': roundaboutStyle.strokeColor,
             'width': roadWidth * 0.15,
             'dash': roundaboutStyle.strokeDashstyle,
@@ -1451,7 +1505,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['restriction']['strokeColor'],
             'width': roadWidth * 0.4, // preferences['restriction']['strokeWidth'],
             'dash': preferences['restriction']['strokeDashstyle'],
@@ -1468,7 +1522,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': validatedStyle.strokeColor,
             'width': roadWidth * 0.5, // validatedStyle.strokeWidth,
             'dash': validatedStyle.strokeDashstyle,
@@ -1484,7 +1538,7 @@
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
             {
-              'myId': attributes.id,
+              'sID': attributes.id,
               'color': preferences['headlights']['strokeColor'],
               'width': roadWidth * 0.2, // preferences['headlights']['strokeWidth'],
               'dash': preferences['headlights']['strokeDashstyle'],
@@ -1500,7 +1554,7 @@
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.LineString(pointList),
             {
-              'myId': attributes.id,
+              'sID': attributes.id,
               'color': preferences['nearbyHOV']['strokeColor'],
               'width': roadWidth * 0.25,
               'dash': preferences['nearbyHOV']['strokeDashstyle'],
@@ -1524,7 +1578,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(res),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['lanes']['strokeColor'],
             'width': roadWidth * 0.3,
             'dash': preferences['lanes']['strokeDashstyle'],
@@ -1548,7 +1602,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(res),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': preferences['lanes']['strokeColor'],
             'width': roadWidth * 0.3,
             'dash': preferences['lanes']['strokeDashstyle'],
@@ -1586,7 +1640,7 @@
                   simplifiedPoints[p + 1],
                 ]).getCentroid(true),
                 {
-                  'myId': attributes.id,
+                  'sID': attributes.id,
                   closeZoomOnly: true,
                   isArrow: true,
                   'zIndex': baselevel + 180,
@@ -1613,7 +1667,7 @@
               new OpenLayers.Feature.Vector(
                 segmentLineString.getCentroid(true),
                 {
-                  'myId': attributes.id,
+                  'sID': attributes.id,
                   closeZoomOnly: true,
                   isArrow: true,
                 },
@@ -1668,7 +1722,7 @@
             new OpenLayers.Feature.Vector(
               points[p],
               {
-                'myId': attributes.id,
+                'sID': attributes.id,
                 'zIndex': baselevel + 200,
                 closeZoomOnly: true,
                 isArrow: true,
@@ -1686,7 +1740,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': tunnelFlagStyle1.strokeColor,
             'opacity': tunnelFlagStyle1.strokeOpacity,
             'width': roadWidth * 0.3,
@@ -1698,7 +1752,7 @@
         lineFeature = new OpenLayers.Feature.Vector(
           new OpenLayers.Geometry.LineString(pointList),
           {
-            'myId': attributes.id,
+            'sID': attributes.id,
             'color': tunnelFlagStyle2.strokeColor,
             'width': roadWidth * 0.1,
             'dash': tunnelFlagStyle2.strokeDashstyle,
@@ -1718,6 +1772,138 @@
     return myFeatures;
   }
 
+  // /**
+  //  *
+  //  * @param {Array} pointList
+  //  * @param {number} offset
+  //  * @return {{leftGeometry, rightGeometry}}: 0 left, 1 right
+  //  */
+  // function shiftLR(pointList, offset) {
+  //   const leftGeometry = [];
+  //   const rightGeometry = [];
+  //   const left = [];
+  //   const right = [];
+  //   let previousLeftX = 0;
+  //   let previousLeftY = 0;
+  //   let previousRightX = 0;
+  //   let previousRightY = 0;
+  //   let moveLeftX = 0;
+  //   let moveLeftY = 0;
+  //   let moveRightX = 0;
+  //   let moveRightY = 0;
+  //   for (let k = 0; k < pointList.length - 1; k += 1) {
+  //     const pk = pointList[k];
+  //     const pk1 = pointList[k + 1];
+  //     const dx = pk.x - pk1.x;
+  //     const dy = pk.y - pk1.y;
+  //     left[0] = pk.clone();
+  //     right[0] = pk.clone();
+  //     left[1] = pk1.clone();
+  //     right[1] = pk1.clone();
+
+  //     console.log(offset);
+  //     // offset = (totalSegmentWidth / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
+  //     // of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
+  //     // console.error(of2);
+  //     // console.log(offset);
+  //     if (Math.abs(dx) < 0.5) {
+  //       // segment is vertical
+  //       if (dy > 0) {
+  //         // console.error("A");
+  //         moveLeftX = -offset;
+  //         moveLeftY = 0;
+  //         moveRightX = offset;
+  //         moveRightY = 0;
+  //         // left[0].move(-offset, 0);
+  //         // left[1].move(-offset, 0);
+  //         // right[0].move(offset, 0);
+  //         // right[1].move(offset, 0);
+  //       } else {
+  //         // console.error("B");
+  //         moveLeftX = offset;
+  //         moveLeftY = 0;
+  //         moveRightX = -offset;
+  //         moveRightY = 0;
+  //         // left[0].move(offset, 0);
+  //         // left[1].move(offset, 0);
+  //         // right[0].move(-offset, 0);
+  //         // right[1].move(-offset, 0);
+  //       }
+  //     } else {
+  //       const m = dy / dx;
+  //       const mb = -1.0 / m;
+  //       // consoleDebug("m: ", m);
+  //       if (Math.abs(m) < 0.05) {
+  //         // Segment is horizontal
+  //         if (dx > 0) {
+  //           // console.error("C");
+  //           moveLeftX = 0;
+  //           moveLeftY = offset;
+  //           moveRightX = 0;
+  //           moveRightY = -offset;
+  //           // left[0].move(0, offset);
+  //           // left[1].move(0, offset);
+  //           // right[0].move(0, -offset);
+  //           // right[1].move(0, -offset);
+  //         } else {
+  //           // console.error("D");
+  //           moveLeftX = 0;
+  //           moveLeftY = -offset;
+  //           moveRightX = 0;
+  //           moveRightY = offset;
+  //           // left[0].move(0, -offset);
+  //           // left[1].move(0, -offset);
+  //           // right[0].move(0, offset);
+  //           // right[1].move(0, offset);
+  //         }
+  //       } else {
+  //         let appliedOffset = offset;
+  //         if ((dy > 0 && dx > 0) || (dx < 0 && dy > 0)) {
+  //           // 1st and 4th q.
+  //           appliedOffset = -offset;
+  //         }
+  //         // console.log(offset);
+  //         const temp = Math.sqrt(1 + mb * mb);
+  //         // console.error("E");
+  //         // console.dir(left[0]);
+  //         moveLeftX = appliedOffset / temp;
+  //         moveLeftY = appliedOffset * (mb / temp);
+  //         moveRightX = -appliedOffset / temp;
+  //         moveRightY = -appliedOffset * (mb / temp);
+  //         // left[0].move(appliedOffset / temp, appliedOffset * (mb / temp));
+  //         // // console.dir(left[0]);
+  //         // left[1].move(appliedOffset / temp, appliedOffset * (mb / temp));
+  //         // right[0].move(-appliedOffset / temp, -appliedOffset * (mb / temp));
+  //         // right[1].move(-appliedOffset / temp, -appliedOffset * (mb / temp));
+  //       }
+  //     }
+
+  //     if (leftGeometry.length === 0) {
+  //       left[0].move(moveLeftX, moveLeftY);
+  //       leftGeometry.push(left[0]);
+  //       right[0].move(moveRightX, moveRightY);
+  //       rightGeometry.push(right[0]);
+  //     } else {
+  //       left[0].move(moveLeftX + previousLeftX, moveLeftY + previousLeftY);
+  //       leftGeometry.push(left[0]);
+  //       right[0].move(moveRightX + previousRightX, moveRightY + previousRightY);
+  //       rightGeometry.push(right[0]);
+  //     }
+
+  //     previousLeftX = moveLeftX;
+  //     previousLeftY = moveLeftY;
+
+  //     previousRightX = moveRightX;
+  //     previousRightY = moveRightY;
+  //   }
+  //   left[1].move(moveLeftX, moveLeftY);
+  //   right[1].move(moveRightX, moveRightY);
+  //   leftGeometry.push(left[1]);
+  //   rightGeometry.push(right[1]);
+  //   console.dir(leftGeometry);
+  //   return { leftGeometry, rightGeometry };
+  // }
+
   /**
    *
    * @param {Waze.Feature.Vector.Node} model
@@ -1731,7 +1917,7 @@
     const pointFeature = new OpenLayers.Feature.Vector(
       point,
       {
-        'myid': attributes.id,
+        'sID': attributes.id,
       },
       getNodeStyle(attributes)
     );
@@ -1783,7 +1969,7 @@
 
   function updateLayerPosition() {
     const gpsLayerIndex = parseInt(
-      W.map.getLayerByUniqueName('gps_points').getZIndex(),
+      W.map.getLayerByName('gps_points').getZIndex(),
       10
     );
 
@@ -2022,33 +2208,28 @@
       'svl_clutterConstant'
     ).value;
 
-    preferences['arrowDeclutter'] = document.getElementById(
-      'svl_arrowDeclutter'
-    ).value;
+    preferences['arrowDeclutter'] =
+      document.getElementById('svl_arrowDeclutter').value;
     preferences['labelOutlineWidth'] = document.getElementById(
       'svl_labelOutlineWidth'
     ).value;
     preferences['disableRoadLayers'] = document.getElementById(
       'svl_disableRoadLayers'
     ).checked;
-    preferences['startDisabled'] = document.getElementById(
-      'svl_startDisabled'
-    ).checked;
+    preferences['startDisabled'] =
+      document.getElementById('svl_startDisabled').checked;
 
-    preferences['showSLtext'] = document.getElementById(
-      'svl_showSLtext'
-    ).checked;
-    preferences['showSLcolor'] = document.getElementById(
-      'svl_showSLcolor'
-    ).checked;
+    preferences['showSLtext'] =
+      document.getElementById('svl_showSLtext').checked;
+    preferences['showSLcolor'] =
+      document.getElementById('svl_showSLcolor').checked;
     preferences['showSLSinglecolor'] = document.getElementById(
       'svl_showSLSinglecolor'
     ).checked;
     preferences['SLColor'] = document.getElementById('svl_SLColor').value;
 
-    preferences['hideMinorRoads'] = document.getElementById(
-      'svl_hideMinorRoads'
-    ).checked;
+    preferences['hideMinorRoads'] =
+      document.getElementById('svl_hideMinorRoads').checked;
     preferences['showDashedUnverifiedSL'] = document.getElementById(
       'svl_showDashedUnverifiedSL'
     ).checked;
@@ -2063,9 +2244,8 @@
       'svl_renderGeomNodes'
     ).checked;
 
-    preferences['nodesThreshold'] = document.getElementById(
-      'svl_nodesThreshold'
-    ).value;
+    preferences['nodesThreshold'] =
+      document.getElementById('svl_nodesThreshold').value;
     preferences['segmentsThreshold'] = document.getElementById(
       'svl_segmentsThreshold'
     ).value;
@@ -3054,8 +3234,8 @@
         id: 'useWMERoadLayerAtZoom',
         title: _('stop_svl_at_zoom'),
         description: _('stop_svl_at_zoom_descr'),
-        min: 0,
-        max: 5,
+        min: 12,
+        max: 17,
         step: 1,
       })
     );
@@ -3065,8 +3245,8 @@
         id: 'switchZoom',
         title: _('close_zoom_until_level'),
         description: _('close_zoom_until_level_descr'),
-        min: 5,
-        max: 9,
+        min: 17,
+        max: 21,
         step: 1,
       })
     );
@@ -3232,10 +3412,9 @@
    * @param {number} id
    */
   function removeNodeById(id) {
-    nodesVector.destroyFeatures(
-      nodesVector.getFeaturesByAttribute('myid', id),
-      { 'silent': true }
-    );
+    nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute('sID', id), {
+      'silent': true,
+    });
   }
 
   /**
@@ -3274,7 +3453,7 @@
     nodes.forEach((node) => {
       const { attributes } = node;
       const nodeFeature = nodesVector.getFeaturesByAttribute(
-        'myid',
+        'sID',
         attributes.id
       )[0];
       if (nodeFeature) {
@@ -3428,6 +3607,7 @@
         'svl': true,
       });
     }
+    W.model.events.register('mergeend', null, mergeEndCallback);
   }
 
   function removeSegmentsEvents() {
@@ -3438,10 +3618,10 @@
       events.objectsadded = events.objectsadded.filter(removeSVLEvents);
       events.objectschanged = events.objectschanged.filter(removeSVLEvents);
       events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
-      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-        removeSVLEvents
-      );
+      events['objects-state-deleted'] =
+        events['objects-state-deleted'].filter(removeSVLEvents);
     }
+    W.model.events.unregister('mergeend', null, mergeEndCallback);
   }
 
   function removeNodeEvents() {
@@ -3452,9 +3632,8 @@
       events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
       events.objectsadded = events.objectsadded.filter(removeSVLEvents);
       events.objectschanged = events.objectschanged.filter(removeSVLEvents);
-      events['objects-state-deleted'] = events['objects-state-deleted'].filter(
-        removeSVLEvents
-      );
+      events['objects-state-deleted'] =
+        events['objects-state-deleted'].filter(removeSVLEvents);
     }
   }
 
@@ -3550,11 +3729,11 @@
   function removeSegmentById(id) {
     consoleDebug(`RemoveSegmentById: ${id}`);
     streetVectorLayer.destroyFeatures(
-      streetVectorLayer.getFeaturesByAttribute('myId', id),
+      streetVectorLayer.getFeaturesByAttribute('sID', id),
       { 'silent': true }
     );
     labelsVector.destroyFeatures(
-      labelsVector.getFeaturesByAttribute('myId', id),
+      labelsVector.getFeaturesByAttribute('sID', id),
       { 'silent': true }
     );
   }
@@ -3643,7 +3822,7 @@
     let trials = 1;
     let sleepTime = 150;
     do {
-      if (!W || !W.map || !W.model) {
+      if (typeof W === "undefined" || typeof W.map === "undefined"  || typeof W.model === "undefined") {
         console.log('SVL: Waze model not ready, retrying in 800ms');
         await sleep(sleepTime * trials);
       } else {
@@ -3717,7 +3896,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.1.6: No changes, (updated dependencies to fix a known security issue).
+      <br>- 5.2.0: Fixes for WME changes, better support for road width. 
       <br>- 5.1.3: SVL initialises faster and in a more reliable way. English strings are inclued in the script in case the connection to the translations is not possible.
       <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
       <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
@@ -3789,6 +3968,30 @@
   }
 
   /**
+   * Returns the geodetic pixel size in meters, optimized for the Waze Map
+   * @returns {number}
+   */
+  function getGeodesicPixelSizeSVL() {
+    const lonlat = OLMap.getCachedCenter();
+    const res = OLMap.resolution;
+    const left = lonlat.add(-res / 2, 0);
+    const right = lonlat.add(res / 2, 0);
+    //const bottom = lonlat.add(0, -res / 2);
+    //const top = lonlat.add(0, res / 2);
+    const dest = new OpenLayers.Projection('EPSG:4326');
+    const source = OLMap.projection;
+    left.transform(source, dest);
+    right.transform(source, dest);
+    // bottom.transform(source, dest);
+    //top.transform(source, dest);
+
+    //return new OpenLayers.Size(
+    return OpenLayers.Util.distVincenty(left, right) * 1000;
+    //  OpenLayers.Util.distVincenty(bottom, top)
+    //);
+  }
+
+  /**
    *
    * @param {number} [svlAttempts=0]
    */
@@ -3818,6 +4021,8 @@
       'strokeWidth': '${width}',
       'strokeOpacity': '${opacity}',
       'strokeDashstyle': '${dash}',
+      'strokeLinecap': 'butt',
+      //TODO: only add it ^ for segments with road width (or a very large width)
       'graphicZIndex': '${zIndex}',
     });
 
@@ -3838,7 +4043,7 @@
 
     streetVectorLayer = new OpenLayers.Layer.Vector(layerName, {
       'styleMap': roadStyleMap,
-      'uniqueName': 'vectorStreet',
+      'name': 'vectorStreet',
       'accelerator': `toggle${layerName.replace(/\s+/g, '')}`,
       'visibility': !preferences['startDisabled'],
       'isVector': true,
@@ -3874,7 +4079,9 @@
             style['pointerEvents'] = 'none';
             if (!farZoom) {
               if (!feature.attributes.isArrow && preferences['realsize']) {
-                style['strokeWidth'] /= OLMap.resolution;
+                //console.dir(style['strokeWidth']);
+                style['strokeWidth'] /= getGeodesicPixelSizeSVL();
+                //console.dir(style['strokeWidth']);
               }
             }
           }
@@ -3891,7 +4098,7 @@
     };
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
-      'uniqueName': 'vectorNodes',
+      'name': 'vectorNodes',
       'visibility': !preferences['startDisabled'],
     });
 
@@ -3938,7 +4145,7 @@
     };
 
     labelsVector = new OpenLayers.Layer.Vector('Labels Vector', {
-      'uniqueName': 'vectorLabels',
+      'name': 'vectorLabels',
       'styleMap': labelStyleMap,
       'visibility': !preferences['startDisabled'],
     });
@@ -4149,7 +4356,7 @@
     }
 
     // initialisation
-    const layers = OLMap.getLayersBy('uniqueName', 'roads');
+    const layers = OLMap.getLayersBy('name', 'roads');
     WMERoadLayer = null;
     if (layers.length === 1) {
       [WMERoadLayer] = layers;
@@ -4194,11 +4401,6 @@
       'object': streetVectorLayer,
     });
 
-    // TODO remove in the next releases
-    $('.olControlAttribution').click(() => {
-      safeAlert('info', _('preferences_moved'));
-    });
-
     // eslint-disable-next-line no-underscore-dangle
     const events = W.prefs._events;
     if (typeof events === 'object') {
@@ -4207,6 +4409,7 @@
       });
     }
 
+    mergeEndCallback();
     console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
   }
 
@@ -4235,6 +4438,23 @@
     redrawAllSegments();
   }
 
+  function initCountry() {
+    document.defaultSegmentWidthMeters = defaultSegmentWidthMeters;
+    if (!W.model.topCountry) {
+      console.error('SVL: could not find topCountry');
+      return;
+    }
+    const defaultLaneWidth = W.model.topCountry.defaultLaneWidthPerRoadType;
+    if (defaultLaneWidth) {
+      Object.keys(defaultLaneWidth).forEach((e) => {
+        defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
+      });
+      redrawAllSegments();
+    } else {
+      console.warn('SVL: could not find default lane width in Waze data model');
+    }
+  }
+
   /**
    *
    * @param {number} [trials=0]
@@ -4247,7 +4467,8 @@
           initSVL();
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error(e);
         let error_message = _('bootstrap_error');
         if (!error_message || error_message === '<invalid translation key>') {
           safeAlert(
@@ -4373,9 +4594,6 @@ Please paste it in a file (CTRL+V) to store it.`;
   fallback[`insert_number`] = `Insert a number`;
   fallback[`pick_a_value_slider`] = `Pick a value using the slider`;
   fallback[`svl_version`] = `SVL v.`;
-  fallback[
-    `preferences_moved`
-  ] = `The preferences have been moved to the sidebar on the left. Please look for the ""SVL 🗺️"" tab.`;
   fallback[
     `init_error`
   ] = `Street Vector Layer failed to inizialize. Maybe the Editor has been updated or your connection/pc is really slow.`;
