@@ -240,6 +240,7 @@
     loadPreferences(true);
   }
 
+  //TODO: remove when width goes to production
   const defaultSegmentWidthMeters = {
     '1': 6.2, // "Street",
     '2': 7, // "Primary Street",
@@ -257,7 +258,24 @@
     '19': 5, // "Runway",
     '20': 6, // "Parking Lot Road",
     '22': 5, // "Alley"
-    // "service": 21,
+  };
+  const defaultLaneWidthMeters = {
+    '1': 3.1, // "Street",
+    '2': 3.5, // "Primary Street",
+    '3': 4.5, // "Freeway",
+    '4': 3.5, // "Ramp",
+    '5': 1, // "Walking Trail",
+    '6': 4.2, // "Major Highway",
+    '7': 4, // "Minor Highway",
+    '8': 4, // "Dirt Road",
+    '10': 1, // "Pedestrian Boardwalk",
+    '15': 4, // "Ferry",
+    '16': 1, // "Stairway",
+    '17': 3.5, // "Private Road",
+    '18': 3, // "Railroad",
+    '19': 2.5, // "Runway",
+    '20': 3, // "Parking Lot Road",
+    '22': 2.5, // "Alley"
   };
   const presets = {
     'svl_standard': {
@@ -455,7 +473,7 @@
     if (preferences['realsize']) {
       return twoWay
         ? defaultSegmentWidthMeters[roadType]
-        : defaultSegmentWidthMeters[roadType] * 0.5;
+        : defaultLaneWidthMeters[roadType];
     }
     // Use the value stored in the preferences
     return streetStyles[roadType].strokeWidth;
@@ -1138,38 +1156,48 @@
     // eslint-disable-next-line prefer-destructuring
     let roadType = attributes.roadType;
 
-    let segmentWidthFrom = null;
+    //Compute the segment width
+    let segmentWidth = null;
+    if(preferences['realsize']){
+      let segmentWidthFrom = null;
     let segmentWidthTo = null;
     if (attributes.fromLanesInfo) {
           if(attributes.fromLanesInfo.laneWidth){
             segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * attributes.fromLanesInfo.laneWidth /100.0;
           }else{
-            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * defaultLaneWidthMeters[attributes.roadType];
           }
+    }else{
+      segmentWidthFrom = defaultLaneWidthMeters[attributes.roadType];
     }
 
     if (attributes.toLanesInfo) {
       if(attributes.toLanesInfo.laneWidth){
         segmentWidthTo = attributes.toLanesInfo.numberOfLanes * attributes.toLanesInfo.laneWidth /100.0;
       }else{
-        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * defaultSegmentWidthMeters[attributes.roadType] / 2.0;
+        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * defaultLaneWidthMeters[attributes.roadType];
       }
+    }else{
+      segmentWidthTo = defaultLaneWidthMeters[attributes.roadType];
     }
-    let segmentWidth = null;
+
+
     if (!isTwoWay) {
       segmentWidth = attributes.fwdDirection
         ? segmentWidthFrom
         : segmentWidthTo;
     } else if (segmentWidthTo != segmentWidthFrom) {
-      //TODO, what to do when the 2 are different?
       segmentWidth = segmentWidthFrom + segmentWidthTo;
-      //console.warn('Different segment width');
     } else if (segmentWidthFrom) {
       //Segment has the same non-null width in both directions, just return one, twice
       segmentWidth = segmentWidthFrom * 2.0;
     }
+    }else{
+      //Use the static value from the preferences
+      segmentWidth = streetStyles[roadType].strokeWidth;
+    }
 
-    const totalSegmentWidth = segmentWidth ?? getWidth(roadType, isTwoWay);
+    const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
     let roadWidth = totalSegmentWidth;
     let lineFeature = null;
     if (attributes.primaryStreetID === null) {
@@ -4439,7 +4467,6 @@
   }
 
   function initCountry() {
-    document.defaultSegmentWidthMeters = defaultSegmentWidthMeters;
     if (!W.model.topCountry) {
       console.error('SVL: could not find topCountry');
       return;
@@ -4448,10 +4475,11 @@
     if (defaultLaneWidth) {
       Object.keys(defaultLaneWidth).forEach((e) => {
         defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
+        defaultLaneWidthMeters[e] = defaultLaneWidth[e] / 100;
       });
       redrawAllSegments();
     } else {
-      console.warn('SVL: could not find default lane width in Waze data model');
+      console.warn('SVL: could not find the default lane width in Waze data model');
     }
   }
 
