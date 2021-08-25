@@ -1160,11 +1160,10 @@
       segmentWidth = attributes.fwdDirection
         ? segmentWidthFrom
         : segmentWidthTo;
-        console.log(segmentWidth);
     } else if (segmentWidthTo != segmentWidthFrom) {
       //TODO, what to do when the 2 are different?
       segmentWidth = segmentWidthFrom + segmentWidthTo;
-      console.warn('Different segment width');
+      //console.warn('Different segment width');
     } else if (segmentWidthFrom) {
       //Segment has the same non-null width in both directions, just return one, twice
       segmentWidth = segmentWidthFrom * 2.0;
@@ -3897,7 +3896,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.1.6: No changes, (updated dependencies to fix a known security issue).
+      <br>- 5.2.0: Fixes for WME changes, better support for road width. 
       <br>- 5.1.3: SVL initialises faster and in a more reliable way. English strings are inclued in the script in case the connection to the translations is not possible.
       <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
       <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
@@ -4022,6 +4021,8 @@
       'strokeWidth': '${width}',
       'strokeOpacity': '${opacity}',
       'strokeDashstyle': '${dash}',
+      'strokeLinecap': 'butt',
+      //TODO: only add it ^ for segments with road width (or a very large width)
       'graphicZIndex': '${zIndex}',
     });
 
