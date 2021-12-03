@@ -1158,41 +1158,50 @@
 
     //Compute the segment width
     let segmentWidth = null;
-    if(preferences['realsize']){
+    if (preferences['realsize']) {
       let segmentWidthFrom = null;
-    let segmentWidthTo = null;
-    if (attributes.fromLanesInfo) {
-          if(attributes.fromLanesInfo.laneWidth){
-            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * attributes.fromLanesInfo.laneWidth /100.0;
-          }else{
-            segmentWidthFrom = attributes.fromLanesInfo.numberOfLanes * defaultLaneWidthMeters[attributes.roadType];
-          }
-    }else{
-      segmentWidthFrom = defaultLaneWidthMeters[attributes.roadType];
-    }
-
-    if (attributes.toLanesInfo) {
-      if(attributes.toLanesInfo.laneWidth){
-        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * attributes.toLanesInfo.laneWidth /100.0;
-      }else{
-        segmentWidthTo = attributes.toLanesInfo.numberOfLanes * defaultLaneWidthMeters[attributes.roadType];
+      let segmentWidthTo = null;
+      if (attributes.fromLanesInfo) {
+        if (attributes.fromLanesInfo.laneWidth) {
+          segmentWidthFrom =
+            (attributes.fromLanesInfo.numberOfLanes *
+              attributes.fromLanesInfo.laneWidth) /
+            100.0;
+        } else {
+          segmentWidthFrom =
+            attributes.fromLanesInfo.numberOfLanes *
+            defaultLaneWidthMeters[attributes.roadType];
+        }
+      } else {
+        segmentWidthFrom = defaultLaneWidthMeters[attributes.roadType];
       }
-    }else{
-      segmentWidthTo = defaultLaneWidthMeters[attributes.roadType];
-    }
 
+      if (attributes.toLanesInfo) {
+        if (attributes.toLanesInfo.laneWidth) {
+          segmentWidthTo =
+            (attributes.toLanesInfo.numberOfLanes *
+              attributes.toLanesInfo.laneWidth) /
+            100.0;
+        } else {
+          segmentWidthTo =
+            attributes.toLanesInfo.numberOfLanes *
+            defaultLaneWidthMeters[attributes.roadType];
+        }
+      } else {
+        segmentWidthTo = defaultLaneWidthMeters[attributes.roadType];
+      }
 
-    if (!isTwoWay) {
-      segmentWidth = attributes.fwdDirection
-        ? segmentWidthFrom
-        : segmentWidthTo;
-    } else if (segmentWidthTo != segmentWidthFrom) {
-      segmentWidth = segmentWidthFrom + segmentWidthTo;
-    } else if (segmentWidthFrom) {
-      //Segment has the same non-null width in both directions, just return one, twice
-      segmentWidth = segmentWidthFrom * 2.0;
-    }
-    }else{
+      if (!isTwoWay) {
+        segmentWidth = attributes.fwdDirection
+          ? segmentWidthFrom
+          : segmentWidthTo;
+      } else if (segmentWidthTo != segmentWidthFrom) {
+        segmentWidth = segmentWidthFrom + segmentWidthTo;
+      } else if (segmentWidthFrom) {
+        //Segment has the same non-null width in both directions, just return one, twice
+        segmentWidth = segmentWidthFrom * 2.0;
+      }
+    } else {
       //Use the static value from the preferences
       segmentWidth = streetStyles[roadType].strokeWidth;
     }
@@ -1995,18 +2004,26 @@
     );
   };
 
-  function updateLayerPosition() {
-    const gpsLayerIndex = parseInt(
-      W.map.getLayerByName('gps_points').getZIndex(),
-      10
-    );
-
-    if (preferences['showUnderGPSPoints']) {
-      streetVectorLayer.setZIndex(gpsLayerIndex - 2);
-      nodesVector.setZIndex(gpsLayerIndex - 1);
+  function updateLayerPosition(trial = 0) {
+    const gpsLayer = W.map.getLayerByName('gps_points');
+    if (gpsLayer) {
+      const gpsLayerIndex = parseInt(gpsLayer.getZIndex(), 10);
+      consoleDebug(`GPS Layer index: ${gpsLayerIndex}`);
+      if (preferences['showUnderGPSPoints']) {
+        streetVectorLayer.setZIndex(gpsLayerIndex - 20);
+        nodesVector.setZIndex(gpsLayerIndex - 15);
+      } else {
+        streetVectorLayer.setZIndex(gpsLayerIndex + 15);
+        nodesVector.setZIndex(gpsLayerIndex + 20);
+      }
     } else {
-      streetVectorLayer.setZIndex(gpsLayerIndex + 1);
-      nodesVector.setZIndex(gpsLayerIndex + 2);
+      // The GPS layer is not available
+      if (trial < 10) {
+        consoleDebug('The GPS Layer was not available, trial ' + trial);
+        setTimeout(() => {
+          updateLayerPosition(++trial);
+        }, 1000 * trial);
+      }
     }
   }
 
@@ -3850,7 +3867,11 @@
     let trials = 1;
     let sleepTime = 150;
     do {
-      if (typeof W === "undefined" || typeof W.map === "undefined"  || typeof W.model === "undefined") {
+      if (
+        typeof W === 'undefined' ||
+        typeof W.map === 'undefined' ||
+        typeof W.model === 'undefined'
+      ) {
         console.log('SVL: Waze model not ready, retrying in 800ms');
         await sleep(sleepTime * trials);
       } else {
@@ -3924,7 +3945,8 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.2.0: Fixes for WME changes, better support for road width. 
+      <br>- 5.2.2: Fixes for WME changes, show GPS tracks above road layer is working again.
+      <br>- 5.2.0: Fixes for WME changes, better support for road width.
       <br>- 5.1.3: SVL initialises faster and in a more reliable way. English strings are inclued in the script in case the connection to the translations is not possible.
       <br>- 5.1.0: Added localisation support. You can help translating this script to your language!
       <br>- 5.1.0: Bug fixes (with the routing panel and some buttons). Small graphic improvements.
@@ -4071,7 +4093,6 @@
 
     streetVectorLayer = new OpenLayers.Layer.Vector(layerName, {
       'styleMap': roadStyleMap,
-      'name': 'vectorStreet',
       'accelerator': `toggle${layerName.replace(/\s+/g, '')}`,
       'visibility': !preferences['startDisabled'],
       'isVector': true,
@@ -4126,7 +4147,6 @@
     };
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
-      'name': 'vectorNodes',
       'visibility': !preferences['startDisabled'],
     });
 
@@ -4479,7 +4499,9 @@
       });
       redrawAllSegments();
     } else {
-      console.warn('SVL: could not find the default lane width in Waze data model');
+      console.warn(
+        'SVL: could not find the default lane width in Waze data model'
+      );
     }
   }
 
@@ -4501,7 +4523,7 @@
         if (!error_message || error_message === '<invalid translation key>') {
           safeAlert(
             'error',
-            'Street Vector Layer failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!'
+            `Street Vector Layer v. ${SVL_VERSION} failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!`
           );
         } else {
           safeAlert('error', error_message);
