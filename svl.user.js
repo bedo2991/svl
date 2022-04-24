@@ -3984,19 +3984,45 @@
     return fallback[key];
     //return tr[I18n.currentLocale()]?.[tr_keys[key]] ?? tr["en"]?.[tr_keys[key]] ?? invalidTranslation(key);
   }
+
+  /**
+   * Perform a GM_xmlhttpRequest as a promise
+   * @param {string} url
+   * @param {Object} opt
+   * @return {Promise}
+   */
+  function request(url, opt={}) {
+    if(opt) {
+    Object.assign(opt, {
+      url,
+      timeout: 30000, //in ms
+    })
+  }
+
+    return new Promise((resolve, reject) => {
+      opt.onerror = opt.ontimeout = reject;
+      opt.onload = resolve;
+      GM_xmlhttpRequest(opt);
+    })
+  }
+
   /**@type{!Object<string,Array<string>>} */
   const tr = [];
   /**@type{!Object<string,number>} */
   const tr_keys = [];
   async function loadTranslations() {
     //console.debug('Loading translations...');
-    const response = await fetch(
-      'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
+    const response = await request(
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv',
+      {
+        method : 'GET',
+        responseType: 'text'
+      }
     );
 
     //console.error("RESPONSE!");
-    if (response.ok && response.status === 200) {
-      const data = await response.text();
+    if (response.readyState === 4 && response.status === 200) {
+      const data = response.responseText;
       let temp = data.split('\n');
       for (const [i, line] of temp.entries()) {
         if (i > 0) {
@@ -4408,6 +4434,8 @@
     WMERoadLayer = null;
     if (layers.length === 1) {
       [WMERoadLayer] = layers;
+    } else {
+      console.error('SVL: Road Layer not found');
     }
     SVLAutomDisabled = false;
 

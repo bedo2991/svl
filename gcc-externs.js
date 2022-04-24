@@ -757,6 +757,12 @@ const jQueryObject = class jQueryObject {
 };
 
 /**
+ *
+ * @param {Object} details
+ */
+const GM_xmlhttpRequest = function (details={}) {};
+
+/**
  * @param {string} x
  * @return {jQueryObject}
  */
