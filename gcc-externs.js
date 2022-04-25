@@ -265,8 +265,42 @@ const GM_info = {
 
 /**
  * @typedef {Object} OpenLayers
- */
+/** @type {*} */
 const OpenLayers = {
+  'ElementsIndexer': class {
+    constructor() {
+    /**@type{Array.<string>} */
+    this.order = [];
+    this.indices = {};
+    }
+
+    /**
+     * @param{Element} node
+     * @return {number}
+     */
+    getZIndex(node){}
+    determineZIndex(newNode){}
+    /** @return {boolean} */
+    exists(newNode){}
+    insert(newNode){}
+    remove(newNode){}
+    compare(a,b, c){}
+    /**
+     *
+     * @param {number} index
+     * @return {HTMLElement}
+     */
+    getNextElement(index){}
+
+  },
+  'Event': {
+    /**
+     *
+     * @param {Event} event
+     */
+    preventDefault (event){}
+  },
+  'State': {"UNKNOWN":"Unknown","INSERT":"Insert","UPDATE":"Update","DELETE":"Delete"},
   'Bounds': class {
     constructor() {}
 
@@ -276,6 +310,12 @@ const OpenLayers = {
      * @return {boolean}
      */
     intersectsBounds(extend) {}
+    /**
+     * @param {number} ratio
+     * @param {(OpenLayers.Pixel|OpenLayers.LonLat)=} origin
+     * @return {OpenLayers.Bounds}
+     */
+    scale(ratio, origin){}
   },
   'Projection': class {
     /**
@@ -338,6 +378,7 @@ const OpenLayers = {
       this.resolution;
       /** @type {OpenLayers.Projection} */
       this.projection;
+      this.layerContainerOriginPx = {x : 0, y : 0};
       this.events = {
         /**
          *
@@ -374,6 +415,16 @@ const OpenLayers = {
      * @return {OpenLayers.Size}
      */
     getGeodesicPixelSize(pixel) {}
+
+    /**
+     * @return {OpenLayers.Size}
+     */
+    getSize(){}
+
+    /**
+     * @return {OpenLayers.Bounds}
+     */
+    getExtent(){}
   },
   'StyleMap': class {
     /**
@@ -381,8 +432,15 @@ const OpenLayers = {
      * @param {StyleMapContent} style
      */
     constructor(style) {}
+    /**
+     *
+     * @param {OpenLayers.Feature} feature
+     * @param {string} intent
+     * @return {Object}
+     */
+    createSymbolizer(feature, intent){}
   },
-  /** @typedef {Object} Geometry */
+  /** @record */
   'Geometry': {
     'Point': class Point {
       /**
@@ -395,7 +453,9 @@ const OpenLayers = {
         this.x;
         /** @type {number} */
         this.y;
+        this.CLASS_NAME = "";
       }
+
 
       /**
        *
@@ -413,9 +473,10 @@ const OpenLayers = {
       getVertices() {}
       /**
        *
-       * @param {boolean} a
+       * @param {boolean} weighted
+       * @return {OpenLayers.Geometry.Point}
        */
-      getCentroid(a) {}
+      getCentroid(weighted) {}
 
       /**
        *
@@ -435,6 +496,8 @@ const OpenLayers = {
     constructor() {
       /** @type {number} */
       this.featureDx;
+      /** @type{HTMLElement} */
+      this.root;
       this.textRoot;
       this.left;
       //* * @type {OpenLayers.Bounds} */
@@ -444,7 +507,57 @@ const OpenLayers = {
       this.LABEL_ID_SUFFIX;
       /** @type {string} */
       this.LABEL_OUTLINE_SUFFIX;
+      /** @type {HTMLElement} */
+      this.vectorRoot;
+      /** @type{OpenLayers.ElementsIndexer} */
+      this.indexer;
     }
+
+    /**
+     *
+     * @param {OpenLayers.Geometry} geometry
+     * @param {Object} style
+     * @return {string}
+     */
+    getNodeType(geometry, style){}
+
+    /**
+     *
+     * @param {HTMLElement} node
+     */
+    postDraw(node) {}
+    /**
+     *
+     * @param {HTMLElement} node
+     * @param {OpenLayers.Geometry} geometry
+     * @param {Object} style
+     * @return {Object}
+     */
+    drawGeometryNode(node, geometry, style){}
+
+    /**
+     *
+     * @param {Object} symbolizer
+     * @return {Object}
+     */
+    applyDefaultSymbolizer(symbolizer){}
+    /**
+     *
+     * @param {string} id
+     * @param {OpenLayers.Geometry} geometry
+     * @param {Object} style
+     * @param {string} featureId
+     */
+    redrawNode (id, geometry, style, featureId) {};
+
+  /**
+   *
+   * @param {string} id
+   * @param {OpenLayers.Geometry} geometry
+   * @param {Object} style
+   * @param {string} featureId
+   */
+    redrawBackgroundNode (id, geometry, style, featureId){};
 
     /**
      *
@@ -459,6 +572,20 @@ const OpenLayers = {
 
     drawText(id, style, location) {}
 
+    /**
+     *
+     * @param {OpenLayers.Bounds} extent
+     * @param {boolean=} resolutionChanged
+     */
+    setExtent(extent, resolutionChanged) {}
+
+    /**
+     *
+     * @param {OpenLayers.Geometry} geometry
+     * @param {Object} style
+     * @param {string} id
+     * @return {boolean} true if the geometry has been drawn completely
+     */
     drawGeometry(geometry, style, id) {}
 
     /**
@@ -471,11 +598,18 @@ const OpenLayers = {
   /** @type {boolean} */
   'IS_GECKO': true,
   'Util': {
+
+    /**
+     *
+     * @param {...*} element
+     */
+    'getElement':function(element){},
+    /** @return {boolean} */
+    'isArray': function(features){},
     'extend': function (a, b) {},
     'distVincenty': function (a, b) {},
   },
-  /** @typedef Feature
-   */
+  /** @record */
   'Feature': {
     'Vector': class {
       /**
@@ -487,6 +621,9 @@ const OpenLayers = {
       constructor(geometry, attributes, style) {
         /** @type {OpenLayers.Geometry.Point | OpenLayers.Geometry.LineString} */
         this.geometry;
+
+        /** @type {OpenLayers.Layer.Vector} */
+        this.layer;
         this.attributes;
         /** @type{Waze.Feature.Vector.Segment|Waze.Feature.Vector.Node} */
         this.model;
@@ -502,9 +639,7 @@ const OpenLayers = {
       move(lonLat) {}
     },
   },
-  /** @typedef Layer
-   *
-   */
+  /** @record */
   'Layer': {
     /**
      * @unrestricted
@@ -525,6 +660,13 @@ const OpenLayers = {
            * @param {boolean} [priority=false]
            */
           'register': function (eventName, a, callback, priority) {},
+          /**
+           *
+           * @param {string} type
+           * @param {Object} evt
+           * @return {boolean}
+           */
+          'triggerEvent' : function(type, evt){},
         };
         /** @type {OpenLayers.Renderer} */
         this.renderer;
@@ -532,8 +674,37 @@ const OpenLayers = {
         this.visibility = true;
         /** @type {Array.<OpenLayers.Feature.Vector>} */
         this.features;
+
+        /** @type {OpenLayers.Map} */
+        this.map;
+
+        /** @type{HTMLElement} */
+        this.div;
+
+        /** @type{Map<number,OpenLayers.Feature.Vector>} */
+        this.unrenderedFeatures
+
+        this.style;
+
+        /** @type{OpenLayers.StyleMap} */
+        this.styleMap;
       }
 
+      /**
+       *
+       * @return {boolean}
+       */
+       redraw(){}
+      /**
+       *
+       * @param {OpenLayers.Feature.Vector} feature
+       */
+      preFeatureInsert(feature){}
+      /**
+       *
+       * @param {OpenLayers.Feature.Vector} feature
+       */
+      onFeatureInsert(feature){}
       /**
        * @return {number}
        */
@@ -589,6 +760,7 @@ const OpenLayers = {
 };
 // Static properties
 OpenLayers.Renderer.symbol = {};
+OpenLayers.Renderer.BACKGROUND_ID_SUFFIX = "";
 OpenLayers.Renderer.defaultSymbolizer = {
   /** @type {string} */
   'labelAlign': '',
@@ -772,6 +944,12 @@ const $ = function (x) {};
  * @param {string} x
  */
 const GM_setClipboard = function (x) {};
+
+/**
+ *
+ * @param {string} x
+ */
+ const GM_addStyle = function (x) {};
 
 /** @typedef {Object} Waze */
 const Waze = {
