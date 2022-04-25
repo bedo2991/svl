@@ -3958,11 +3958,10 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.3.0: Improved rendering performance.
       <br>- 5.2.3: Tampermonkey will let you know what domains we get data from (spoiler: Google Sheets, for the translations).
       <br>- 5.2.2: Fixes for WME changes, show GPS tracks above road layer is working again.
-      <br>- 5.2.0: Fixes for WME changes, better support for road width.
-      <br>- 5.1.3: SVL initialises faster and in a more reliable way. English strings are inclued in the script in case the connection to the translations is not possible.
-      <br>- 5.1.0: Added localisation support. You can help translating this script to your language!`,
+      <br>- 5.2.0: Fixes for WME changes, better support for road width.`,
       '',
       GM_info.script.supportURL
     );
