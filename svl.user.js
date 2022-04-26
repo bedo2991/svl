@@ -4234,7 +4234,7 @@
       }
 
 
-      /*if(!newNode._style.graphicZIndex){
+      /*if(!newNode['_style'].graphicZIndex){
         console.error("NO ZETA INDEX");
         console.dir(newNode);
       }*/
@@ -4249,7 +4249,7 @@
 
           // Changed here, great performance improvement by not using Utils.getElement
           const nextNode = document.getElementById(this.order[middle]);
-          const placement = nextNode? (newNode._style.graphicZIndex - nextNode._style.graphicZIndex) : 0;
+          const placement = nextNode? (newNode['_style'].graphicZIndex - nextNode['_style'].graphicZIndex) : 0;
 
           if (placement > 0) {
               leftIndex = middle;
@@ -4259,7 +4259,7 @@
       }
 
       this.order.splice(rightIndex, 0, nodeId);
-      this.indices[nodeId] = newNode._style.graphicZIndex;
+      this.indices[nodeId] = newNode['_style'].graphicZIndex;
 
       // If the new node should be before another in the index
       // order, return the node before which we have to insert the new one;
