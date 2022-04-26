@@ -3973,6 +3973,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.3.2: Bug fixes, rectoring for more performance.
       <br>- 5.3.0: Improved rendering performance.
       <br>- 5.2.3: Tampermonkey will let you know what domains we get data from (spoiler: Google Sheets, for the translations).
       <br>- 5.2.2: Fixes for WME changes, show GPS tracks above road layer is working again.
