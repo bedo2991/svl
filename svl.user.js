@@ -1729,7 +1729,7 @@
                   'rotation': degrees,
                   'stroke': true,
                   'strokeColor': '#000',
-                  'graphiczIndex': baselevel + 180,
+                  'graphicZIndex': baselevel + 180,
                   'strokeWidth': 1.5,
                   'fill': true,
                   'fillColor': '#fff',
