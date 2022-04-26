@@ -553,7 +553,7 @@
     preferences['farZoomLabelSize'] =
       loadedPreferences?.['farZoomLabelSize'] ?? 12;
     preferences['useWMERoadLayerAtZoom'] =
-      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 13;
+      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 15;
     preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 17;
 
     preferences['arrowDeclutter'] =
