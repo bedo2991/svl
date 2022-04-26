@@ -185,32 +185,47 @@
     }
   }
 
-  function setLayerVisibility(layer, visibility) {
+  /**
+   *
+   * @param {number} layer
+   * @param {boolean} visibility
+   * @param {?number} trial
+   * @returns
+   */
+  function setLayerVisibility(layer, visibility, trial = 0) {
     // Toggle layers
     if (layer === SVL_LAYER) {
       consoleDebug(`Changing SVL Layer visibility to ${visibility}`);
-      streetVectorLayer.setVisibility(visibility);
+      //streetVectorLayer.setVisibility(visibility);
     } else if (WMERoadLayer) {
       consoleDebug(`Changing Road Layer visibility to ${visibility}`);
-      WMERoadLayer.setVisibility(visibility);
+      //WMERoadLayer.setVisibility(visibility);
     } else {
       console.warn("SVL: cannot toggle the WME's road layer");
     }
     // Toggle checkboxes
     if (!layerCheckboxes[layer]) {
-      consoleDebug(`Initialising layer ${layer}`);
+      consoleDebug(`Initialising checkbox for layer ${layer}`);
       layerCheckboxes[layer] = document.getElementById(
         layer === SVL_LAYER
           ? 'layer-switcher-item_street_vector_layer'
           : 'layer-switcher-item_road'
       );
       if (!layerCheckboxes[layer]) {
-        console.warn(`SVL: cannot find checkbox for layer number ${layer}`);
+        console.warn(`SVL: cannot find checkbox for layer number ${layer}, attempt ${trial+1}/10`);
+        if(trial < 10) {
+          setTimeout(()=>{
+            setLayerVisibility(layer, visibility, trial + 1);
+          },400 * (trial+1));
+        }
         return;
       }
     }
-    // console.dir(layerCheckboxes[layer]);
-    layerCheckboxes[layer].checked = visibility;
+    consoleDebug(`Switching the layer ${layer} checkbox to ${visibility}`);
+    if((layerCheckboxes[layer].checked && !visibility) || (!layerCheckboxes[layer].checked && visibility)){
+      layerCheckboxes[layer].click();
+    }
+    //layerCheckboxes[layer].checked = visibility;
   }
 
   // TODO
