@@ -185,32 +185,47 @@
     }
   }
 
-  function setLayerVisibility(layer, visibility) {
+  /**
+   *
+   * @param {number} layer
+   * @param {boolean} visibility
+   * @param {?number} trial
+   * @returns
+   */
+  function setLayerVisibility(layer, visibility, trial = 0) {
     // Toggle layers
     if (layer === SVL_LAYER) {
       consoleDebug(`Changing SVL Layer visibility to ${visibility}`);
-      streetVectorLayer.setVisibility(visibility);
+      //streetVectorLayer.setVisibility(visibility);
     } else if (WMERoadLayer) {
       consoleDebug(`Changing Road Layer visibility to ${visibility}`);
-      WMERoadLayer.setVisibility(visibility);
+      //WMERoadLayer.setVisibility(visibility);
     } else {
       console.warn("SVL: cannot toggle the WME's road layer");
     }
     // Toggle checkboxes
     if (!layerCheckboxes[layer]) {
-      consoleDebug(`Initialising layer ${layer}`);
+      consoleDebug(`Initialising checkbox for layer ${layer}`);
       layerCheckboxes[layer] = document.getElementById(
         layer === SVL_LAYER
           ? 'layer-switcher-item_street_vector_layer'
           : 'layer-switcher-item_road'
       );
       if (!layerCheckboxes[layer]) {
-        console.warn(`SVL: cannot find checkbox for layer number ${layer}`);
+        console.warn(`SVL: cannot find checkbox for layer number ${layer}, attempt ${trial+1}/10`);
+        if(trial < 10) {
+          setTimeout(()=>{
+            setLayerVisibility(layer, visibility, trial + 1);
+          },400 * (trial+1));
+        }
         return;
       }
     }
-    // console.dir(layerCheckboxes[layer]);
-    layerCheckboxes[layer].checked = visibility;
+    consoleDebug(`Switching the layer ${layer} checkbox to ${visibility}`);
+    if((layerCheckboxes[layer].checked && !visibility) || (!layerCheckboxes[layer].checked && visibility)){
+      layerCheckboxes[layer].click();
+    }
+    //layerCheckboxes[layer].checked = visibility;
   }
 
   // TODO
@@ -538,7 +553,7 @@
     preferences['farZoomLabelSize'] =
       loadedPreferences?.['farZoomLabelSize'] ?? 12;
     preferences['useWMERoadLayerAtZoom'] =
-      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 13;
+      loadedPreferences?.['useWMERoadLayerAtZoom'] ?? 15;
     preferences['switchZoom'] = loadedPreferences?.['switchZoom'] ?? 17;
 
     preferences['arrowDeclutter'] =
@@ -1714,7 +1729,7 @@
                   'rotation': degrees,
                   'stroke': true,
                   'strokeColor': '#000',
-                  'graphiczIndex': baselevel + 180,
+                  'graphicZIndex': baselevel + 180,
                   'strokeWidth': 1.5,
                   'fill': true,
                   'fillColor': '#fff',
@@ -3958,6 +3973,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.3.2: Bug fixes, rectoring for more performance.
       <br>- 5.3.0: Improved rendering performance.
       <br>- 5.2.3: Tampermonkey will let you know what domains we get data from (spoiler: Google Sheets, for the translations).
       <br>- 5.2.2: Fixes for WME changes, show GPS tracks above road layer is working again.
@@ -4179,13 +4195,13 @@
      * @return {Element}
      */
     OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function(index) {
-      const nextIndex = index + 1;
-      if (nextIndex < this.order.length) {
-          let nextElement = document.getElementById(this.order[nextIndex]);
-          if (!nextElement) {
-              nextElement = this.svlGetNextElement(nextIndex);
-          }
+      // const nextIndex = index + 1;
+      // console.log(`Order length: ${this.order.length}` );
+      for(let i = index + 1; i < this.order.length; i++){
+        let nextElement = document.getElementById(this.order[i]);
+        if(nextElement){
           return nextElement;
+        }
       }
       return null;
   };
@@ -4197,13 +4213,33 @@
     OpenLayers.ElementsIndexer.prototype.insert = function(newNode) {
       // If the node is known to the indexer, remove it so we can
       // recalculate where it should go.
-      if (this.exists(newNode)) {
-          this.remove(newNode);
+      const nodeId = newNode.id;
+      // if newNode exists
+      if (this.indices[nodeId] != null ) {
+        this.remove(newNode);
+          //simplified this.remove(newNode);
+          //Delete from the order array
+/*           const arrayIndex = this.order.indexOf(newNode);
+          if(arrayIndex >= 0){
+              this.order.splice(arrayIndex, 1);
+              //Delete the key from the index object
+              delete this.indices[nodeId];
+
+              if (this.order.length > 0) {
+                const lastId = this.order[this.order.length - 1];
+                this.maxZIndex = this.indices[lastId];
+            } else {
+                this.maxZIndex = 0;
+            }
+          } */
       }
 
-      const nodeId = newNode.id;
 
-      this.determineZIndex(newNode);
+      /*if(!newNode['_style'].graphicZIndex){
+        console.error("NO ZETA INDEX");
+        console.dir(newNode);
+      }*/
+      //this.determineZIndex(newNode);
 
       let leftIndex = -1;
       let rightIndex = this.order.length;
@@ -4213,7 +4249,8 @@
           middle = Math.floor((leftIndex + rightIndex) / 2);
 
           // Changed here, great performance improvement by not using Utils.getElement
-          let placement = this.compare(this, newNode, document.getElementById(this.order[middle]));
+          const nextNode = document.getElementById(this.order[middle]);
+          const placement = nextNode? (newNode['_style'].graphicZIndex - nextNode['_style'].graphicZIndex) : 0;
 
           if (placement > 0) {
               leftIndex = middle;
@@ -4223,7 +4260,7 @@
       }
 
       this.order.splice(rightIndex, 0, nodeId);
-      this.indices[nodeId] = this.getZIndex(newNode);
+      this.indices[nodeId] = newNode['_style'].graphicZIndex;
 
       // If the new node should be before another in the index
       // order, return the node before which we have to insert the new one;
@@ -4262,10 +4299,11 @@
       // performance problem (when dragging, for instance) this is
       // likely where it would be.
       if (this.indexer) {
-          var insert = this.indexer.insert(node);
-          if (insert) {
-              this.vectorRoot.insertBefore(node, insert);
+          const insertMeAfterThisNode = this.indexer.insert(node);
+          if (insertMeAfterThisNode) {
+              this.vectorRoot.insertBefore(node, insertMeAfterThisNode);
           } else {
+              // element can be appended
               this.vectorRoot.appendChild(node);
           }
       } else {
