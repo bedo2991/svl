@@ -3825,7 +3825,7 @@
       }
       removeSegmentById(s.getID());
       // console.debug(e[i]);
-      if (s.state !== 'Delete') {
+      if (s.state !== 'DELETE') {
         addSegments([s]);
       }
     });
