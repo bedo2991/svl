@@ -1,12 +1,21 @@
 {
   "name": "svl",
-  "version": "5.3.2",
+  "version": "5.3.3",
   "description": "Street Vector Layer (SVL)\r The Road layer for the Waze editors, made by editors.",
   "main": "svl.user.js",
   "watch": {
-    "debug": ["svl.user.js", "gcc-externs.js"],
-    "compile":  ["svl.user.js", "gcc-externs.js"],
-    "compile-pp":  ["svl.user.js", "gcc-externs.js"]
+    "debug": [
+      "svl.user.js",
+      "gcc-externs.js"
+    ],
+    "compile": [
+      "svl.user.js",
+      "gcc-externs.js"
+    ],
+    "compile-pp": [
+      "svl.user.js",
+      "gcc-externs.js"
+    ]
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
