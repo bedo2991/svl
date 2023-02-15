@@ -6,20 +6,20 @@
   /** @type {Function} */
   const consoleDebug = DEBUG
     ? (...args) => {
-        for (let i = 0; i < args.length; i += 1) {
-          if (typeof args[i] === 'string') {
-            console.log(`[SVL] ${SVL_VERSION}: ${args[i]}`);
-          } else {
-            console.dir(args[i]);
-          }
+      for (let i = 0; i < args.length; i += 1) {
+        if (typeof args[i] === 'string') {
+          console.log(`[SVL] ${SVL_VERSION}: ${args[i]}`);
+        } else {
+          console.dir(args[i]);
         }
       }
-    : () => {};
+    }
+    : () => { };
 
   /** @type {Function} */
-  const consoleGroup = DEBUG ? console.group : () => {};
+  const consoleGroup = DEBUG ? console.group : () => { };
   /** @type {Function} */
-  const consoleGroupEnd = DEBUG ? console.groupEnd : () => {};
+  const consoleGroupEnd = DEBUG ? console.groupEnd : () => { };
 
   /** @type{number} */
   const MAX_SEGMENTS = 3000;
@@ -212,17 +212,17 @@
           : 'layer-switcher-item_road'
       );
       if (!layerCheckboxes[layer]) {
-        console.warn(`SVL: cannot find checkbox for layer number ${layer}, attempt ${trial+1}/10`);
-        if(trial < 10) {
-          setTimeout(()=>{
+        console.warn(`SVL: cannot find checkbox for layer number ${layer}, attempt ${trial + 1}/10`);
+        if (trial < 10) {
+          setTimeout(() => {
             setLayerVisibility(layer, visibility, trial + 1);
-          },400 * (trial+1));
+          }, 400 * (trial + 1));
         }
         return;
       }
     }
     consoleDebug(`Switching the layer ${layer} checkbox to ${visibility}`);
-    if((layerCheckboxes[layer].checked && !visibility) || (!layerCheckboxes[layer].checked && visibility)){
+    if ((layerCheckboxes[layer].checked && !visibility) || (!layerCheckboxes[layer].checked && visibility)) {
       layerCheckboxes[layer].click();
     }
     //layerCheckboxes[layer].checked = visibility;
@@ -1237,7 +1237,7 @@
         }
       );
       segmentFeatures.push(lineFeature);
-      return {segmentFeatures};
+      return { segmentFeatures };
     }
 
     // consoleDebug(width);
@@ -1283,7 +1283,7 @@
 
         const speedStrokeStyle =
           preferences['showDashedUnverifiedSL'] &&
-          (attributes.fwdMaxSpeedUnverified || attributes.revMaxSpeedUnverified)
+            (attributes.fwdMaxSpeedUnverified || attributes.revMaxSpeedUnverified)
             ? 'dash'
             : 'solid';
 
@@ -1818,7 +1818,7 @@
 
     // Add Label
     const labels = drawLabels(model, simplified);
-    return {segmentFeatures, labels};
+    return { segmentFeatures, labels };
   }
 
   // /**
@@ -2116,7 +2116,7 @@
     document.getElementById('svl_saveNewPref').classList.add('btn-primary');
     document.getElementById('svl_rollbackButton').classList.remove('disabled');
     document.getElementById('svl_rollbackButton').disabled = false;
-    document.getElementById('sidepanel-svl').classList.add('svl_unsaved');
+    document.getElementById('svl_buttons').classList.add('svl_unsaved');
     // $("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
 
     const presetSelect = document.getElementById('svl_presets');
@@ -2438,7 +2438,7 @@
       case 'restriction':
         return (
           locale?.['restrictions']?.['modal_headers']?.[
-            'restriction_summary'
+          'restriction_summary'
           ] ?? i
         );
       case 'dirty':
@@ -2606,7 +2606,7 @@
     document.getElementById('svl_rollbackButton').classList.add('disabled');
     document.getElementById('svl_rollbackButton').disabled = true;
     document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
-    document.getElementById('sidepanel-svl').classList.remove('svl_unsaved');
+    document.getElementById('svl_buttons').classList.remove('svl_unsaved');
     updateStreetsPreferenceValues();
 
     const options = getOptions();
@@ -2860,16 +2860,12 @@
   function initPreferencePanel() {
     //console.debug('Init Preference Panel');
     const style = document.createElement('style');
-    style['innerHTML'] = `
-        <style>
-        #sidepanel-svl details{margin-bottom:9pt;}
-        #sidepanel-svl i{font-size:small;}
-        .svl_unsaved{background-color:#ffcc00}
+    style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
         .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
         .prefLineSelect{width:100%; margin-bottom:1vh;}
         .prefLineSelect label{display:block;width:100%}
         .prefLineCheckbox{width:100%; margin-bottom:1vh;}
-        .prefLineCheckbox label{display:block;width:100%}
+        .prefLineCheckbox label{display:block;width:100%;}
         .prefLineCheckbox input{float:right;}
         .prefLineInteger{width:100%; margin-bottom:1vh;}
         .prefLineInteger label{display:block;width:100%}
@@ -2877,20 +2873,24 @@
         .prefLineSlider {width:100%; margin-bottom:1vh;}
         .prefLineSlider label{display:block;width:100%}
         .prefLineSlider input{float:right;}
-        .newOption::before {content:"${_(
-          'new_since_version'
-        )} " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
+        .newOption::before {content:"${_('new_since_version')} " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
         .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}
         .svl_logo {width:130px; display:inline-block; float:right}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
-        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#eee; top:0; }
+        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#fff; top:0; }
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
-        #sidepanel-svl summary{font-weight:bold; margin:10px;}</style>`;
+        #sidepanel-svl summary{font-weight:bold; margin:10px;}
+        #sidepanel-svl {width:98%;}
+        #sidepanel-svl details{margin-bottom:9pt;}
+        #sidepanel-svl i{font-size:small;}`;
 
     document.body.appendChild(style);
+    const panelDiv = document.createElement('div');
     const mainDiv = document.createElement('div');
+    mainDiv.id = 'sidepanel-svl';
+    panelDiv.append(mainDiv);
 
     const logo = document.createElement('img');
     logo.className = 'svl_logo';
@@ -2972,6 +2972,7 @@
     resetButton.title = _('reset_help');
 
     const buttons = document.createElement('div');
+    buttons.id = 'svl_buttons';
     buttons.className = 'svl_buttons expand';
     buttons.appendChild(saveButton);
     buttons.appendChild(rollbackButton);
@@ -3436,32 +3437,38 @@
     utilityButtons.appendChild(exportButton);
     mainDiv.appendChild(utilityButtons);
 
-    const ignored = new WazeWrap.Interface.Tab(
-      'SVL 🗺️',
-      mainDiv.innerHTML,
-      updatePreferenceValues
-    );
+    const { tabLabel, tabPane } = W.userscripts.registerSidebarTab("svl-v2");
 
-    const prefElements = document.querySelectorAll('.prefElement');
-    prefElements.forEach((element) => {
-      element.addEventListener('change', updateValuesFromPreferences);
+    tabLabel.innerText = 'SVL 🗺️';
+    tabLabel.title = 'Street Vector Layer';
+
+    tabPane.innerHTML = panelDiv.innerHTML;
+
+    // Once the panel has been added...
+    W.userscripts.waitForElementConnected(tabPane).then(() => {
+      // Add event listeners
+      const prefElements = document.querySelectorAll('.prefElement');
+      prefElements.forEach((element) => {
+        element.addEventListener('change', updateValuesFromPreferences);
+      });
+
+      document
+        .getElementById('svl_saveNewPref')
+        .addEventListener('click', saveNewPref);
+      document
+        .getElementById('svl_rollbackButton')
+        .addEventListener('click', rollbackPreferences);
+      document
+        .getElementById('svl_resetButton')
+        .addEventListener('click', resetPreferencesCallback);
+      document
+        .getElementById('svl_importButton')
+        .addEventListener('click', importPreferencesCallback);
+      document
+        .getElementById('svl_exportButton')
+        .addEventListener('click', exportPreferences);
+      updatePreferenceValues();
     });
-
-    document
-      .getElementById('svl_saveNewPref')
-      .addEventListener('click', saveNewPref);
-    document
-      .getElementById('svl_rollbackButton')
-      .addEventListener('click', rollbackPreferences);
-    document
-      .getElementById('svl_resetButton')
-      .addEventListener('click', resetPreferencesCallback);
-    document
-      .getElementById('svl_importButton')
-      .addEventListener('click', importPreferencesCallback);
-    document
-      .getElementById('svl_exportButton')
-      .addEventListener('click', exportPreferences);
   }
 
   /**
@@ -3589,9 +3596,9 @@
     if (drawingAborted) {
       if (
         Object.keys(W.model.segments.objects).length <
-          preferences['segmentsThreshold'] &&
+        preferences['segmentsThreshold'] &&
         Object.keys(W.model.nodes.objects).length <
-          preferences['nodesThreshold']
+        preferences['nodesThreshold']
       ) {
         drawingAborted = false;
         setLayerVisibility(SVL_LAYER, true);
@@ -3599,12 +3606,9 @@
         redrawAllSegments();
       } else {
         console.warn(
-          `[SVL] Still too many elements to draw: Segments: ${
-            Object.keys(W.model.segments.objects).length
-          }/${preferences['segmentsThreshold']}, Nodes: ${
-            Object.keys(W.model.nodes.objects).length
-          }/${
-            preferences['nodesThreshold']
+          `[SVL] Still too many elements to draw: Segments: ${Object.keys(W.model.segments.objects).length
+          }/${preferences['segmentsThreshold']}, Nodes: ${Object.keys(W.model.nodes.objects).length
+          }/${preferences['nodesThreshold']
           } - You can change these thresholds in the preference panel.`
         );
       }
@@ -3771,11 +3775,11 @@
     segments.forEach((el) => {
       if (el !== null) {
         const res = drawSegment(el);
-        if(res.segmentFeatures){
+        if (res.segmentFeatures) {
           segmentsFeatures.push(...res.segmentFeatures); //this should be way more efficient than "concat"
         }
-        if(res.labels){
-         labelsFeatures.push(...res.labels);
+        if (res.labels) {
+          labelsFeatures.push(...res.labels);
         }
       }
     });
@@ -3789,7 +3793,7 @@
     if (labelsFeatures.length > 0) {
       consoleDebug(`${labelsFeatures.length} features added to the labels layer`);
       labelsVector.addFeatures(labelsFeatures, { 'silent': true });
-    }else{
+    } else {
       console.warn('[SVL] no labels features drawn');
     }
     consoleGroupEnd();
@@ -3891,24 +3895,6 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function waitForWazeModel() {
-    let trials = 1;
-    let sleepTime = 150;
-    do {
-      if (
-        typeof W === 'undefined' ||
-        typeof W.map === 'undefined' ||
-        typeof W.model === 'undefined'
-      ) {
-        console.log('SVL: Waze model not ready, retrying in 800ms');
-        await sleep(sleepTime * trials);
-      } else {
-        return true;
-      }
-    } while (trials++ <= 30);
-    throw new Error('SVL: could not find the Waze Model');
-  }
-
   async function waitForWazeWrap() {
     let trials = 1;
     let sleepTime = 150;
@@ -3973,11 +3959,9 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.0: Replaced deprecated tampermonkey includes with match. Support for the new WME script API.
       <br>- 5.3.2: Bug fixes, rectoring for more performance.
-      <br>- 5.3.0: Improved rendering performance.
-      <br>- 5.2.3: Tampermonkey will let you know what domains we get data from (spoiler: Google Sheets, for the translations).
-      <br>- 5.2.2: Fixes for WME changes, show GPS tracks above road layer is working again.
-      <br>- 5.2.0: Fixes for WME changes, better support for road width.`,
+      <br>- 5.3.0: Improved rendering performance.`,
       '',
       GM_info.script.supportURL
     );
@@ -4017,13 +4001,13 @@
    * @param {Object} opt
    * @return {Promise}
    */
-  function request(url, opt={}) {
-    if(opt) {
-    Object.assign(opt, {
-      url,
-      timeout: 30000, //in ms
-    })
-  }
+  function request(url, opt = {}) {
+    if (opt) {
+      Object.assign(opt, {
+        url,
+        timeout: 30000, //in ms
+      })
+    }
 
     return new Promise((resolve, reject) => {
       opt.onerror = opt.ontimeout = reject;
@@ -4041,7 +4025,7 @@
     const response = await request(
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv',
       {
-        method : 'GET',
+        method: 'GET',
         responseType: 'text'
       }
     );
@@ -4093,45 +4077,41 @@
     //);
   }
 
-      /**
-     *
-     * @param {Object} source
-     * @return {Object}
-     */
-       function svlExtend(source) {
-        let destination = {};
-        if (source) {
-            for (let property in source) {
-                const value = source[property];
-                if (value !== undefined) {
-                    destination[property] = value;
-                }
-            }
-        }
-        return destination;
-      }
-
-      OpenLayers.Util.getElement = function() {
-        const elements = [];
-
-        for (let i=0, len=arguments.length; i<len; i++) {
-            var element = arguments[i];
-            if (typeof element == 'string') {
-                element = document.getElementById(element);
-            }
-            if (arguments.length === 1) {
-                return element;
-            }
-            elements.push(element);
-        }
-        return elements;
-    };
-
   /**
-   *
-   * @param {number} [svlAttempts=0]
-   */
-  function initSVL(svlAttempts = 0) {
+ *
+ * @param {Object} source
+ * @return {Object}
+ */
+  function svlExtend(source) {
+    let destination = {};
+    if (source) {
+      for (let property in source) {
+        const value = source[property];
+        if (value !== undefined) {
+          destination[property] = value;
+        }
+      }
+    }
+    return destination;
+  }
+
+  OpenLayers.Util.getElement = function () {
+    const elements = [];
+
+    for (let i = 0, len = arguments.length; i < len; i++) {
+      var element = arguments[i];
+      if (typeof element == 'string') {
+        element = document.getElementById(element);
+      }
+      if (arguments.length === 1) {
+        return element;
+      }
+      elements.push(element);
+    }
+    return elements;
+  };
+
+  function initSVL() {
     // Initialize variables
     svlGlobals();
 
@@ -4194,44 +4174,44 @@
      * @param {number} index
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function(index) {
+    OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index) {
       // const nextIndex = index + 1;
       // console.log(`Order length: ${this.order.length}` );
-      for(let i = index + 1; i < this.order.length; i++){
+      for (let i = index + 1; i < this.order.length; i++) {
         let nextElement = document.getElementById(this.order[i]);
-        if(nextElement){
+        if (nextElement) {
           return nextElement;
         }
       }
       return null;
-  };
+    };
     /**
      *
      * @param {HTMLElement} newNode
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.insert = function(newNode) {
+    OpenLayers.ElementsIndexer.prototype.insert = function (newNode) {
       // If the node is known to the indexer, remove it so we can
       // recalculate where it should go.
       const nodeId = newNode.id;
       // if newNode exists
-      if (this.indices[nodeId] != null ) {
+      if (this.indices[nodeId] != null) {
         this.remove(newNode);
-          //simplified this.remove(newNode);
-          //Delete from the order array
-/*           const arrayIndex = this.order.indexOf(newNode);
-          if(arrayIndex >= 0){
-              this.order.splice(arrayIndex, 1);
-              //Delete the key from the index object
-              delete this.indices[nodeId];
-
-              if (this.order.length > 0) {
-                const lastId = this.order[this.order.length - 1];
-                this.maxZIndex = this.indices[lastId];
-            } else {
-                this.maxZIndex = 0;
-            }
-          } */
+        //simplified this.remove(newNode);
+        //Delete from the order array
+        /*           const arrayIndex = this.order.indexOf(newNode);
+                  if(arrayIndex >= 0){
+                      this.order.splice(arrayIndex, 1);
+                      //Delete the key from the index object
+                      delete this.indices[nodeId];
+        
+                      if (this.order.length > 0) {
+                        const lastId = this.order[this.order.length - 1];
+                        this.maxZIndex = this.indices[lastId];
+                    } else {
+                        this.maxZIndex = 0;
+                    }
+                  } */
       }
 
 
@@ -4246,17 +4226,17 @@
       let middle;
 
       while (rightIndex - leftIndex > 1) {
-          middle = Math.floor((leftIndex + rightIndex) / 2);
+        middle = Math.floor((leftIndex + rightIndex) / 2);
 
-          // Changed here, great performance improvement by not using Utils.getElement
-          const nextNode = document.getElementById(this.order[middle]);
-          const placement = nextNode? (newNode['_style'].graphicZIndex - nextNode['_style'].graphicZIndex) : 0;
+        // Changed here, great performance improvement by not using Utils.getElement
+        const nextNode = document.getElementById(this.order[middle]);
+        const placement = nextNode ? (newNode['_style'].graphicZIndex - nextNode['_style'].graphicZIndex) : 0;
 
-          if (placement > 0) {
-              leftIndex = middle;
-          } else {
-              rightIndex = middle;
-          }
+        if (placement > 0) {
+          leftIndex = middle;
+        } else {
+          rightIndex = middle;
+        }
       }
 
       this.order.splice(rightIndex, 0, nodeId);
@@ -4266,7 +4246,7 @@
       // order, return the node before which we have to insert the new one;
       // else, return null to indicate that the new node can be appended.
       return this.svlGetNextElement(rightIndex);
-  };
+    };
 
     /**
      *
@@ -4276,7 +4256,7 @@
      * @param {string} featureId
      * @returns
      */
-    streetVectorLayer.renderer.redrawNode =  function(id, geometry, style, featureId) {
+    streetVectorLayer.renderer.redrawNode = function (id, geometry, style, featureId) {
       style = this.applyDefaultSymbolizer(style);
       // Get the node if it's already on the map.
       var node = this.nodeFactory(id, this.getNodeType(geometry, style));
@@ -4288,8 +4268,8 @@
       node['_style'] = style;
 
       var drawResult = this.drawGeometryNode(node, geometry, style);
-      if(drawResult === false) {
-          return false;
+      if (drawResult === false) {
+        return false;
       }
 
       node = drawResult.node;
@@ -4299,57 +4279,57 @@
       // performance problem (when dragging, for instance) this is
       // likely where it would be.
       if (this.indexer) {
-          const insertMeAfterThisNode = this.indexer.insert(node);
-          if (insertMeAfterThisNode) {
-              this.vectorRoot.insertBefore(node, insertMeAfterThisNode);
-          } else {
-              // element can be appended
-              this.vectorRoot.appendChild(node);
-          }
+        const insertMeAfterThisNode = this.indexer.insert(node);
+        if (insertMeAfterThisNode) {
+          this.vectorRoot.insertBefore(node, insertMeAfterThisNode);
+        } else {
+          // element can be appended
+          this.vectorRoot.appendChild(node);
+        }
       } else {
-          // if there's no indexer, simply append the node to root,
-          // but only if the node is a new one
-          if (node.parentNode !== this.vectorRoot){
-              this.vectorRoot.appendChild(node);
-          }
+        // if there's no indexer, simply append the node to root,
+        // but only if the node is a new one
+        if (node.parentNode !== this.vectorRoot) {
+          this.vectorRoot.appendChild(node);
+        }
       }
 
       this.postDraw(node);
 
       return drawResult.complete;
-  };
+    };
 
-    streetVectorLayer.renderer.drawGeometry = function(geometry, style, featureId) {
+    streetVectorLayer.renderer.drawGeometry = function (geometry, style, featureId) {
       let rendered = false;
       let removeBackground = false;
       if (style.display != "none") {
-          if (style.backgroundGraphic) {
-              this.redrawBackgroundNode(geometry.id, geometry, style,
-                  featureId);
-          } else {
-              removeBackground = true;
-          }
-          rendered = this.redrawNode(geometry.id, geometry, style,
-              featureId);
+        if (style.backgroundGraphic) {
+          this.redrawBackgroundNode(geometry.id, geometry, style,
+            featureId);
+        } else {
+          removeBackground = true;
+        }
+        rendered = this.redrawNode(geometry.id, geometry, style,
+          featureId);
       }
       if (rendered === false) {
-          var node = document.getElementById(geometry.id);
-          if (node) {
-              if (node['_style'].backgroundGraphic) {
-                  removeBackground = true;
-              }
-              node.parentNode.removeChild(node);
+        var node = document.getElementById(geometry.id);
+        if (node) {
+          if (node['_style'].backgroundGraphic) {
+            removeBackground = true;
           }
+          node.parentNode.removeChild(node);
+        }
       }
       if (removeBackground) {
-          var node = document.getElementById(
-              geometry.id + this.BACKGROUND_ID_SUFFIX);
-          if (node) {
-              node.parentNode.removeChild(node);
-          }
+        var node = document.getElementById(
+          geometry.id + this.BACKGROUND_ID_SUFFIX);
+        if (node) {
+          node.parentNode.removeChild(node);
+        }
       }
       return rendered;
-  };
+    };
 
     streetVectorLayer.renderer.drawFeature = function drawFeature(
       feature,
@@ -4395,46 +4375,46 @@
       return undefined;
     };
 
-    streetVectorLayer.drawFeature = function(feature, style, farZoom = isFarZoom()) {
+    streetVectorLayer.drawFeature = function (feature, style, farZoom = isFarZoom()) {
       // don't try to draw the feature with the renderer if the layer is not
       // drawn itself
       if (!this.drawn) {
-          return;
+        return;
       }
       if (typeof style != "object") {
-          if(!style && feature.state === OpenLayers.State.DELETE) {
-              style = "delete";
-          }
-          var renderIntent = style || feature.renderIntent;
-          style = feature.style || this.style;
-          if (!style) {
-              style = this.styleMap.createSymbolizer(feature, renderIntent);
-          }
+        if (!style && feature.state === OpenLayers.State.DELETE) {
+          style = "delete";
+        }
+        var renderIntent = style || feature.renderIntent;
+        style = feature.style || this.style;
+        if (!style) {
+          style = this.styleMap.createSymbolizer(feature, renderIntent);
+        }
       }
 
       var drawn = this.renderer.drawFeature(feature, style, farZoom);
       //TODO remove the check for null when we get rid of Renderer.SVG
       if (drawn === false || drawn === null) {
-          this.unrenderedFeatures[feature.id] = feature;
+        this.unrenderedFeatures[feature.id] = feature;
       } else {
-          delete this.unrenderedFeatures[feature.id];
+        delete this.unrenderedFeatures[feature.id];
       }
-  }
+    }
 
 
-  streetVectorLayer.moveTo = function(bounds, zoomChanged, dragging) {
-    OpenLayers.Layer.prototype.moveTo.apply(this, arguments);
+    streetVectorLayer.moveTo = function (bounds, zoomChanged, dragging) {
+      OpenLayers.Layer.prototype.moveTo.apply(this, arguments);
 
-    var coordSysUnchanged = true;
-    const farZoom = isFarZoom();
-    if (!dragging) {
+      var coordSysUnchanged = true;
+      const farZoom = isFarZoom();
+      if (!dragging) {
         this.renderer.root.style.visibility = 'hidden';
 
         var viewSize = this.map.getSize(),
-            viewWidth = viewSize.w,
-            viewHeight = viewSize.h,
-            offsetLeft = (viewWidth / 2 * this.ratio) - viewWidth / 2,
-            offsetTop = (viewHeight / 2 * this.ratio) - viewHeight / 2;
+          viewWidth = viewSize.w,
+          viewHeight = viewSize.h,
+          offsetLeft = (viewWidth / 2 * this.ratio) - viewWidth / 2,
+          offsetTop = (viewHeight / 2 * this.ratio) - viewHeight / 2;
         offsetLeft += this.map.layerContainerOriginPx.x;
         offsetLeft = -Math.round(offsetLeft);
         offsetTop += this.map.layerContainerOriginPx.y;
@@ -4452,94 +4432,94 @@
         // This seems to happen on only certain configurations; it was originally
         // noticed in FF 2.0 and Linux.
         if (OpenLayers.IS_GECKO === true) {
-            this.div.scrollLeft = this.div.scrollLeft;
+          this.div.scrollLeft = this.div.scrollLeft;
         }
 
         if (!zoomChanged && coordSysUnchanged) {
-            for (var i in this.unrenderedFeatures) {
-                var feature = this.unrenderedFeatures[i];
-                this.drawFeature(feature, undefined, farZoom);
-            }
+          for (var i in this.unrenderedFeatures) {
+            var feature = this.unrenderedFeatures[i];
+            this.drawFeature(feature, undefined, farZoom);
+          }
         }
-    }
+      }
 
-    if (!this.drawn || zoomChanged || !coordSysUnchanged) {
+      if (!this.drawn || zoomChanged || !coordSysUnchanged) {
         this.drawn = true;
         var feature;
-        for(var i=0, len=this.features.length; i<len; i++) {
-            this.renderer.locked = (i !== (len - 1));
-            feature = this.features[i];
-            this.drawFeature(feature, undefined, farZoom);
+        for (var i = 0, len = this.features.length; i < len; i++) {
+          this.renderer.locked = (i !== (len - 1));
+          feature = this.features[i];
+          this.drawFeature(feature, undefined, farZoom);
         }
-    }
-};
+      }
+    };
 
-  streetVectorLayer.svlAddFeatures = function(/**@type{Array.<OpenLayers.Feature.Vector>}*/features, /** @type{Object|null} */ options) {
-    // For us features is guaranteed to be an array
-    //if (!(OpenLayers.Util.isArray(features))) {
-    //    features = [features];
-    //}
+    streetVectorLayer.svlAddFeatures = function (/**@type{Array.<OpenLayers.Feature.Vector>}*/features, /** @type{Object|null} */ options) {
+      // For us features is guaranteed to be an array
+      //if (!(OpenLayers.Util.isArray(features))) {
+      //    features = [features];
+      //}
 
-/*     var notify = !options || !options.silent;
-    if(notify) {
-        var event = {features: features};
-        var ret = this.events.triggerEvent("beforefeaturesadded", event);
-        if(ret === false) {
-            return;
-        }
-        features = event.features;
-    } */
+      /*     var notify = !options || !options.silent;
+          if(notify) {
+              var event = {features: features};
+              var ret = this.events.triggerEvent("beforefeaturesadded", event);
+              if(ret === false) {
+                  return;
+              }
+              features = event.features;
+          } */
 
-    const farZoom = isFarZoom();
+      const farZoom = isFarZoom();
 
-    // Track successfully added features for featuresadded event, since
-    // beforefeatureadded can veto single features.
-    var featuresAdded = [];
-    for (var i=0, len=features.length; i<len; i++) {
+      // Track successfully added features for featuresadded event, since
+      // beforefeatureadded can veto single features.
+      var featuresAdded = [];
+      for (var i = 0, len = features.length; i < len; i++) {
         if (i != (features.length - 1)) {
-            this.renderer.locked = true;
+          this.renderer.locked = true;
         } else {
-            this.renderer.locked = false;
+          this.renderer.locked = false;
         }
         var feature = features[i];
 
         if (this.geometryType &&
           !(feature.geometry instanceof this.geometryType)) {
-            throw new TypeError('addFeatures: component should be an ' +
-                                this.geometryType.prototype.CLASS_NAME);
-          }
+          throw new TypeError('addFeatures: component should be an ' +
+            this.geometryType.prototype.CLASS_NAME);
+        }
 
         //give feature reference to its layer
         feature.layer = this;
 
         if (!feature.style && this.style) {
-            feature.style = svlExtend(this.style);
+          feature.style = svlExtend(this.style);
         }
 
-/*         if (notify) {
-            if(this.events.triggerEvent("beforefeatureadded",
-                                        {feature: feature}) === false) {
-                continue;
-            }
-            this.preFeatureInsert(feature);
-        } */
+        /*         if (notify) {
+                    if(this.events.triggerEvent("beforefeatureadded",
+                                                {feature: feature}) === false) {
+                        continue;
+                    }
+                    this.preFeatureInsert(feature);
+                } */
 
         featuresAdded.push(feature);
         this.features.push(feature);
         this.drawFeature(feature, undefined, farZoom);
 
-/*         if (notify) {
-            this.events.triggerEvent("featureadded", {
-                feature: feature
-            });
-            this.onFeatureInsert(feature);
-        } */
-    }
+        /*         if (notify) {
+                    this.events.triggerEvent("featureadded", {
+                        feature: feature
+                    });
+                    this.onFeatureInsert(feature);
+                } */
+      }
 
-/*     if(notify) {
-        this.events.triggerEvent("featuresadded", {features: featuresAdded});
-    } */
-};
+      /*     if(notify) {
+              this.events.triggerEvent("featuresadded", {features: featuresAdded});
+          } */
+    };
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
       'visibility': !preferences['startDisabled'],
@@ -4763,7 +4743,7 @@
         }
         if (OpenLayers.IS_GECKO === false) {
           tspan.setAttribute(
-           'baseline-shift',
+            'baseline-shift',
             OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
           );
         }
@@ -4906,30 +4886,14 @@
     }
   }
 
-  /**
-   *
-   * @param {number} [trials=0]
-   */
-  async function bootstrapSVL(trials = 0) {
-    // Check all requisites for the script
-    await waitForWazeModel()
-      .then((res) => {
-        if (res === true) {
-          initSVL();
-        }
-      })
-      .catch((e) => {
-        console.error(e);
-        let error_message = _('bootstrap_error');
-        if (!error_message || error_message === '<invalid translation key>') {
-          safeAlert(
-            'error',
-            `Street Vector Layer v. ${SVL_VERSION} failed to initialize. Please check that you have the latest version installed and then report the error on the Waze forum. Thank you!`
-          );
-        } else {
-          safeAlert('error', error_message);
-        }
+  function bootstrapSVL() {
+    if (W?.userscripts?.state?.isReady) {
+      initSVL();
+    } else {
+      document.addEventListener("wme-ready", initSVL, {
+        once: true,
       });
+    }
   }
 
   /**
