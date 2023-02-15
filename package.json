@@ -22,9 +22,9 @@
     "debug": "npx google-closure-compiler --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --language_in=ECMASCRIPT_2020 --language_out=ECMASCRIPT_2020 --warning_level=VERBOSE --compilation_level=WHITESPACE_ONLY",
     "compile": "npx google-closure-compiler --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS  --warning_level=VERBOSE",
     "compile-pp": "npx google-closure-compiler --formatting=pretty_print --js=svl.user.js --js gcc-externs.js --js_output_file=install.user.js --compilation_level=ADVANCED_OPTIMIZATIONS  --warning_level=VERBOSE",
-    "concat": "cross-env concat -o releases\\release-$npm_package_version.user.js header.js install.user.js",
+    "concat": "cross-env concat -o releases\\release-%npm_package_version%.user.js header.js install.user.js",
     "build": "npm run compile && npm run concat",
-    "release": "cross-env replace-in-files --regex='\\d+\\.\\d+\\.\\d+' --replacement=$npm_package_version header.js && git add header.js && npm run build",
+    "release": "cross-env replace-in-files --regex='\\d+\\.\\d+\\.\\d+' --replacement=%npm_package_version% header.js && git add header.js && npm run build",
     "watch": "npm-watch"
   },
   "repository": {
