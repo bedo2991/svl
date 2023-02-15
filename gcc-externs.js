@@ -3,11 +3,11 @@
  *  @externs
  */
 const Restriction = class {
-  constructor() {}
+  constructor() { }
   /**
    * @return {string}
    */
-  getDefaultType() {}
+  getDefaultType() { }
 };
 
 /**
@@ -63,6 +63,14 @@ const Restriction = class {
  * }}
  */
 let SegmentAttributes;
+
+/**
+ * @typedef {{
+* tabLabel: HTMLElement,
+* tabPane: HTMLElement
+* }}
+ */
+let RegisterSidebarTabResult;
 
 /**
  * @typedef {{
@@ -153,27 +161,48 @@ let AddressObject;
 let FlagAttributes;
 
 const W = {
+  'userscripts': {
+    'state': {
+      /**@type{boolean} */
+      'isInitialMapDataLoaded': true,
+      /**@type{boolean} */
+      'isInitialized': true,
+      /**@type{boolean} */
+      'isReady': true,
+    },
+    /***
+     * @param{string} scriptID
+     * @return{RegisterSidebarTabResult}
+     */
+    'registerSidebarTab': function(scriptID){},
+    /**
+     * 
+     * @param {HTMLElement} el
+     * @return {Promise<void>}
+     */
+    'waitForElementConnected': function(el){},
+  },
   'controller': {
-    'reload': function () {},
+    'reload': function () { },
   },
   'map': {
     /**
      * @return {OpenLayers.Map}
      */
-    'getOLMap': function () {},
+    'getOLMap': function () { },
     /**
      *
      * @param {string} uniqueName
      * @return {OpenLayers.Layer.Vector}
      * @deprecated
      */
-    'getLayerByUniqueName': function (uniqueName) {},
-        /**
-     *
-     * @param {string} uniqueName
-     * @return {OpenLayers.Layer.Vector}
-     */
-     'getLayerByName': function (uniqueName) {},
+    'getLayerByUniqueName': function (uniqueName) { },
+    /**
+ *
+ * @param {string} uniqueName
+ * @return {OpenLayers.Layer.Vector}
+ */
+    'getLayerByName': function (uniqueName) { },
   },
   'model': {
     'events': {
@@ -183,20 +212,20 @@ const W = {
        * @param {(*|null)} context
        * @param {Function} callback
        */
-      'register': function (event_name, context, callback) {},
+      'register': function (event_name, context, callback) { },
       /**
        *
        * @param {string} event_name
        * @param {(*|null)} context
        * @param {Function} callback
        */
-      'unregister': function (event_name, context, callback) {},
+      'unregister': function (event_name, context, callback) { },
     },
     'actionManager': {
       /**
        * @return {number}
        */
-      'unsavedActionsNum': function () {},
+      'unsavedActionsNum': function () { },
     },
     'topCountry': {
       /**@type{string} */
@@ -250,7 +279,7 @@ const I18n = {
   /**
    * @returns {string}
    */
-  currentLocale: function () {},
+  currentLocale: function () { },
 };
 const GM_info = {
   'script': {
@@ -269,28 +298,28 @@ const GM_info = {
 const OpenLayers = {
   'ElementsIndexer': class {
     constructor() {
-    /**@type{Array.<string>} */
-    this.order = [];
-    this.indices = {};
+      /**@type{Array.<string>} */
+      this.order = [];
+      this.indices = {};
     }
 
     /**
      * @param{Element} node
      * @return {number}
      */
-    getZIndex(node){}
-    determineZIndex(newNode){}
+    getZIndex(node) { }
+    determineZIndex(newNode) { }
     /** @return {boolean} */
-    exists(newNode){}
-    insert(newNode){}
-    remove(newNode){}
-    compare(a,b, c){}
+    exists(newNode) { }
+    insert(newNode) { }
+    remove(newNode) { }
+    compare(a, b, c) { }
     /**
      *
      * @param {number} index
      * @return {HTMLElement}
      */
-    getNextElement(index){}
+    getNextElement(index) { }
 
   },
   'Event': {
@@ -298,24 +327,24 @@ const OpenLayers = {
      *
      * @param {Event} event
      */
-    preventDefault (event){}
+    preventDefault(event) { }
   },
-  'State': {"UNKNOWN":"Unknown","INSERT":"Insert","UPDATE":"Update","DELETE":"Delete"},
+  'State': { "UNKNOWN": "Unknown", "INSERT": "Insert", "UPDATE": "Update", "DELETE": "Delete" },
   'Bounds': class {
-    constructor() {}
+    constructor() { }
 
     /**
      *
      * @param {OpenLayers.Bounds} extend
      * @return {boolean}
      */
-    intersectsBounds(extend) {}
+    intersectsBounds(extend) { }
     /**
      * @param {number} ratio
      * @param {(OpenLayers.Pixel|OpenLayers.LonLat)=} origin
      * @return {OpenLayers.Bounds}
      */
-    scale(ratio, origin){}
+    scale(ratio, origin) { }
   },
   'Projection': class {
     /**
@@ -336,7 +365,7 @@ const OpenLayers = {
      * @param {number} lon
      * @param {number} lat
      */
-    constructor(lon, lat) {}
+    constructor(lon, lat) { }
 
     /**
      *
@@ -344,7 +373,7 @@ const OpenLayers = {
      * @param {number} lat
      * @return {OpenLayers.LonLat}
      */
-    add(lon, lat) {}
+    add(lon, lat) { }
 
     /**
      *
@@ -352,7 +381,7 @@ const OpenLayers = {
      * @param {OpenLayers.Projection} dest
      * @return {OpenLayers.LonLat}
      */
-    transform(source, dest) {}
+    transform(source, dest) { }
   },
   'Pixel': class {
     /**
@@ -360,7 +389,7 @@ const OpenLayers = {
      * @param {number} x
      * @param {number} y
      */
-    constructor(x, y) {}
+    constructor(x, y) { }
   },
   'Size': class {
     constructor() {
@@ -378,7 +407,7 @@ const OpenLayers = {
       this.resolution;
       /** @type {OpenLayers.Projection} */
       this.projection;
-      this.layerContainerOriginPx = {x : 0, y : 0};
+      this.layerContainerOriginPx = { x: 0, y: 0 };
       this.events = {
         /**
          *
@@ -387,20 +416,20 @@ const OpenLayers = {
          * @param {Function} callback
          * @param {boolean} [priority=false]
          */
-        'register': function (eventName, a, callback, priority) {},
+        'register': function (eventName, a, callback, priority) { },
       };
     }
 
     /**
      * @return {OpenLayers.LonLat}
      */
-    getCachedCenter() {}
+    getCachedCenter() { }
 
     /**
      *
      * @param {OpenLayers.Layer.Vector} layer
      */
-    addLayer(layer) {}
+    addLayer(layer) { }
 
     /**
      *
@@ -408,37 +437,37 @@ const OpenLayers = {
      * @param {string} value
      * @return {Array.<OpenLayers.Layer.Vector>}
      */
-    getLayersBy(attr, value) {}
+    getLayersBy(attr, value) { }
 
     /**
      * @param {OpenLayers.Pixel=} pixel
      * @return {OpenLayers.Size}
      */
-    getGeodesicPixelSize(pixel) {}
+    getGeodesicPixelSize(pixel) { }
 
     /**
      * @return {OpenLayers.Size}
      */
-    getSize(){}
+    getSize() { }
 
     /**
      * @return {OpenLayers.Bounds}
      */
-    getExtent(){}
+    getExtent() { }
   },
   'StyleMap': class {
     /**
      *
      * @param {StyleMapContent} style
      */
-    constructor(style) {}
+    constructor(style) { }
     /**
      *
      * @param {OpenLayers.Feature} feature
      * @param {string} intent
      * @return {Object}
      */
-    createSymbolizer(feature, intent){}
+    createSymbolizer(feature, intent) { }
   },
   /** @record */
   'Geometry': {
@@ -462,7 +491,7 @@ const OpenLayers = {
        * @param {OpenLayers.Geometry.Point} point
        * @return {number}
        */
-      distanceTo(point) {}
+      distanceTo(point) { }
     },
     'LineString': class LineString {
       constructor(pointArray) {
@@ -470,26 +499,26 @@ const OpenLayers = {
         this.components;
       }
       /**@return Array */
-      getVertices() {}
+      getVertices() { }
       /**
        *
        * @param {boolean} weighted
        * @return {OpenLayers.Geometry.Point}
        */
-      getCentroid(weighted) {}
+      getCentroid(weighted) { }
 
       /**
        *
        * @param {number} factor
        * @return {OpenLayers.Geometry.LineString}
        */
-      simplify(factor) {}
+      simplify(factor) { }
     },
 
     /**
      * @return {OpenLayers.Bounds}
      */
-    'getBounds': function () {},
+    'getBounds': function () { },
   },
   /** @typedef Renderer */
   'Renderer': class {
@@ -519,13 +548,13 @@ const OpenLayers = {
      * @param {Object} style
      * @return {string}
      */
-    getNodeType(geometry, style){}
+    getNodeType(geometry, style) { }
 
     /**
      *
      * @param {HTMLElement} node
      */
-    postDraw(node) {}
+    postDraw(node) { }
     /**
      *
      * @param {HTMLElement} node
@@ -533,14 +562,14 @@ const OpenLayers = {
      * @param {Object} style
      * @return {Object}
      */
-    drawGeometryNode(node, geometry, style){}
+    drawGeometryNode(node, geometry, style) { }
 
     /**
      *
      * @param {Object} symbolizer
      * @return {Object}
      */
-    applyDefaultSymbolizer(symbolizer){}
+    applyDefaultSymbolizer(symbolizer) { }
     /**
      *
      * @param {string} id
@@ -548,36 +577,36 @@ const OpenLayers = {
      * @param {Object} style
      * @param {string} featureId
      */
-    redrawNode (id, geometry, style, featureId) {};
+    redrawNode(id, geometry, style, featureId) { };
 
-  /**
-   *
-   * @param {string} id
-   * @param {OpenLayers.Geometry} geometry
-   * @param {Object} style
-   * @param {string} featureId
-   */
-    redrawBackgroundNode (id, geometry, style, featureId){};
+    /**
+     *
+     * @param {string} id
+     * @param {OpenLayers.Geometry} geometry
+     * @param {Object} style
+     * @param {string} featureId
+     */
+    redrawBackgroundNode(id, geometry, style, featureId) { };
 
     /**
      *
      * @param {number} id
      */
-    removeText(id) {}
+    removeText(id) { }
 
     /** @returns {number} */
-    getResolution() {}
+    getResolution() { }
 
-    drawFeature(feature, style) {}
+    drawFeature(feature, style) { }
 
-    drawText(id, style, location) {}
+    drawText(id, style, location) { }
 
     /**
      *
      * @param {OpenLayers.Bounds} extent
      * @param {boolean=} resolutionChanged
      */
-    setExtent(extent, resolutionChanged) {}
+    setExtent(extent, resolutionChanged) { }
 
     /**
      *
@@ -586,14 +615,14 @@ const OpenLayers = {
      * @param {string} id
      * @return {boolean} true if the geometry has been drawn completely
      */
-    drawGeometry(geometry, style, id) {}
+    drawGeometry(geometry, style, id) { }
 
     /**
      *
      * @param {string} id
      * @param {string} type
      */
-    nodeFactory(id, type) {}
+    nodeFactory(id, type) { }
   },
   /** @type {boolean} */
   'IS_GECKO': true,
@@ -603,11 +632,11 @@ const OpenLayers = {
      *
      * @param {...*} element
      */
-    'getElement':function(element){},
+    'getElement': function (element) { },
     /** @return {boolean} */
-    'isArray': function(features){},
-    'extend': function (a, b) {},
-    'distVincenty': function (a, b) {},
+    'isArray': function (features) { },
+    'extend': function (a, b) { },
+    'distVincenty': function (a, b) { },
   },
   /** @record */
   'Feature': {
@@ -631,12 +660,12 @@ const OpenLayers = {
       }
 
       /** @return {OpenLayers.Feature.Vector} */
-      clone() {}
+      clone() { }
       /**
        *
        * @param {OpenLayers.LonLat|OpenLayers.Pixel} lonLat
        */
-      move(lonLat) {}
+      move(lonLat) { }
     },
   },
   /** @record */
@@ -659,14 +688,14 @@ const OpenLayers = {
            * @param {Function} callback
            * @param {boolean} [priority=false]
            */
-          'register': function (eventName, a, callback, priority) {},
+          'register': function (eventName, a, callback, priority) { },
           /**
            *
            * @param {string} type
            * @param {Object} evt
            * @return {boolean}
            */
-          'triggerEvent' : function(type, evt){},
+          'triggerEvent': function (type, evt) { },
         };
         /** @type {OpenLayers.Renderer} */
         this.renderer;
@@ -694,52 +723,52 @@ const OpenLayers = {
        *
        * @return {boolean}
        */
-       redraw(){}
+      redraw() { }
       /**
        *
        * @param {OpenLayers.Feature.Vector} feature
        */
-      preFeatureInsert(feature){}
+      preFeatureInsert(feature) { }
       /**
        *
        * @param {OpenLayers.Feature.Vector} feature
        */
-      onFeatureInsert(feature){}
+      onFeatureInsert(feature) { }
       /**
        * @return {number}
        */
-      getZIndex() {}
+      getZIndex() { }
 
       /**
        *
        * @param {number} opacity
        */
-      setOpacity(opacity) {}
+      setOpacity(opacity) { }
 
       /**
        *
        * @param {boolean} bool
        */
-      setVisibility(bool) {}
+      setVisibility(bool) { }
 
       /**
        *
        * @return {boolean}
        */
-      getVisibility() {}
+      getVisibility() { }
 
       /**
        *
        * @param {number} value
        */
-      setZIndex(value) {}
+      setZIndex(value) { }
 
       /**
        *
        * @param {Array.<OpenLayers.Feature.Vector>=} array
        * @param {Object=} options
        */
-      destroyFeatures(array, options) {}
+      destroyFeatures(array, options) { }
 
       /**
        *
@@ -747,14 +776,14 @@ const OpenLayers = {
        * @param {*} id
        * @return {Array.<OpenLayers.Feature.Vector>}
        */
-      getFeaturesByAttribute(featureName, id) {}
+      getFeaturesByAttribute(featureName, id) { }
 
       /**
        *
        * @param {Array.<OpenLayers.Feature.Vector>} features
        * @param {Object=} options
        */
-      addFeatures(features, options) {}
+      addFeatures(features, options) { }
     },
   },
 };
@@ -767,7 +796,7 @@ OpenLayers.Renderer.defaultSymbolizer = {
 };
 
 OpenLayers.Renderer.SVG = class SVG {
-  constructor() {}
+  constructor() { }
 };
 
 // Static properties
@@ -778,7 +807,7 @@ OpenLayers.Renderer.SVG.LABEL_VFACTOR = [];
 const WazeWrap = {
   'User': {
     /** @return {number} */
-    'Rank': function () {},
+    'Rank': function () { },
   },
   'Alerts': {
     /**
@@ -786,31 +815,31 @@ const WazeWrap = {
      * @param {string} name
      * @param {string} message
      */
-    'info': function (name, message) {},
+    'info': function (name, message) { },
     /**
      *
      * @param {string} name
      * @param {string} message
      */
-    'warning': function (name, message) {},
+    'warning': function (name, message) { },
     /**
      *
      * @param {string} name
      * @param {string} message
      */
-    'error': function (name, message) {},
+    'error': function (name, message) { },
     /**
      *
      * @param {string} name
      * @param {string} message
      */
-    'success': function (name, message) {},
+    'success': function (name, message) { },
     /**
      *
      * @param {string} name
      * @param {string} message
      */
-    'debug': function (name, message) {},
+    'debug': function (name, message) { },
     /**
      *
      * @param {string} name
@@ -825,7 +854,7 @@ const WazeWrap = {
       defaultText,
       okCallback,
       cancelCalback
-    ) {},
+    ) { },
     /**
      *
      * @param {string} name
@@ -842,14 +871,14 @@ const WazeWrap = {
       cancelCalback,
       okButtonText,
       cancelButtonText
-    ) {},
+    ) { },
   },
   /** @type {boolean} */
   'Ready': true,
   /**
    * @return {boolean}
    */
-  'hasSelectedFeatures': function () {},
+  'hasSelectedFeatures': function () { },
   'Interface': {
     'Tab': class {
       /**
@@ -860,7 +889,7 @@ const WazeWrap = {
        * @param {Function} callback
        * @param {Object=} context
        * */
-      constructor(name, content, callback, context) {}
+      constructor(name, content, callback, context) { }
     },
     'Shortcut': class {
       /**
@@ -875,9 +904,9 @@ const WazeWrap = {
        * @param {Object=} scope
        * @return {OpenLayers.Geometry.Point} A point at the general location of the segment, null if the segment is not found
        * */
-      constructor(name, desc, group, title, shortcut, callback, scope) {}
+      constructor(name, desc, group, title, shortcut, callback, scope) { }
 
-      add() {}
+      add() { }
     },
     /**
      *
@@ -893,7 +922,7 @@ const WazeWrap = {
       html,
       greasemonkeyURL,
       forumURL
-    ) {},
+    ) { },
 
     /**
      * Creates a checkbox in the layer menu
@@ -910,51 +939,51 @@ const WazeWrap = {
       checked,
       callback,
       layer
-    ) {},
+    ) { },
   },
 };
 const jQueryObject = class jQueryObject {
-  constructor() {}
+  constructor() { }
   /**
    *
    * @param {string} a
    * @param {boolean|string} b
    */
-  prop(a, b) {}
+  prop(a, b) { }
   /**
    *
    * @param {Function} callback
    */
-  click(callback) {}
+  click(callback) { }
 };
 
 /**
  *
  * @param {Object} details
  */
-const GM_xmlhttpRequest = function (details={}) {};
+const GM_xmlhttpRequest = function (details = {}) { };
 
 /**
  * @param {string} x
  * @return {jQueryObject}
  */
-const $ = function (x) {};
+const $ = function (x) { };
 /**
  *
  * @param {string} x
  */
-const GM_setClipboard = function (x) {};
+const GM_setClipboard = function (x) { };
 
 /**
  *
  * @param {string} x
  */
- const GM_addStyle = function (x) {};
+const GM_addStyle = function (x) { };
 
 /** @typedef {Object} Waze */
 const Waze = {
   'DataModel': class {
-    constructor() {}
+    constructor() { }
   },
   /** @typedef {Object} Feature */
   'Feature': {
@@ -971,34 +1000,34 @@ const Waze = {
         }
 
         /** @return {SegmentAttributes} */
-        getAttributes() {}
+        getAttributes() { }
 
         /** @return {boolean} */
-        isOneWay() {}
+        isOneWay() { }
 
         /** @return {boolean} */
-        isInRoundabout() {}
+        isInRoundabout() { }
 
         /** @return {number} - from 0 to 6. */
-        getLockRank() {}
+        getLockRank() { }
 
         /** @return {FlagAttributes} */
-        getFlagAttributes() {}
+        getFlagAttributes() { }
 
         /** @return {AddressObject} */
-        getAddress() {}
+        getAddress() { }
 
         /** @return {boolean} */
-        hasNonEmptyStreet() {}
+        hasNonEmptyStreet() { }
         /**
          * @return {number}
          */
-        getID() {}
+        getID() { }
 
         /**
          * @return {?number}
          */
-        getOldID() {}
+        getOldID() { }
       },
       'Node': class {
         constructor() {
@@ -1007,24 +1036,24 @@ const Waze = {
         }
 
         /** @return {NodeAttributes} */
-        getAttributes() {}
+        getAttributes() { }
 
         /** @return {boolean} */
-        isOneWay() {}
+        isOneWay() { }
 
         /** @return {boolean} */
-        isInRoundabout() {}
+        isInRoundabout() { }
 
         /** @return {number} - from 0 to 6. */
-        getLockRank() {}
+        getLockRank() { }
 
         /** @return {FlagAttributes} */
-        getFlagAttributes() {}
+        getFlagAttributes() { }
 
         /**
          * @return {number}
          */
-        getID() {}
+        getID() { }
       },
     },
   },
