@@ -1,4 +1,4 @@
-(function svl() {
+(function svl()  {
   /** @type {string} */
   const SVL_VERSION = GM_info.script.version;
   /** @type {boolean} */
@@ -3823,10 +3823,10 @@
     // console.debug("Changed Segment");
     consoleDebug(`Edit ${segments.length} segments`);
     segments.forEach((s) => {
-      const oldID = s.getOldID();
+      /*const oldID = s.getOldID();
       if (oldID) {
         removeSegmentById(parseInt(oldID, 10));
-      }
+      }*/
       removeSegmentById(s.getID());
       // console.debug(e[i]);
       if (s.state !== 'DELETE') {

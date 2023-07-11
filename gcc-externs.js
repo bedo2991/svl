@@ -1026,6 +1026,7 @@ const Waze = {
 
         /**
          * @return {?number}
+         * @deprecated
          */
         getOldID() { }
       },
