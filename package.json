@@ -1,6 +1,6 @@
 {
   "name": "svl",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "Street Vector Layer (SVL)\r The Road layer for the Waze editors, made by editors.",
   "main": "svl.user.js",
   "watch": {
