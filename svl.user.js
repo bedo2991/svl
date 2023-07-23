@@ -1155,6 +1155,8 @@
    */
   function drawSegment(model) {
     // consoleDebug("DrawSegment");
+    if(model.state === 'DELETE')
+      return {};
     const attributes = model.getAttributes();
     consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
@@ -1958,6 +1960,7 @@
    * @param {Waze.Feature.Vector.Node} model
    */
   function drawNode(model) {
+    if(model.state === 'DELETE') return {};
     const attributes = model.getAttributes();
     const point = new OpenLayers.Geometry.Point(
       attributes.geometry.x,
@@ -3573,9 +3576,9 @@
     const myFeatures = [];
     for (let i = 0; i < nodes.length; i += 1) {
       if (nodes[i].attributes.geometry !== undefined) {
-        if (nodes[i].attributes.id > 0) {
+        //if (nodes[i].attributes.id > 0) {
           myFeatures.push(drawNode(nodes[i]));
-        }
+        //}
       } else {
         console.warn('[SVL] Geometry of node is undefined');
       }
@@ -3787,14 +3790,14 @@
       consoleDebug(`${segmentsFeatures.length} features added to the street layer`);
       streetVectorLayer.svlAddFeatures(segmentsFeatures, { 'silent': true });
     } else {
-      console.warn('[SVL] no segment features drawn');
+      consoleDebug('[SVL] no segment features drawn');
     }
 
     if (labelsFeatures.length > 0) {
       consoleDebug(`${labelsFeatures.length} features added to the labels layer`);
       labelsVector.addFeatures(labelsFeatures, { 'silent': true });
     } else {
-      console.warn('[SVL] no labels features drawn');
+      consoleDebug('[SVL] no labels features drawn');
     }
     consoleGroupEnd();
   }
@@ -3959,6 +3962,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.
       <br>- 5.4.0: Replaced deprecated tampermonkey includes with match. Support for the new WME script API.
       <br>- 5.3.2: Bug fixes, rectoring for more performance.
       <br>- 5.3.0: Improved rendering performance.`,
