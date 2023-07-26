@@ -944,18 +944,16 @@
     const address = segmentModel.getAddress();
     const hasStreetName = segmentModel.hasNonEmptyStreet();
     if (
-      attributes.primaryStreetID !== null &&
-      address.attributes.state === undefined
+      attributes.primaryStreetID !== null && !address.hasState()
     ) {
       consoleDebug('Address not ready', address, attributes);
       setTimeout(() => {
         drawLabels(segmentModel, simplified, true);
       }, 500);
     } else {
-      const addressAttributes = address.attributes;
       let streetPart = '';
       if (hasStreetName) {
-        streetPart = addressAttributes.street.name;
+        streetPart = address.getStreetName();
       } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
         streetPart = '⚑';
       }
@@ -973,7 +971,7 @@
             break;
           }
           const altStreet = W.model.streets.objects[streetID];
-          if (altStreet && altStreet.name !== addressAttributes.street.name) {
+          if (altStreet && altStreet.name !== streetPart) {
             ANsShown += 1;
             altStreetPart += altStreet.name ? `(${altStreet.name})` : '';
           }
@@ -3962,6 +3960,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.3: Fixed missing streetnames on beta.
       <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.
       <br>- 5.4.0: Replaced deprecated tampermonkey includes with match. Support for the new WME script API.
       <br>- 5.3.2: Bug fixes, rectoring for more performance.
@@ -4876,7 +4875,7 @@
       console.error('SVL: could not find topCountry');
       return;
     }
-    const defaultLaneWidth = W.model.topCountry.defaultLaneWidthPerRoadType;
+    const defaultLaneWidth = W.model.topCountry?.defaultLaneWidthPerRoadType ?? W.model.topCountry.attributes.defaultLaneWidthPerRoadType;
     if (defaultLaneWidth) {
       Object.keys(defaultLaneWidth).forEach((e) => {
         defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
