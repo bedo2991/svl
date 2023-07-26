@@ -138,12 +138,13 @@ let StreetAttributes;
 
 let AddressAttributes;
 
-/**
- * @typedef {{
- * attributes:AddressAttributes,
- * }}
- */
-let AddressObject;
+let AddressObject ={
+  'attributes':AddressAttributes,
+  //@return {boolean}
+  hasState: function(){},
+  //@return {string}
+  getStreetName: function(){},
+};
 
 /**
  * @typedef {{
