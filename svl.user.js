@@ -1,4 +1,4 @@
-(function svl()  {
+(function svl() {
   /** @type {string} */
   const SVL_VERSION = GM_info.script.version;
   /** @type {boolean} */
@@ -162,8 +162,8 @@
 
   function mergeEndCallback() {
     const tc = W.model.topCountry;
-    if (tc && tc?.id !== countryID) {
-      countryID = tc.id;
+    if (tc && tc.getID() !== countryID) {
+      countryID = tc.getID();
       console.log('SVL: Init new country ' + countryID);
       initCountry();
     }
@@ -924,9 +924,8 @@
    *
    * @param {Waze.Feature.Vector.Segment} segmentModel
    * @param {Array<OpenLayers.Geometry.Point>} simplified
-   * @param {boolean} [delayed=false]
    */
-  function drawLabels(segmentModel, simplified, delayed = false) {
+  function drawLabels(segmentModel, simplified) {
     // consoleDebug('drawLabels');
     let labelFeature;
     let labelText;
@@ -943,185 +942,173 @@
     const attributes = segmentModel.getAttributes();
     const address = segmentModel.getAddress();
     const hasStreetName = segmentModel.hasNonEmptyStreet();
-    if (
-      attributes.primaryStreetID !== null && !address.hasState()
-    ) {
-      consoleDebug('Address not ready', address, attributes);
-      setTimeout(() => {
-        drawLabels(segmentModel, simplified, true);
-      }, 500);
-    } else {
-      let streetPart = '';
-      if (hasStreetName) {
-        streetPart = address.getStreetName();
-      } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
-        streetPart = '⚑';
-      }
-      // consoleDebug(`Streetpart: ${streetPart}`);
+    let streetPart = '';
+    if (hasStreetName) {
+      streetPart = address.getStreetName();
+    } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
+      streetPart = '⚑';
+    }
+    // consoleDebug(`Streetpart: ${streetPart}`);
 
-      // add alt street names
-      let altStreetPart = '';
-      if (preferences['showANs']) {
-        let ANsShown = 0;
-        for (let i = 0; i < attributes.streetIDs.length; i += 1) {
-          const streetID = attributes.streetIDs[i];
-          if (ANsShown === 2) {
-            // Show maximum 2 alternative names
-            altStreetPart += ' …';
-            break;
-          }
-          const altStreet = W.model.streets.objects[streetID];
-          if (altStreet && altStreet.name !== streetPart) {
-            ANsShown += 1;
-            altStreetPart += altStreet.name ? `(${altStreet.name})` : '';
-          }
-        }
-
-        altStreetPart = altStreetPart.replace(')(', ', ');
-        if (altStreetPart !== '') {
-          altStreetPart = `\n${altStreetPart}`;
-        }
-      }
-
-      if (!streetStyles[attributes.roadType]) {
-        streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
-      }
-
-      let speedPart = '';
-      const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
-      if (speed && preferences['showSLtext']) {
-        if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
-          speedPart = getSuperScript(attributes.fwdMaxSpeed);
-        } else if (attributes.fwdMaxSpeed) {
-          speedPart = getSuperScript(attributes.fwdMaxSpeed);
-          if (attributes.revMaxSpeed) {
-            speedPart += `'${getSuperScript(attributes.revMaxSpeed)}`;
-          }
-        } else {
-          speedPart = getSuperScript(attributes.revMaxSpeed);
-          if (attributes.fwdMaxSpeed) {
-            speedPart += `'${getSuperScript(attributes.fwdMaxSpeed)}`;
-          }
-        }
-        /* jslint bitwise: true */
-        if (
-          attributes.fwdMaxSpeedUnverified ||
-          attributes.revMaxSpeedUnverified
-        ) {
-          /* jslint bitwise: false */
-          speedPart += '?';
-        }
-      }
-      labelText = `${streetPart} ${speedPart}`;
-      if (labelText === ' ') {
-        return [];
-      }
-      /* streetNameThresholdDistance =
-        labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
-      doubleLabelDistance = 4 * streetNameThresholdDistance; */
-
-      const roadTypeID = attributes.roadType;
-      const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
-        'sID': attributes.id,
-        'color': streetStyles[roadTypeID]
-          ? streetStyles[roadTypeID]['strokeColor']
-          : '#f00',
-        'outlinecolor': streetStyles[roadTypeID]
-          ? streetStyles[roadTypeID]['outlineColor']
-          : '#fff',
-        'outlinewidth': preferences['labelOutlineWidth'],
-      });
-
-      const distances = [];
-      // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
-      for (let p = 0; p < simplified.length - 1; p += 1) {
-        const distance = simplified[p].distanceTo(simplified[p + 1]);
-        distances.push({ index: p, distance });
-      }
-      // sort them by distance, descending
-      distances.sort((a, b) =>
-        a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
-      );
-      let labelsToInsert = streetPart === '' ? 1 : distances.length;
-      const requiredSpace = clutterConstant * labelText.length;
-      // console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
-
-      // console.debug(segmentModel.getID(), distances);
-      for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
-        // console.log(`LabelsToInsert: ${labelsToInsert}`);
-        if (
-          distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
-        ) {
-          // console.log(`Breaking at index ${i}`);
+    // add alt street names
+    let altStreetPart = '';
+    if (preferences['showANs']) {
+      let ANsShown = 0;
+      for (let i = 0; i < attributes.streetIDs.length; i += 1) {
+        const streetID = attributes.streetIDs[i];
+        if (ANsShown === 2) {
+          // Show maximum 2 alternative names
+          altStreetPart += ' …';
           break;
         }
-        const p = distances[i].index;
-        // consoleDebug('Label can be inserted:');
-        // console.dir(address);
-        let dx = 0;
-        let dy = 0;
-        // if (distance > streetNameThresholdDistance) {
-        // consoleDebug('Label inserted');
-        // p = maxDistanceIndex;
-        // if (distance < doubleLabelDistance) {
-        // || farzoom
-        // p0 = simplified[p];
-        // p1 = simplified[p + 1];
-        // } else {
-        p0 = simplified[p];
-        p1 = new OpenLayers.Geometry.LineString([
-          p0,
-          simplified[p + 1],
-        ]).getCentroid(
-          true
-        ); /* Important: pass true parameter otherwise it will return start point as centroid */ // Clone the label
+        const altStreet = W.model.streets.objects[streetID];
+        if (altStreet && altStreet.name !== streetPart) {
+          ANsShown += 1;
+          altStreetPart += altStreet.name ? `(${altStreet.name})` : '';
+        }
+      }
+
+      altStreetPart = altStreetPart.replace(')(', ', ');
+      if (altStreetPart !== '') {
+        altStreetPart = `\n${altStreetPart}`;
+      }
+    }
+
+    if (!streetStyles[attributes.roadType]) {
+      streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
+    }
+
+    let speedPart = '';
+    const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
+    if (speed && preferences['showSLtext']) {
+      if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
+        speedPart = getSuperScript(attributes.fwdMaxSpeed);
+      } else if (attributes.fwdMaxSpeed) {
+        speedPart = getSuperScript(attributes.fwdMaxSpeed);
+        if (attributes.revMaxSpeed) {
+          speedPart += `'${getSuperScript(attributes.revMaxSpeed)}`;
+        }
+      } else {
+        speedPart = getSuperScript(attributes.revMaxSpeed);
+        if (attributes.fwdMaxSpeed) {
+          speedPart += `'${getSuperScript(attributes.fwdMaxSpeed)}`;
+        }
+      }
+      /* jslint bitwise: true */
+      if (
+        attributes.fwdMaxSpeedUnverified ||
+        attributes.revMaxSpeedUnverified
+      ) {
+        /* jslint bitwise: false */
+        speedPart += '?';
+      }
+    }
+    labelText = `${streetPart} ${speedPart}`;
+    if (labelText === ' ') {
+      return [];
+    }
+    /* streetNameThresholdDistance =
+      labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
+    doubleLabelDistance = 4 * streetNameThresholdDistance; */
+
+    const roadTypeID = attributes.roadType;
+    const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
+      'sID': attributes.id,
+      'color': streetStyles[roadTypeID]
+        ? streetStyles[roadTypeID]['strokeColor']
+        : '#f00',
+      'outlinecolor': streetStyles[roadTypeID]
+        ? streetStyles[roadTypeID]['outlineColor']
+        : '#fff',
+      'outlinewidth': preferences['labelOutlineWidth'],
+    });
+
+    const distances = [];
+    // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
+    for (let p = 0; p < simplified.length - 1; p += 1) {
+      const distance = simplified[p].distanceTo(simplified[p + 1]);
+      distances.push({ index: p, distance });
+    }
+    // sort them by distance, descending
+    distances.sort((a, b) =>
+      a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
+    );
+    let labelsToInsert = streetPart === '' ? 1 : distances.length;
+    const requiredSpace = clutterConstant * labelText.length;
+    // console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
+
+    // console.debug(segmentModel.getID(), distances);
+    for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
+      // console.log(`LabelsToInsert: ${labelsToInsert}`);
+      if (
+        distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
+      ) {
+        // console.log(`Breaking at index ${i}`);
+        break;
+      }
+      const p = distances[i].index;
+      // consoleDebug('Label can be inserted:');
+      // console.dir(address);
+      let dx = 0;
+      let dy = 0;
+      // if (distance > streetNameThresholdDistance) {
+      // consoleDebug('Label inserted');
+      // p = maxDistanceIndex;
+      // if (distance < doubleLabelDistance) {
+      // || farzoom
+      // p0 = simplified[p];
+      // p1 = simplified[p + 1];
+      // } else {
+      p0 = simplified[p];
+      p1 = new OpenLayers.Geometry.LineString([
+        p0,
+        simplified[p + 1],
+      ]).getCentroid(
+        true
+      ); /* Important: pass true parameter otherwise it will return start point as centroid */ // Clone the label
         // }
         /* centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
           true
         ); */ labelFeature = sampleLabel.clone();
-        labelFeature.geometry = p1;
-        if (attributes.fwdDirection) {
-          dx = p1.x - p0.x;
-          dy = p1.y - p0.y;
-        } else {
-          dx = p0.x - p1.x;
-          dy = p0.y - p1.y;
-        }
-        const angle = Math.atan2(dx, dy);
-        let degrees = 90 + (angle * 180) / Math.PI;
-        if (streetPart !== '') {
-          directionArrow = ' ▶ ';
-          if (degrees > 90 && degrees < 270) {
-            degrees -= 180;
-            // directionArrow = " ▶ ";
-          } else {
-            directionArrow = ' ◀ ';
-          }
-        } else {
-          directionArrow = '';
-        }
-        if (!segmentModel.isOneWay()) {
-          directionArrow = ''; // The degree has to be computed anyway
-        }
-        labelFeature.attributes.label =
-          directionArrow + labelText + directionArrow + altStreetPart; // +
-        // labelsToInsert; //TODO remove
-
-        labelFeature.attributes['angle'] = degrees;
-        labelFeature.attributes.closeZoomOnly = p % 2 === 1;
-        labelFeature.attributes.showAtzoom = labelsToInsert;
-        labelsToInsert -= 1;
-        labels.push(labelFeature);
+      labelFeature.geometry = p1;
+      if (attributes.fwdDirection) {
+        dx = p1.x - p0.x;
+        dy = p1.y - p0.y;
+      } else {
+        dx = p0.x - p1.x;
+        dy = p0.y - p1.y;
       }
-      // console.dir(distances);
-      /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
+      const angle = Math.atan2(dx, dy);
+      let degrees = 90 + (angle * 180) / Math.PI;
+      if (streetPart !== '') {
+        directionArrow = ' ▶ ';
+        if (degrees > 90 && degrees < 270) {
+          degrees -= 180;
+          // directionArrow = " ▶ ";
+        } else {
+          directionArrow = ' ◀ ';
+        }
+      } else {
+        directionArrow = '';
+      }
+      if (!segmentModel.isOneWay()) {
+        directionArrow = ''; // The degree has to be computed anyway
+      }
+      labelFeature.attributes.label =
+        directionArrow + labelText + directionArrow + altStreetPart; // +
+      // labelsToInsert; //TODO remove
 
-      } */
+      labelFeature.attributes['angle'] = degrees;
+      labelFeature.attributes.closeZoomOnly = p % 2 === 1;
+      labelFeature.attributes.showAtzoom = labelsToInsert;
+      labelsToInsert -= 1;
+      labels.push(labelFeature);
     }
-    if (delayed && labelFeature) {
-      // Add the labels directly
-      labelsVector.addFeatures(labels, { 'silent': true });
-    }
+    // console.dir(distances);
+    /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
+
+    } */
+
     return labels;
   }
 
@@ -1153,7 +1140,7 @@
    */
   function drawSegment(model) {
     // consoleDebug("DrawSegment");
-    if(model.state === 'DELETE')
+    if (model.getState() === 'DELETE')
       return {};
     const attributes = model.getAttributes();
     consoleDebug(`Drawing segment: ${attributes.id}`);
@@ -1958,7 +1945,7 @@
    * @param {Waze.Feature.Vector.Node} model
    */
   function drawNode(model) {
-    if(model.state === 'DELETE') return {};
+    if (model.getState() === 'DELETE') return {};
     const attributes = model.getAttributes();
     const point = new OpenLayers.Geometry.Point(
       attributes.geometry.x,
@@ -3575,7 +3562,7 @@
     for (let i = 0; i < nodes.length; i += 1) {
       if (nodes[i].attributes.geometry !== undefined) {
         //if (nodes[i].attributes.id > 0) {
-          myFeatures.push(drawNode(nodes[i]));
+        myFeatures.push(drawNode(nodes[i]));
         //}
       } else {
         console.warn('[SVL] Geometry of node is undefined');
@@ -3960,6 +3947,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.5: Fix streetnames not showing in countries without states.
       <br>- 5.4.3: Fixed missing streetnames on beta.
       <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.
       <br>- 5.4.0: Replaced deprecated tampermonkey includes with match. Support for the new WME script API.

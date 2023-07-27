@@ -135,14 +135,17 @@ let StreetAttributes;
  * street:StreetAttributes,
  * }}
  */
-
 let AddressAttributes;
 
-let AddressObject ={
-  'attributes':AddressAttributes,
-  //@return {boolean}
+/** @typedef {Object} AddressObject */
+const AddressObject = {
+  /** @type{AddressAttributes} */
+  'attributes' : {},
+
+  /**@return {boolean} */
   hasState: function(){},
-  //@return {string}
+
+  /** @return {string} */
   getStreetName: function(){},
 };
 
@@ -229,7 +232,19 @@ const W = {
       'unsavedActionsNum': function () { },
     },
     'topCountry': {
-      /**@type{string} */
+      /** @returns {number} */
+      getID(){},
+      /**@type{string} @deprecated */
+      'abbr': '',
+      /**@type{string} @deprecated*/
+      'env': '',
+      /**@type{number} @deprecated*/
+      'id': 0,
+      /** @type{Object.<string, number>} @deprecated*/
+      'defaultLaneWidthPerRoadType': {},
+
+      'attributes':{
+        /**@type{string} */
       'abbr': '',
       /**@type{string} */
       'env': '',
@@ -237,6 +252,7 @@ const W = {
       'id': 0,
       /** @type{Object.<string, number>} */
       'defaultLaneWidthPerRoadType': {},
+      }
     },
     'streets': {
       /** @type{Object.<number, StreetAttributes>} */
@@ -1006,6 +1022,9 @@ const Waze = {
         /** @return {boolean} */
         isOneWay() { }
 
+         /** @return {string|null} */
+        getState() { }
+
         /** @return {boolean} */
         isInRoundabout() { }
 
@@ -1039,6 +1058,9 @@ const Waze = {
 
         /** @return {NodeAttributes} */
         getAttributes() { }
+
+        /** @return {string|null} */
+        getState() { }
 
         /** @return {boolean} */
         isOneWay() { }
