@@ -121,6 +121,7 @@ const StreetAttributes = {
   'id': 0,
   'cityID': 0,
   'englishName': '',
+  /** @deprecated */
   'name': '',
   'isEmpty': true,
   'outOfScope': true,
