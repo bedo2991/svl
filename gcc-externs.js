@@ -113,21 +113,23 @@ let NodeAttributes;
 let StyleMapContent;
 
 /**
- * @typedef {{
- * id:number,
- * cityID:(number|null),
- * englishName:(string|null),
- * name:(string|null),
- * isEmpty:boolean,
- * outOfScope:boolean,
- * persistent:boolean,
- * selected:boolean,
- * signText:(string|null),
- * signType:(string|null),
- * state:(number|null),
- * }}
+ * @typedef {Object} StreetAttributes
  */
-let StreetAttributes;
+const StreetAttributes = {
+  /** @returns{string|null} */
+  getName() { },
+  'id': 0,
+  'cityID': 0,
+  'englishName': '',
+  'name': '',
+  'isEmpty': true,
+  'outOfScope': true,
+  'persistent': true,
+  'selected': true,
+  'signText': "",
+  'signType': "",
+  'state': 0,
+};
 
 /**
  * @typedef {{
@@ -140,13 +142,13 @@ let AddressAttributes;
 /** @typedef {Object} AddressObject */
 const AddressObject = {
   /** @type{AddressAttributes} */
-  'attributes' : {},
+  'attributes': {},
 
   /**@return {boolean} */
-  hasState: function(){},
+  hasState: function () { },
 
   /** @return {string} */
-  getStreetName: function(){},
+  getStreetName: function () { },
 };
 
 /**
@@ -178,13 +180,13 @@ const W = {
      * @param{string} scriptID
      * @return{RegisterSidebarTabResult}
      */
-    'registerSidebarTab': function(scriptID){},
+    'registerSidebarTab': function (scriptID) { },
     /**
      * 
      * @param {HTMLElement} el
      * @return {Promise<void>}
      */
-    'waitForElementConnected': function(el){},
+    'waitForElementConnected': function (el) { },
   },
   'controller': {
     'reload': function () { },
@@ -233,7 +235,7 @@ const W = {
     },
     'topCountry': {
       /** @returns {number} */
-      getID(){},
+      getID() { },
       /**@type{string} @deprecated */
       'abbr': '',
       /**@type{string} @deprecated*/
@@ -243,18 +245,21 @@ const W = {
       /** @type{Object.<string, number>} @deprecated*/
       'defaultLaneWidthPerRoadType': {},
 
-      'attributes':{
+      'attributes': {
         /**@type{string} */
-      'abbr': '',
-      /**@type{string} */
-      'env': '',
-      /**@type{number} */
-      'id': 0,
-      /** @type{Object.<string, number>} */
-      'defaultLaneWidthPerRoadType': {},
+        'abbr': '',
+        /**@type{string} */
+        'env': '',
+        /**@type{number} */
+        'id': 0,
+        /** @type{Object.<string, number>} */
+        'defaultLaneWidthPerRoadType': {},
       }
     },
     'streets': {
+      /**@param {number} id 
+       * @returns{StreetAttributes|null} */
+      getObjectById(id) { },
       /** @type{Object.<number, StreetAttributes>} */
       'objects': {},
       '_events': {
@@ -1022,7 +1027,7 @@ const Waze = {
         /** @return {boolean} */
         isOneWay() { }
 
-         /** @return {string|null} */
+        /** @return {string|null} */
         getState() { }
 
         /** @return {boolean} */

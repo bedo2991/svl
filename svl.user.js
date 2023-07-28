@@ -961,10 +961,11 @@
           altStreetPart += ' …';
           break;
         }
-        const altStreet = W.model.streets.objects[streetID];
-        if (altStreet && altStreet.name !== streetPart) {
+        const altStreet = W.model.streets.getObjectById(streetID);
+        const altStreetName = altStreet?.getName()
+        if (altStreetName && altStreetName !== streetPart) {
           ANsShown += 1;
-          altStreetPart += altStreet.name ? `(${altStreet.name})` : '';
+          altStreetPart += `(${altStreetName})`;
         }
       }
 
@@ -3947,12 +3948,10 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.6: Fix alternative streetnames not showing in β.
       <br>- 5.4.5: Fix streetnames not showing in countries without states.
-      <br>- 5.4.3: Fixed missing streetnames on beta.
-      <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.
-      <br>- 5.4.0: Replaced deprecated tampermonkey includes with match. Support for the new WME script API.
-      <br>- 5.3.2: Bug fixes, rectoring for more performance.
-      <br>- 5.3.0: Improved rendering performance.`,
+      <br>- 5.4.3: Fixed missing streetnames in β.
+      <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.`,
       '',
       GM_info.script.supportURL
     );
