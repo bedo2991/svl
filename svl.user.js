@@ -962,7 +962,7 @@
           break;
         }
         const altStreet = W.model.streets.getObjectById(streetID);
-        const altStreetName = altStreet?.getName()
+        const altStreetName = altStreet?.name ?? altStreet?.getName()
         if (altStreetName && altStreetName !== streetPart) {
           ANsShown += 1;
           altStreetPart += `(${altStreetName})`;
@@ -3948,7 +3948,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.4.6: Fix alternative streetnames not showing in β.
+      <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
       <br>- 5.4.5: Fix streetnames not showing in countries without states.
       <br>- 5.4.3: Fixed missing streetnames in β.
       <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.`,
