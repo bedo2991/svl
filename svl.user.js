@@ -3948,10 +3948,9 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.4.8: Fix for WME Beta
       <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
-      <br>- 5.4.5: Fix streetnames not showing in countries without states.
-      <br>- 5.4.3: Fixed missing streetnames in β.
-      <br>- 5.4.2: Fixed ghosts segments when all segments get redrawn (when layer got toggled or because of zoom). Nodes are now drawn on new segments, too.`,
+      <br>- 5.4.5: Fix streetnames not showing in countries without states.`,
       '',
       GM_info.script.supportURL
     );
@@ -4085,25 +4084,26 @@
     return destination;
   }
 
-  OpenLayers.Util.getElement = function () {
-    const elements = [];
-
-    for (let i = 0, len = arguments.length; i < len; i++) {
-      var element = arguments[i];
-      if (typeof element == 'string') {
-        element = document.getElementById(element);
-      }
-      if (arguments.length === 1) {
-        return element;
-      }
-      elements.push(element);
-    }
-    return elements;
-  };
-
   function initSVL() {
     // Initialize variables
     svlGlobals();
+
+    // Override OpenLayers function
+    OpenLayers.Util.getElement = function () {
+      const elements = [];
+  
+      for (let i = 0, len = arguments.length; i < len; i++) {
+        var element = arguments[i];
+        if (typeof element == 'string') {
+          element = document.getElementById(element);
+        }
+        if (arguments.length === 1) {
+          return element;
+        }
+        elements.push(element);
+      }
+      return elements;
+    };
 
     if (loadPreferences() === false) {
       // First run, or new broswer
@@ -4877,7 +4877,7 @@
   }
 
   function bootstrapSVL() {
-    if (W?.userscripts?.state?.isReady) {
+    if (typeof W !== 'undefined' && W.userscripts?.state?.isReady) {
       initSVL();
     } else {
       document.addEventListener("wme-ready", initSVL, {
