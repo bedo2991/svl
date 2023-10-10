@@ -3948,7 +3948,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.4.8: Fix for WME Beta
+      <br>- 5.4.9: Fix for WME Beta
       <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
       <br>- 5.4.5: Fix streetnames not showing in countries without states.`,
       '',
@@ -4180,63 +4180,43 @@
      * @param {HTMLElement} newNode
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.insert = function (newNode) {
+    OpenLayers.ElementsIndexer.prototype.insert = function(newNode) {
       // If the node is known to the indexer, remove it so we can
       // recalculate where it should go.
       const nodeId = newNode.id;
       // if newNode exists
       if (this.indices[nodeId] != null) {
-        this.remove(newNode);
-        //simplified this.remove(newNode);
-        //Delete from the order array
-        /*           const arrayIndex = this.order.indexOf(newNode);
-                  if(arrayIndex >= 0){
-                      this.order.splice(arrayIndex, 1);
-                      //Delete the key from the index object
-                      delete this.indices[nodeId];
-        
-                      if (this.order.length > 0) {
-                        const lastId = this.order[this.order.length - 1];
-                        this.maxZIndex = this.indices[lastId];
-                    } else {
-                        this.maxZIndex = 0;
-                    }
-                  } */
+          this.remove(newNode);
       }
 
+      this.determineZIndex(newNode);
 
-      /*if(!newNode['_style'].graphicZIndex){
-        console.error("NO ZETA INDEX");
-        console.dir(newNode);
-      }*/
-      //this.determineZIndex(newNode);
-
-      let leftIndex = -1;
-      let rightIndex = this.order.length;
-      let middle;
+      var leftIndex = -1;
+      var rightIndex = this.order.length;
+      var middle;
 
       while (rightIndex - leftIndex > 1) {
-        middle = Math.floor((leftIndex + rightIndex) / 2);
+          middle = parseInt((leftIndex + rightIndex) / 2);
 
-        // Changed here, great performance improvement by not using Utils.getElement
-        const nextNode = document.getElementById(this.order[middle]);
-        const placement = nextNode ? (newNode['_style'].graphicZIndex - nextNode['_style'].graphicZIndex) : 0;
+          // Changed here, great performance improvement by not using Utils.getElement
+          var placement = this.compare(this, newNode,
+              document.getElementById(this.order[middle]));
 
-        if (placement > 0) {
-          leftIndex = middle;
-        } else {
-          rightIndex = middle;
-        }
+          if (placement > 0) {
+              leftIndex = middle;
+          } else {
+              rightIndex = middle;
+          }
       }
 
       this.order.splice(rightIndex, 0, nodeId);
-      this.indices[nodeId] = newNode['_style'].graphicZIndex;
+      this.indices[nodeId] = this.getZIndex(newNode);
 
       // If the new node should be before another in the index
       // order, return the node before which we have to insert the new one;
       // else, return null to indicate that the new node can be appended.
       return this.svlGetNextElement(rightIndex);
-    };
+  };
 
     /**
      *
