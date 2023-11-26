@@ -54,6 +54,9 @@
   /** @type {OpenLayers.Map} */
   let OLMap;
 
+  /** @type{OpenLayers.Projection} */
+  let gmapsProjection;
+
   /** @type{number} */
   const ROAD_LAYER = 0;
   /** @type{number} */
@@ -171,6 +174,7 @@
 
   function svlGlobals() {
     OLMap = W.map.getOLMap();
+    gmapsProjection = new OpenLayers.Projection('EPSG:4326');
     preferences = null;
     OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
   }
@@ -1144,12 +1148,11 @@
     if (model.getState() === 'DELETE')
       return {};
     const attributes = model.getAttributes();
-    const olGeometry = model.getOLGeometry(); 
     consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
-    const points = olGeometry.components;
-    const pointList = olGeometry.getVertices(); // is an array
-    const simplified = new OpenLayers.Geometry.LineString(pointList).simplify(
+    const geoPoints = model.getGeometry().coordinates; // array of coordinates
+    const olPointArray = geoPoints.map(geoPoint => new OpenLayers.Geometry.Point(geoPoint[0], geoPoint[1]).transform(gmapsProjection, OLMap.projection));
+    const simplified = new OpenLayers.Geometry.LineString(olPointArray).simplify(
       1.5
     ).components;
     const segmentFeatures = [];
@@ -1217,7 +1220,7 @@
     if (attributes.primaryStreetID === null) {
       // consoleDebug("RED segment", model);
       lineFeature = new OpenLayers.Feature.Vector(
-        new OpenLayers.Geometry.LineString(pointList),
+        new OpenLayers.Geometry.LineString(olPointArray),
         {
           'sID': attributes.id,
           'color': preferences['red']['strokeColor'],
@@ -1245,7 +1248,7 @@
         // consoleDebug("Bridge");
         isBridge = true;
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': '#000000',
@@ -1291,9 +1294,9 @@
           const left = [];
           const right = [];
           //For each pair of points...
-          for (let k = 0; k < pointList.length - 1; k += 1) {
-            const pk = pointList[k];
-            const pk1 = pointList[k + 1];
+          for (let k = 0; k < olPointArray.length - 1; k += 1) {
+            const pk = olPointArray[k];
+            const pk1 = olPointArray[k + 1];
             const dx = pk.x - pk1.x;
             const dy = pk.y - pk1.y;
             left[0] = pk.clone();
@@ -1403,7 +1406,7 @@
           }
           if (speedValue) {
             lineFeature = new OpenLayers.Feature.Vector(
-              new OpenLayers.Geometry.LineString(pointList),
+              new OpenLayers.Geometry.LineString(olPointArray),
               {
                 'sID': attributes.id,
                 'color': getColorStringFromSpeed(speedValue),
@@ -1420,7 +1423,7 @@
 
       // Draw the road
       lineFeature = new OpenLayers.Feature.Vector(
-        new OpenLayers.Geometry.LineString(pointList),
+        new OpenLayers.Geometry.LineString(olPointArray),
         {
           'sID': attributes.id,
           'color': streetStyles[roadType]['strokeColor'],
@@ -1434,7 +1437,7 @@
       if (attributes.level < 0) {
         // Tunnel
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': '#000000',
@@ -1453,7 +1456,7 @@
         currentLock > WazeWrap?.User?.Rank()
       ) {
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': nonEditableStyle.strokeColor,
@@ -1470,7 +1473,7 @@
 
       if (flags.unpaved) {
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': preferences['dirty']['strokeColor'],
@@ -1488,7 +1491,7 @@
       // CLOSE Zoom properties
       if (attributes.hasClosures) {
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': preferences['closure']['strokeColor'],
@@ -1510,7 +1513,7 @@
         // It is a toll road
         // consoleDebug("Segment is toll");
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': preferences['toll']['strokeColor'],
@@ -1527,7 +1530,7 @@
         // It is a roundabout
         // consoleDebug("Segment is a roundabout");
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': roundaboutStyle.strokeColor,
@@ -1545,7 +1548,7 @@
         // It has restrictions
         // consoleDebug("Segment has restrictions");
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': preferences['restriction']['strokeColor'],
@@ -1562,7 +1565,7 @@
       if (attributes.validated === false) {
         // Segments that needs validation
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': validatedStyle.strokeColor,
@@ -1578,7 +1581,7 @@
       if (flags.headlights) {
         segmentFeatures.push(
           new OpenLayers.Feature.Vector(
-            new OpenLayers.Geometry.LineString(pointList),
+            new OpenLayers.Geometry.LineString(olPointArray),
             {
               'sID': attributes.id,
               'color': preferences['headlights']['strokeColor'],
@@ -1594,7 +1597,7 @@
       if (flags.nearbyHOV) {
         segmentFeatures.push(
           new OpenLayers.Feature.Vector(
-            new OpenLayers.Geometry.LineString(pointList),
+            new OpenLayers.Geometry.LineString(olPointArray),
             {
               'sID': attributes.id,
               'color': preferences['nearbyHOV']['strokeColor'],
@@ -1610,7 +1613,7 @@
 
       if (attributes.fwdLaneCount > 0) {
         // console.log("LANE fwd");
-        const res = pointList.slice(-2);
+        const res = olPointArray.slice(-2);
         // if(pointList.length === 2){
         res[0] = new OpenLayers.Geometry.LineString([
           res[0],
@@ -1634,7 +1637,7 @@
 
       if (attributes.revLaneCount > 0) {
         // console.log("LANE rev");
-        const res = pointList.slice(0, 2);
+        const res = olPointArray.slice(0, 2);
         // if(pointList.length === 2){
         res[1] = new OpenLayers.Geometry.LineString([
           res[0],
@@ -1661,11 +1664,11 @@
         attributes.revDirection === false
       ) {
         // consoleDebug("The segment is oneway or has unknown direction");
-        let simplifiedPoints = points;
+        let simplifiedPoints = olPointArray;
         // N.B. attributes.length is the length in meters, not the items in the array (it's an object)
         if (
           !isInRoundabout &&
-          attributes.length / points.length < preferences['arrowDeclutter']
+          attributes.length / olPointArray.length < preferences['arrowDeclutter']
         ) {
           simplifiedPoints = simplified;
         }
@@ -1737,8 +1740,8 @@
             id: attributes.id,
             rev: false,
             isForward: attributes.fwdDirection,
-            p0: points[0],
-            p1: points[1],
+            p0: olPointArray[0],
+            p1: olPointArray[1],
           })
         );
       }
@@ -1749,8 +1752,8 @@
             id: attributes.id,
             rev: true,
             isForward: attributes.fwdDirection,
-            p0: points[points.length - 1],
-            p1: points[points.length - 2],
+            p0: olPointArray[olPointArray.length - 1],
+            p1: olPointArray[olPointArray.length - 2],
           })
         );
       }
@@ -1758,11 +1761,11 @@
       // Show geometry points
       if (preferences['renderGeomNodes'] === true && !isInRoundabout) {
         // If it's not a roundabout
-        for (let p = 1; p < points.length - 2; p += 1) {
+        for (let p = 1; p < olPointArray.length - 2; p += 1) {
           // let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
           segmentFeatures.push(
             new OpenLayers.Feature.Vector(
-              points[p],
+              olPointArray[p],
               {
                 'sID': attributes.id,
                 'zIndex': baselevel + 200,
@@ -1780,7 +1783,7 @@
       // In any 'Zoom':
       if (flags.tunnel) {
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': tunnelFlagStyle1.strokeColor,
@@ -1792,7 +1795,7 @@
         );
         segmentFeatures.push(lineFeature);
         lineFeature = new OpenLayers.Feature.Vector(
-          new OpenLayers.Geometry.LineString(pointList),
+          new OpenLayers.Geometry.LineString(olPointArray),
           {
             'sID': attributes.id,
             'color': tunnelFlagStyle2.strokeColor,
@@ -1949,10 +1952,8 @@
   function drawNode(model) {
     if (model.getState() === 'DELETE') return {};
     const attributes = model.getAttributes();
-    const point = new OpenLayers.Geometry.Point(
-      attributes.geometry.x,
-      attributes.geometry.y
-    );
+    const geoPoints = model.getGeometry();
+    const point = new OpenLayers.Geometry.Point(geoPoints.coordinates[0], geoPoints.coordinates[1]).transform(gmapsProjection, OLMap.projection);
     const pointFeature = new OpenLayers.Feature.Vector(
       point,
       {
@@ -3949,6 +3950,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)
       <br>- 5.5.0: Fix for new WME
       <br>- 5.4.9: Fix for WME Beta
       <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
@@ -4055,10 +4057,8 @@
     const right = lonlat.add(res / 2, 0);
     //const bottom = lonlat.add(0, -res / 2);
     //const top = lonlat.add(0, res / 2);
-    const dest = new OpenLayers.Projection('EPSG:4326');
-    const source = OLMap.projection;
-    left.transform(source, dest);
-    right.transform(source, dest);
+    left.transform(OLMap.projection, gmapsProjection);
+    right.transform(OLMap.projection, gmapsProjection);
     // bottom.transform(source, dest);
     //top.transform(source, dest);
 

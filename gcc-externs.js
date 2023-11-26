@@ -12,6 +12,22 @@ const Restriction = class {
 
 /**
  * @typedef {{
+ * type: string,
+ * coordinates:Array<Array<number>>
+ * }}
+ */
+let GeoJson;
+
+/**
+ * @typedef {{
+ * type:string,
+ * coordinates:Array<number>
+ * }}
+ */
+let GeoJsonPoint;
+
+/**
+ * @typedef {{
  * id:number,
  * roadType:number,
  * routingRoadType:(number|null),
@@ -82,7 +98,6 @@ let LaneWidthInfos;
 /**
  * @typedef {{
  * id:number,
- * geometry:OpenLayers.Geometry.Point,
  * permissions:number,
  * rank:(number|null) ,
  * segIDs:Array.<number>,
@@ -507,6 +522,14 @@ const OpenLayers = {
         this.CLASS_NAME = "";
       }
 
+    /**
+     *
+     * @param {OpenLayers.Projection} source
+     * @param {OpenLayers.Projection} dest
+     * @return {OpenLayers.Geometry.Point}
+     */
+    transform(source, dest) { }
+
 
       /**
        *
@@ -541,6 +564,14 @@ const OpenLayers = {
      * @return {OpenLayers.Bounds}
      */
     'getBounds': function () { },
+
+     /**
+     *
+     * @param {OpenLayers.Projection} source
+     * @param {OpenLayers.Projection} dest
+     * @return {OpenLayers.LonLat}
+     */
+     transform(source, dest) { }
   },
   /** @typedef Renderer */
   'Renderer': class {
@@ -1021,7 +1052,12 @@ const Waze = {
           this.state;
         }
 
-        /** TODO deprecated, use getGeometry  coordinates of the GeoJSON based geometries will be WGS84 values. This is opposed to the coordinates in the OpenLayers.Geometry instances, which are projected values in Mercator projection.
+        /**
+         * @return {GeoJson}
+         */
+        getGeometry(){ }
+
+        /** @deprecated use getGeometry  coordinates of the GeoJSON based geometries will be WGS84 values. This is opposed to the coordinates in the OpenLayers.Geometry instances, which are projected values in Mercator projection.
          *  @return {OpenLayers.Geometry.LineString} */
         getOLGeometry(){ }
 
@@ -1064,6 +1100,17 @@ const Waze = {
           /** @type {NodeAttributes} */
           this.attributes;
         }
+
+        /**
+         * @return {GeoJsonPoint}
+         */
+        getGeometry(){}
+
+        /**
+         * @deprecated use getGeometry
+         * @return {OpenLayers.Geometry.Point}
+         */
+        getOLGeometry(){}
 
         /** @return {NodeAttributes} */
         getAttributes() { }
