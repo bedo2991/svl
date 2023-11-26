@@ -28,7 +28,6 @@ const Restriction = class {
  * fromNodeID:number,
  * toNodeID:number,
  * primaryStreetID:(number|null),
- * geometry:OpenLayers.Geometry.LineString,
  * fwdMaxSpeed:number,
  * revMaxSpeed:number,
  * fwdMaxSpeedUnverified:boolean,
@@ -1022,6 +1021,10 @@ const Waze = {
           this.state;
         }
 
+        /** TODO deprecated, use getGeometry  coordinates of the GeoJSON based geometries will be WGS84 values. This is opposed to the coordinates in the OpenLayers.Geometry instances, which are projected values in Mercator projection.
+         *  @return {OpenLayers.Geometry.LineString} */
+        getOLGeometry(){ }
+
         /** @return {SegmentAttributes} */
         getAttributes() { }
 
@@ -1088,3 +1091,11 @@ const Waze = {
     },
   },
 };
+
+/**
+ * 
+ * @param {OpenLayers.Bounds} bounds 
+ * @param {boolean} zoomChanged - Tells when zoom has changed, as layers have to do some init work in that case.
+ * @param {boolean} dragging 
+ */
+OpenLayers.Layer.prototype.moveTo = function(bounds, zoomChanged, dragging) {}

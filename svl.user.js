@@ -1144,10 +1144,11 @@
     if (model.getState() === 'DELETE')
       return {};
     const attributes = model.getAttributes();
+    const olGeometry = model.getOLGeometry(); 
     consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
-    const points = attributes.geometry.components;
-    const pointList = attributes.geometry.getVertices(); // is an array
+    const points = olGeometry.components;
+    const pointList = olGeometry.getVertices(); // is an array
     const simplified = new OpenLayers.Geometry.LineString(pointList).simplify(
       1.5
     ).components;
@@ -3948,6 +3949,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.5.0: Fix for new WME
       <br>- 5.4.9: Fix for WME Beta
       <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
       <br>- 5.4.5: Fix streetnames not showing in countries without states.`,
@@ -4196,7 +4198,7 @@
       var middle;
 
       while (rightIndex - leftIndex > 1) {
-          middle = parseInt((leftIndex + rightIndex) / 2);
+          middle = parseInt((leftIndex + rightIndex) / 2, 10);
 
           // Changed here, great performance improvement by not using Utils.getElement
           var placement = this.compare(this, newNode,
@@ -4424,7 +4426,14 @@
       }
     };
 
-    streetVectorLayer.svlAddFeatures = function (/**@type{Array.<OpenLayers.Feature.Vector>}*/features, /** @type{Object|null} */ options) {
+    streetVectorLayer.svlAddFeatures = 
+    /**
+     * 
+     * @param {Array.<OpenLayers.Feature.Vector|null> | null} features 
+     * @param {(Object|null)=} options 
+     * @returns {?}
+     */
+    function (features, options) {
       // For us features is guaranteed to be an array
       //if (!(OpenLayers.Util.isArray(features))) {
       //    features = [features];
