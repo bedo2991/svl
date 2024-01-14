@@ -173,7 +173,7 @@
   }
 
   function svlGlobals() {
-    OLMap = W.map.getOLMap();
+    OLMap = W.map.getWazeMap().getOLMap();
     gmapsProjection = new OpenLayers.Projection('EPSG:4326');
     preferences = null;
     OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
@@ -3950,11 +3950,10 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 5.5.2: Fix for WME Beta. Warning: SVL may stop working for good in the future due to WME changes
       <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)
       <br>- 5.5.0: Fix for new WME
-      <br>- 5.4.9: Fix for WME Beta
-      <br>- 5.4.7: Fix alternative streetnames not showing in β and then not showing in production.
-      <br>- 5.4.5: Fix streetnames not showing in countries without states.`,
+      <br>- 5.4.9: Fix for WME Beta`,
       '',
       GM_info.script.supportURL
     );

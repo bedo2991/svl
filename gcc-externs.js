@@ -208,6 +208,11 @@ const W = {
   },
   'map': {
     /**
+     * @return {WazeMap}
+     */
+    'getWazeMap': function () { },
+    /**
+     * @deprecated
      * @return {OpenLayers.Map}
      */
     'getOLMap': function () { },
@@ -328,6 +333,22 @@ const GM_info = {
     'name': '',
   },
 };
+
+/**
+ * @typedef {Object} WazeMap
+ */
+const WazeMap = {
+  /** @type {string} */
+  'regionCode' : '',
+  /** @type {string} */
+  'deployEnv' : '',
+  /** @type {number} */
+  'minZoomLevel': 0,
+  /** @type {number} */
+  'maxZoomLevel': 0,
+  /** @type {OpenLayers.Map} */
+  'olMap' : {}
+}
 
 /**
  * @typedef {Object} OpenLayers
