@@ -105,6 +105,7 @@
     'pointerEvents': 'none',
   };
 
+  // note: nodes inside JB cannot be styled consistently (WME's function does not always work)
   const nodeStyleDeadEnd = {
     'stroke': false,
     'fillColor': '#C31CFF',
@@ -925,6 +926,16 @@
   }
 
   /**
+   * 
+   * @param {Waze.Feature.Vector.Segment} segment
+   * @returns 
+   */
+  function hasNonEmptyStreet(segment) {
+    const e = segment.getAddress();
+    return null != e.getStreet() && !e.isEmptyStreet()
+  }
+
+  /**
    *
    * @param {Waze.Feature.Vector.Segment} segmentModel
    * @param {Array<OpenLayers.Geometry.Point>} simplified
@@ -945,7 +956,7 @@
     labelFeature = null;
     const attributes = segmentModel.getAttributes();
     const address = segmentModel.getAddress();
-    const hasStreetName = segmentModel.hasNonEmptyStreet();
+    const hasStreetName = hasNonEmptyStreet(segmentModel);
     let streetPart = '';
     if (hasStreetName) {
       streetPart = address.getStreetName();
@@ -3950,7 +3961,7 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.5.2: Fix for WME Beta. Warning: SVL may stop working for good in the future due to WME changes
+      <br>- 5.5.3: Fix for WME Beta. Warning: SVL may stop working for good in the future due to WME changes
       <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)
       <br>- 5.5.0: Fix for new WME
       <br>- 5.4.9: Fix for WME Beta`,

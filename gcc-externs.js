@@ -164,6 +164,15 @@ const AddressObject = {
 
   /** @return {string} */
   getStreetName: function () { },
+
+  /** @return {?StreetAttributes} */
+  getStreet: function () { },
+
+  /**@return {boolean} */
+  isEmptyStreet: function() { },
+
+  /**@return {boolean} */
+  isEmpty: function() { },
 };
 
 /**
@@ -1103,8 +1112,6 @@ const Waze = {
         /** @return {AddressObject} */
         getAddress() { }
 
-        /** @return {boolean} */
-        hasNonEmptyStreet() { }
         /**
          * @return {number}
          */
@@ -1121,6 +1128,11 @@ const Waze = {
           /** @type {NodeAttributes} */
           this.attributes;
         }
+
+        /**
+         * @return {boolean}
+         */
+        isConnectedToBigJunction(){}
 
         /**
          * @return {GeoJsonPoint}
@@ -1167,3 +1179,10 @@ const Waze = {
  * @param {boolean} dragging 
  */
 OpenLayers.Layer.prototype.moveTo = function(bounds, zoomChanged, dragging) {}
+
+Window.prototype.navigator.scheduling = {
+        /**
+     * @type{boolean}
+     */
+    'isInputPending' : function (){}
+}
