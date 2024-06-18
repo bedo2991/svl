@@ -931,7 +931,7 @@
    * @returns 
    */
   function hasNonEmptyStreet(segment) {
-    const e = segment.getAddress();
+    const e = segment.getAddress(W.model);
     return null != e.getStreet() && !e.isEmptyStreet()
   }
 
@@ -955,7 +955,7 @@
     const labels = [];
     labelFeature = null;
     const attributes = segmentModel.getAttributes();
-    const address = segmentModel.getAddress();
+    const address = segmentModel.getAddress(W.model);
     const hasStreetName = hasNonEmptyStreet(segmentModel);
     let streetPart = '';
     if (hasStreetName) {
@@ -3514,6 +3514,10 @@
     return nodeStyle;
   }
 
+  /**
+ *
+ * @param {Array<Waze.Feature.Vector.Node>} nodes
+ */
   function changeNodes(nodes) {
     consoleDebug('Change nodes');
     nodes.forEach((node) => {
@@ -3524,8 +3528,9 @@
       )[0];
       if (nodeFeature) {
         nodeFeature.style = getNodeStyle(attributes);
+        const olGeo = node.getOLGeometry();
         nodeFeature.move(
-          new OpenLayers.LonLat(attributes.geometry.x, attributes.geometry.y)
+          new OpenLayers.LonLat(olGeo.x, olGeo.y)
         );
       } else if (attributes.id > 0) {
         // The node has just been saved
@@ -3574,7 +3579,7 @@
 
     const myFeatures = [];
     for (let i = 0; i < nodes.length; i += 1) {
-      if (nodes[i].attributes.geometry !== undefined) {
+      if (nodes[i].getOLGeometry() !== undefined) {
         //if (nodes[i].attributes.id > 0) {
         myFeatures.push(drawNode(nodes[i]));
         //}
@@ -3961,10 +3966,8 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 5.5.3: Fix for WME Beta. Warning: SVL may stop working for good in the future due to WME changes
-      <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)
-      <br>- 5.5.0: Fix for new WME
-      <br>- 5.4.9: Fix for WME Beta`,
+      <br>- 5.5.3 & 4: Fix for WME Beta. <b>Warning: SVL may stop working for good in the future due to WME internal changes</b>
+      <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)`,
       '',
       GM_info.script.supportURL
     );
@@ -4170,7 +4173,6 @@
       },
     });
 
-
     /**
      *
      * @param {number} index
@@ -4192,7 +4194,7 @@
      * @param {HTMLElement} newNode
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.insert = function(newNode) {
+    OpenLayers.ElementsIndexer.prototype.insert = function (newNode) {
       // If the node is known to the indexer, remove it so we can
       // recalculate where it should go.
       const nodeId = newNode.id;

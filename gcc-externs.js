@@ -127,6 +127,85 @@ let NodeAttributes;
 let StyleMapContent;
 
 /**
+ * @typedef {Object} WazeModel
+ */
+const WazeModel = {
+  'events': {
+    /**
+     *
+     * @param {string} event_name
+     * @param {(*|null)} context
+     * @param {Function} callback
+     */
+    'register': function (event_name, context, callback) { },
+    /**
+     *
+     * @param {string} event_name
+     * @param {(*|null)} context
+     * @param {Function} callback
+     */
+    'unregister': function (event_name, context, callback) { },
+  },
+  'actionManager': {
+    /**
+     * @return {number}
+     */
+    'unsavedActionsNum': function () { },
+  },
+  'topCountry': {
+    /** @returns {number} */
+    getID() { },
+    /**@type{string} @deprecated */
+    'abbr': '',
+    /**@type{string} @deprecated*/
+    'env': '',
+    /**@type{number} @deprecated*/
+    'id': 0,
+    /** @type{Object.<string, number>} @deprecated*/
+    'defaultLaneWidthPerRoadType': {},
+
+    'attributes': {
+      /**@type{string} */
+      'abbr': '',
+      /**@type{string} */
+      'env': '',
+      /**@type{number} */
+      'id': 0,
+      /** @type{Object.<string, number>} */
+      'defaultLaneWidthPerRoadType': {},
+    }
+  },
+  'streets': {
+    /**@param {number} id 
+     * @returns{StreetAttributes|null} */
+    getObjectById(id) { },
+    /** @type{Object.<number, StreetAttributes>} */
+    'objects': {},
+    '_events': {
+      'objectsupdated': [],
+    },
+  },
+  'segments': {
+    'objects': {},
+    '_events': {
+      'objectsadded': [],
+      'objectschanged': [],
+      'objectsremoved': [],
+      'objects-state-deleted': [],
+    },
+  },
+  'nodes': {
+    'objects': {},
+    '_events': {
+      'objectsadded': [],
+      'objectschanged': [],
+      'objectsremoved': [],
+      'objects-state-deleted': [],
+    },
+  },
+};
+
+/**
  * @typedef {Object} StreetAttributes
  */
 const StreetAttributes = {
@@ -169,10 +248,10 @@ const AddressObject = {
   getStreet: function () { },
 
   /**@return {boolean} */
-  isEmptyStreet: function() { },
+  isEmptyStreet: function () { },
 
   /**@return {boolean} */
-  isEmpty: function() { },
+  isEmpty: function () { },
 };
 
 /**
@@ -216,6 +295,11 @@ const W = {
     'reload': function () { },
   },
   'map': {
+
+    /** @type {OpenLayers.Layer.Vector} */
+    'roadLayer': null,
+    /** @type {Array<OpenLayers.Layer.Vector>} */
+    'roadLayers': null,
     /**
      * @return {WazeMap}
      */
@@ -239,81 +323,9 @@ const W = {
  */
     'getLayerByName': function (uniqueName) { },
   },
-  'model': {
-    'events': {
-      /**
-       *
-       * @param {string} event_name
-       * @param {(*|null)} context
-       * @param {Function} callback
-       */
-      'register': function (event_name, context, callback) { },
-      /**
-       *
-       * @param {string} event_name
-       * @param {(*|null)} context
-       * @param {Function} callback
-       */
-      'unregister': function (event_name, context, callback) { },
-    },
-    'actionManager': {
-      /**
-       * @return {number}
-       */
-      'unsavedActionsNum': function () { },
-    },
-    'topCountry': {
-      /** @returns {number} */
-      getID() { },
-      /**@type{string} @deprecated */
-      'abbr': '',
-      /**@type{string} @deprecated*/
-      'env': '',
-      /**@type{number} @deprecated*/
-      'id': 0,
-      /** @type{Object.<string, number>} @deprecated*/
-      'defaultLaneWidthPerRoadType': {},
 
-      'attributes': {
-        /**@type{string} */
-        'abbr': '',
-        /**@type{string} */
-        'env': '',
-        /**@type{number} */
-        'id': 0,
-        /** @type{Object.<string, number>} */
-        'defaultLaneWidthPerRoadType': {},
-      }
-    },
-    'streets': {
-      /**@param {number} id 
-       * @returns{StreetAttributes|null} */
-      getObjectById(id) { },
-      /** @type{Object.<number, StreetAttributes>} */
-      'objects': {},
-      '_events': {
-        'objectsupdated': [],
-      },
-    },
-    'segments': {
-      'objects': {},
-      '_events': {
-        'objectsadded': [],
-        'objectschanged': [],
-        'objectsremoved': [],
-        'objects-state-deleted': [],
-      },
-    },
-    'nodes': {
-      'objects': {},
-      '_events': {
-        'objectsadded': [],
-        'objectschanged': [],
-        'objectsremoved': [],
-        'objects-state-deleted': [],
-      },
-    },
-  },
+  /**@type{WazeModel} */
+  'model': null,
   'prefs': {
     '_events': {},
     'attributes': {
@@ -348,15 +360,15 @@ const GM_info = {
  */
 const WazeMap = {
   /** @type {string} */
-  'regionCode' : '',
+  'regionCode': '',
   /** @type {string} */
-  'deployEnv' : '',
+  'deployEnv': '',
   /** @type {number} */
   'minZoomLevel': 0,
   /** @type {number} */
   'maxZoomLevel': 0,
   /** @type {OpenLayers.Map} */
-  'olMap' : {}
+  'olMap': {}
 }
 
 /**
@@ -552,13 +564,13 @@ const OpenLayers = {
         this.CLASS_NAME = "";
       }
 
-    /**
-     *
-     * @param {OpenLayers.Projection} source
-     * @param {OpenLayers.Projection} dest
-     * @return {OpenLayers.Geometry.Point}
-     */
-    transform(source, dest) { }
+      /**
+       *
+       * @param {OpenLayers.Projection} source
+       * @param {OpenLayers.Projection} dest
+       * @return {OpenLayers.Geometry.Point}
+       */
+      transform(source, dest) { }
 
 
       /**
@@ -595,13 +607,13 @@ const OpenLayers = {
      */
     'getBounds': function () { },
 
-     /**
-     *
-     * @param {OpenLayers.Projection} source
-     * @param {OpenLayers.Projection} dest
-     * @return {OpenLayers.LonLat}
-     */
-     transform(source, dest) { }
+    /**
+    *
+    * @param {OpenLayers.Projection} source
+    * @param {OpenLayers.Projection} dest
+    * @return {OpenLayers.LonLat}
+    */
+    transform(source, dest) { }
   },
   /** @typedef Renderer */
   'Renderer': class {
@@ -1085,11 +1097,11 @@ const Waze = {
         /**
          * @return {GeoJson}
          */
-        getGeometry(){ }
+        getGeometry() { }
 
         /** @deprecated use getGeometry  coordinates of the GeoJSON based geometries will be WGS84 values. This is opposed to the coordinates in the OpenLayers.Geometry instances, which are projected values in Mercator projection.
          *  @return {OpenLayers.Geometry.LineString} */
-        getOLGeometry(){ }
+        getOLGeometry() { }
 
         /** @return {SegmentAttributes} */
         getAttributes() { }
@@ -1109,8 +1121,11 @@ const Waze = {
         /** @return {FlagAttributes} */
         getFlagAttributes() { }
 
-        /** @return {AddressObject} */
-        getAddress() { }
+        /**
+         * @param {WazeModel} model
+         *  @return {AddressObject} 
+         * */
+        getAddress(model) { }
 
         /**
          * @return {number}
@@ -1132,18 +1147,18 @@ const Waze = {
         /**
          * @return {boolean}
          */
-        isConnectedToBigJunction(){}
+        isConnectedToBigJunction() { }
 
         /**
          * @return {GeoJsonPoint}
          */
-        getGeometry(){}
+        getGeometry() { }
 
         /**
          * @deprecated use getGeometry
          * @return {OpenLayers.Geometry.Point}
          */
-        getOLGeometry(){}
+        getOLGeometry() { }
 
         /** @return {NodeAttributes} */
         getAttributes() { }
@@ -1178,11 +1193,11 @@ const Waze = {
  * @param {boolean} zoomChanged - Tells when zoom has changed, as layers have to do some init work in that case.
  * @param {boolean} dragging 
  */
-OpenLayers.Layer.prototype.moveTo = function(bounds, zoomChanged, dragging) {}
+OpenLayers.Layer.prototype.moveTo = function (bounds, zoomChanged, dragging) { }
 
 Window.prototype.navigator.scheduling = {
-        /**
-     * @type{boolean}
-     */
-    'isInputPending' : function (){}
+  /**
+* @type{boolean}
+*/
+  'isInputPending': function () { }
 }
