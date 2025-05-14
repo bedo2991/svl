@@ -1,10 +1,35 @@
-(function svl() {
+import { DataModelName, KeyboardShortcut, SegmentPermission, WmeSDK } from "wme-sdk-typings";
+
+// the sdk initScript function will be called after the SDK is initialized
+unsafeWindow.SDK_INITIALIZED.then(initScript);
+
+interface PreferenceObject {
+  [key: string]: any
+}
+interface MeterObject {
+  [key: string]: number
+}
+function initScript() {
+  // initialize the sdk, these should remain here at the top of the script
+  if (!unsafeWindow.getWmeSdk) {
+    // This block is required for type checking, but it is guaranteed that the function exists.
+    throw new Error("SDK not available");
+  }
+  const wmeSDK: WmeSDK = unsafeWindow.getWmeSdk(
+    {
+      scriptId: "svl-sdk",
+      scriptName: "Street Vector Layer"
+    }
+  )
+
+  console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
+
   /** @type {string} */
-  const SVL_VERSION = GM_info.script.version;
+  const SVL_VERSION: string = GM_info.script.version;
   /** @type {boolean} */
-  const DEBUG = window.localStorage.getItem('svlDebugOn') === 'true';
+  const DEBUG: boolean = unsafeWindow.localStorage.getItem('svlDebugOn') === 'true';
   /** @type {Function} */
-  const consoleDebug = DEBUG
+  const consoleDebug: Function = DEBUG
     ? (...args) => {
       for (let i = 0; i < args.length; i += 1) {
         if (typeof args[i] === 'string') {
@@ -17,62 +42,78 @@
     : () => { };
 
   /** @type {Function} */
-  const consoleGroup = DEBUG ? console.group : () => { };
+  const consoleGroup: Function = DEBUG ? console.group : () => { };
   /** @type {Function} */
-  const consoleGroupEnd = DEBUG ? console.groupEnd : () => { };
+  const consoleGroupEnd: Function = DEBUG ? console.groupEnd : () => { };
+
+  const assertFeatureDoesNotExist: Function = DEBUG
+    ? (id: number, layer: OpenLayers.Layer.Vector) => {
+      if (layer.getFeaturesByAttribute("sID", id).length > 0) {
+        console.error(`[SVL] Performance. Feature with id ${id} already exists in layer ${layer.name}`);
+        console.dir(wmeSDK.Events);
+        console.trace();
+        throw new Error(`Feature with id ${id} already exists in layer ${layer.name}`);
+        //alert(`ERROR! Feature with id ${id} already exists in layer ${layer.name}`);
+      }
+    }
+    : () => { };
 
   /** @type{number} */
-  const MAX_SEGMENTS = 3000;
+  const MAX_SEGMENTS: number = 3000;
   /** @type{number} */
-  const MAX_NODES = 4000;
+  const MAX_NODES: number = 4000;
 
   /** @type{boolean} */
-  let onlineTranslations = false;
+  let onlineTranslations: boolean = false;
 
-  let autoLoadInterval = null;
+  let autoLoadInterval: (number | null) = null;
 
-  let clutterConstant;
+  let clutterConstant: number;
+
+  const segmentEventsRemoveCallbacks: Array<Function> = [];
+  const nodeEventsRemoveCallbacks: Array<Function> = [];
+  let manageWMEStreetLayerCallback: Function | null = null;
 
   /** @type{number|null} */
-  let countryID = null;
+  let countryID: number | null = null;
 
-  let streetStyles = [];
+  let streetStyles: Array<{ strokeColor: string; strokeWidth: number; strokeDashstyle: string; outlineColor: string }> = [];
   /** @type {OpenLayers.Layer.Vector} */
-  let streetVectorLayer;
+  let streetVectorLayer: OpenLayers.Layer.Vector;
   /** @type {OpenLayers.Layer.Vector} */
-  let nodesVector;
+  let nodesVector: OpenLayers.Layer.Vector;
   /** @type {OpenLayers.Layer.Vector} */
-  let labelsVector;
+  let labelsVector: OpenLayers.Layer.Vector;
   /** @type {boolean} */
-  let drawingAborted = false;
+  let drawingAborted: boolean = false;
 
-  let preferences;
+  let preferences: PreferenceObject;
   /** @type {OpenLayers.Layer.Vector} */
-  let WMERoadLayer;
+  let WMERoadLayer: (OpenLayers.Layer.Vector | null);
   /** @type {boolean} */
-  let SVLAutomDisabled;
+  let SVLAutomDisabled: boolean;
   /** @type {OpenLayers.Map} */
-  let OLMap;
+  let OLMap: OpenLayers.Map;
 
   /** @type{OpenLayers.Projection} */
-  let gmapsProjection;
+  let gmapsProjection: OpenLayers.Projection;
 
   /** @type{number} */
-  const ROAD_LAYER = 0;
+  const ROAD_LAYER: number = 0;
   /** @type{number} */
-  const SVL_LAYER = 1;
+  const SVL_LAYER: number = 1;
   /** @type{Object} */
-  const layerCheckboxes = {
+  const layerCheckboxes: { [key: string]: (HTMLInputElement | null) } = {
     'ROAD_LAYER': null,
     'SVL_LAYER': null,
   };
 
   /** @type{number} */
-  const clutterMax = 20;
+  const clutterMax: number = 20;
   /** @type{number} */
-  const fontSizeMax = 32;
+  const fontSizeMax: number = 32;
   /** @type{Array<string>} */
-  const superScript = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+  const superScript: Array<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
   const svlIgnoredStreets = {
     '8': true,
     '10': true,
@@ -159,16 +200,16 @@
     }
   };
 
-  function isFarZoom(zoom = OLMap.zoom) {
+  function isFarZoom(zoom = wmeSDK.Map.getZoomLevel()) {
     //console.log("isFarZoom " + zoom);
     return zoom < preferences['switchZoom'];
   }
 
   function mergeEndCallback() {
-    const tc = W.model.topCountry;
-    if (tc && tc.getID() !== countryID) {
-      countryID = tc.getID();
-      console.log('SVL: Init new country ' + countryID);
+    const tc = wmeSDK.DataModel.Countries.getTopCountry();
+    if (tc && tc.id !== countryID) {
+      countryID = tc.id;
+      consoleDebug('Init new country ' + countryID);
       initCountry();
     }
   }
@@ -181,23 +222,16 @@
   }
 
   function refreshWME() {
-    if (
-      W.model.actionManager.unsavedActionsNum() === 0 &&
-      !WazeWrap.hasSelectedFeatures() &&
-      document.querySelectorAll('.place-update-edit.show').length === 0
+    if (wmeSDK.Editing.getUnsavedChangesCount() === 0 &&
+      wmeSDK.Editing.getSelection() === null && !wmeSDK.Editing.isDrawingInProgress() &&
+      document.querySelector('#panel-container')?.hasChildNodes() === false
     ) {
-      W.controller.reload();
+      wmeSDK.DataModel.refreshData();
     }
   }
 
-  /**
-   *
-   * @param {number} layer
-   * @param {boolean} visibility
-   * @param {?number} trial
-   * @returns
-   */
-  function setLayerVisibility(layer, visibility, trial = 0) {
+  function setLayerVisibility(layer: number, visibility: boolean, trial: number = 0) {
+    //TODO: consider using wmeSDK.Map.setLayerVisibility({ layerName: "roads", visibility: false })
     // Toggle layers
     if (layer === SVL_LAYER) {
       consoleDebug(`Changing SVL Layer visibility to ${visibility}`);
@@ -211,13 +245,13 @@
     // Toggle checkboxes
     if (!layerCheckboxes[layer]) {
       consoleDebug(`Initialising checkbox for layer ${layer}`);
-      layerCheckboxes[layer] = document.getElementById(
+      layerCheckboxes[layer] = <HTMLInputElement>document.getElementById(
         layer === SVL_LAYER
           ? 'layer-switcher-item_street_vector_layer'
           : 'layer-switcher-item_road'
       );
       if (!layerCheckboxes[layer]) {
-        console.warn(`SVL: cannot find checkbox for layer number ${layer}, attempt ${trial + 1}/10`);
+        console.warn(`SVL: cannot find checkbox for layer "${layer}", attempt ${trial + 1}/10`);
         if (trial < 10) {
           setTimeout(() => {
             setLayerVisibility(layer, visibility, trial + 1);
@@ -237,16 +271,16 @@
   function hasToBeSkipped(roadid) {
     return (
       preferences['hideMinorRoads'] &&
-      OLMap.zoom === 3 &&
+      wmeSDK.Map.getZoomLevel() === 3 &&
       svlIgnoredStreets[roadid] === true
     );
   }
 
-  function savePreferences(pref, silent = true) {
+  function savePreferences(pref: PreferenceObject, silent = true) {
     consoleDebug('savePreferences');
     pref.version = SVL_VERSION;
     try {
-      window.localStorage.setItem('svl', JSON.stringify(pref));
+      unsafeWindow.localStorage.setItem('svl', JSON.stringify(pref));
       if (!silent) {
         safeAlert('success', _('preferences_saved'));
       }
@@ -262,7 +296,7 @@
   }
 
   //TODO: remove when width goes to production
-  const defaultSegmentWidthMeters = {
+  const defaultSegmentWidthMeters: MeterObject = {
     '1': 6.2, // "Street",
     '2': 7, // "Primary Street",
     '3': 9, // "Freeway",
@@ -280,7 +314,7 @@
     '20': 6, // "Parking Lot Road",
     '22': 5, // "Alley"
   };
-  const defaultLaneWidthMeters = {
+  const defaultLaneWidthMeters: MeterObject = {
     '1': 3.1, // "Street",
     '2': 3.5, // "Primary Street",
     '3': 4.5, // "Freeway",
@@ -489,7 +523,7 @@
    * @param {boolean} twoWay
    * @returns {number}
    */
-  function getWidth(roadType, twoWay) {
+  function getWidth(roadType: number, twoWay: boolean): number {
     // If in close zoom and user enabled the realsize mode
     if (preferences['realsize']) {
       return twoWay
@@ -505,9 +539,9 @@
     let loadedPreferences = null;
 
     if (overwrite === true) {
-      window.localStorage.removeItem('svl');
+      unsafeWindow.localStorage.removeItem('svl');
     } else {
-      const pref = window.localStorage.getItem('svl');
+      const pref = unsafeWindow.localStorage.getItem('svl');
       if (pref) {
         loadedPreferences = JSON.parse(pref);
       }
@@ -524,6 +558,7 @@
     }
     // else: preference read from localstorage
 
+
     preferences = {};
     preferences['autoReload'] = {};
     // jshint ignore: start
@@ -537,7 +572,7 @@
     preferences['SLColor'] = loadedPreferences?.['SLColor'] ?? '#ffdf00';
 
     preferences['fakelock'] =
-      loadedPreferences?.['fakelock'] ?? WazeWrap?.User?.Rank() ?? 6; // jshint ignore:line
+      loadedPreferences?.['fakelock'] ?? wmeSDK.State.getUserInfo()?.rank ?? 6; // jshint ignore:line
     preferences['hideMinorRoads'] =
       loadedPreferences?.['hideMinorRoads'] ?? true;
     preferences['showDashedUnverifiedSL'] =
@@ -870,7 +905,7 @@
     return oldUser;
   }
 
-  function bestBackground(color) {
+  function bestBackground(color: string) {
     const oppositeColor =
       parseInt(color.substring(1, 3), 16) * 0.299 +
       parseInt(color.substring(3, 5), 16) * 0.587 +
@@ -881,7 +916,7 @@
     return '#000';
   }
 
-  function getColorStringFromSpeed(metricspeed) {
+  function getColorStringFromSpeed(metricspeed: number) {
     if (preferences['showSLSinglecolor']) {
       return preferences['SLColor'];
     }
@@ -894,7 +929,7 @@
     );
   }
 
-  function getAngle(isForward, p0, p1) {
+  function getAngle(isForward: boolean, p0: OpenLayers.Geometry.Point, p1: OpenLayers.Geometry.Point) {
     let dx = 0;
     let dy = 0;
 
@@ -909,13 +944,13 @@
     return (angle * 180) / Math.PI; // 360-(...) -90 removed from here
   }
 
-  function getSuperScript(number) {
+  function getSuperScript(number: number): string {
     let res = '';
     if (number) {
-      let numberString = number;
+      let numberString: string = number.toString();
       if (W.prefs.attributes['isImperial'] === true) {
         // Convert the speed limit to mph
-        numberString = Math.round(number / 1.609344);
+        numberString = Math.round(number / 1.609344).toString();
       }
       numberString = numberString.toString();
       for (let i = 0; i < numberString.length; i += 1) {
@@ -930,7 +965,7 @@
    * @param {Waze.Feature.Vector.Segment} segment
    * @returns 
    */
-  function hasNonEmptyStreet(segment) {
+  function hasNonEmptyStreet(segment: Waze.Feature.Vector.Segment) {
     const e = segment.getAddress(W.model);
     return null != e.getStreet() && !e.isEmptyStreet()
   }
@@ -940,17 +975,17 @@
    * @param {Waze.Feature.Vector.Segment} segmentModel
    * @param {Array<OpenLayers.Geometry.Point>} simplified
    */
-  function drawLabels(segmentModel, simplified) {
+  function drawLabels(segmentModel: Waze.Feature.Vector.Segment, simplified: Array<OpenLayers.Geometry.Point>) {
     // consoleDebug('drawLabels');
     let labelFeature;
-    let labelText;
+    let labelText: string;
 
     // let centroid;
     /** @type {string} */
-    let directionArrow;
+    let directionArrow: string;
     // let streetNameThresholdDistance;
-    let p0;
-    let p1;
+    let p0: OpenLayers.Geometry.Point;
+    let p1: OpenLayers.Geometry.Point;
     // let doubleLabelDistance;
     const labels = [];
     labelFeature = null;
@@ -1039,10 +1074,10 @@
       'outlinewidth': preferences['labelOutlineWidth'],
     });
 
-    const distances = [];
+    const distances: { index: number, distance: number }[] = [];
     // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
     for (let p = 0; p < simplified.length - 1; p += 1) {
-      const distance = simplified[p].distanceTo(simplified[p + 1]);
+      const distance = <number>simplified[p].distanceTo(simplified[p + 1]);
       distances.push({ index: p, distance });
     }
     // sort them by distance, descending
@@ -1122,13 +1157,15 @@
     }
     // console.dir(distances);
     /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
-
+ 
     } */
 
     return labels;
   }
 
-  function createAverageSpeedCamera({ id, rev, isForward, p0, p1 }) {
+  function createAverageSpeedCamera({ id, rev, isForward, p0, p1 }: {
+    id: number, rev: boolean, isForward: boolean, p0: OpenLayers.Geometry.Point, p1: OpenLayers.Geometry.Point
+  }) {
     const degrees = getAngle(isForward, rev ? p1 : p0, rev ? p0 : p1);
     return new OpenLayers.Feature.Vector(
       new OpenLayers.Geometry.Point(
@@ -1154,11 +1191,12 @@
   /**
    * @param {Waze.Feature.Vector.Segment} model
    */
-  function drawSegment(model) {
+  function drawSegment(model: Waze.Feature.Vector.Segment) {
     // consoleDebug("DrawSegment");
-    if (model.getState() === 'DELETE')
+    if (!model || model.getState() === 'DELETE')
       return {};
     const attributes = model.getAttributes();
+    assertFeatureDoesNotExist(attributes.id, streetVectorLayer);
     consoleDebug(`Drawing segment: ${attributes.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
     const geoPoints = model.getGeometry().coordinates; // array of coordinates
@@ -1166,7 +1204,7 @@
     const simplified = new OpenLayers.Geometry.LineString(olPointArray).simplify(
       1.5
     ).components;
-    const segmentFeatures = [];
+    const segmentFeatures: OpenLayers.Feature.Vector[] = [];
     const baselevel = attributes.level * 100;
     const isTwoWay = attributes.fwdDirection && attributes.revDirection;
     const isInRoundabout = model.isInRoundabout();
@@ -1176,10 +1214,10 @@
     let roadType = attributes.roadType;
 
     //Compute the segment width
-    let segmentWidth = null;
+    let segmentWidth: number = 0;
     if (preferences['realsize']) {
-      let segmentWidthFrom = null;
-      let segmentWidthTo = null;
+      let segmentWidthFrom = 0;
+      let segmentWidthTo = 0;
       if (attributes.fromLanesInfo) {
         if (attributes.fromLanesInfo.laneWidth) {
           segmentWidthFrom =
@@ -1227,7 +1265,7 @@
 
     const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
     let roadWidth = totalSegmentWidth;
-    let lineFeature = null;
+    let lineFeature: (OpenLayers.Feature.Vector | null) = null;
     if (attributes.primaryStreetID === null) {
       // consoleDebug("RED segment", model);
       lineFeature = new OpenLayers.Feature.Vector(
@@ -1302,8 +1340,8 @@
             ? totalSegmentWidth * 0.14
             : totalSegmentWidth * 0.22;
           //let { leftGeometry, rightGeometry } = shiftLR(pointList, offset);
-          const left = [];
-          const right = [];
+          const left: OpenLayers.Geometry.Point[] = [];
+          const right: OpenLayers.Geometry.Point[] = [];
           //For each pair of points...
           for (let k = 0; k < olPointArray.length - 1; k += 1) {
             const pk = olPointArray[k];
@@ -1824,145 +1862,14 @@
     return { segmentFeatures, labels };
   }
 
-  // /**
-  //  *
-  //  * @param {Array} pointList
-  //  * @param {number} offset
-  //  * @return {{leftGeometry, rightGeometry}}: 0 left, 1 right
-  //  */
-  // function shiftLR(pointList, offset) {
-  //   const leftGeometry = [];
-  //   const rightGeometry = [];
-  //   const left = [];
-  //   const right = [];
-  //   let previousLeftX = 0;
-  //   let previousLeftY = 0;
-  //   let previousRightX = 0;
-  //   let previousRightY = 0;
-  //   let moveLeftX = 0;
-  //   let moveLeftY = 0;
-  //   let moveRightX = 0;
-  //   let moveRightY = 0;
-  //   for (let k = 0; k < pointList.length - 1; k += 1) {
-  //     const pk = pointList[k];
-  //     const pk1 = pointList[k + 1];
-  //     const dx = pk.x - pk1.x;
-  //     const dy = pk.y - pk1.y;
-  //     left[0] = pk.clone();
-  //     right[0] = pk.clone();
-  //     left[1] = pk1.clone();
-  //     right[1] = pk1.clone();
-
-  //     console.log(offset);
-  //     // offset = (totalSegmentWidth / 5.0) * (30.0 / (OLMap.zoom * OLMap.zoom)); //((Wmap.zoom+1)/11)+0.6*(1/(11-Wmap.zoom));// (10-Wmap.zoom/3)/(10-Wmap.zoom);
-  //     // of2 = 11 * Math.pow(2.0, 5 - W.map.zoom);
-  //     // console.error(of2);
-  //     // console.log(offset);
-  //     if (Math.abs(dx) < 0.5) {
-  //       // segment is vertical
-  //       if (dy > 0) {
-  //         // console.error("A");
-  //         moveLeftX = -offset;
-  //         moveLeftY = 0;
-  //         moveRightX = offset;
-  //         moveRightY = 0;
-  //         // left[0].move(-offset, 0);
-  //         // left[1].move(-offset, 0);
-  //         // right[0].move(offset, 0);
-  //         // right[1].move(offset, 0);
-  //       } else {
-  //         // console.error("B");
-  //         moveLeftX = offset;
-  //         moveLeftY = 0;
-  //         moveRightX = -offset;
-  //         moveRightY = 0;
-  //         // left[0].move(offset, 0);
-  //         // left[1].move(offset, 0);
-  //         // right[0].move(-offset, 0);
-  //         // right[1].move(-offset, 0);
-  //       }
-  //     } else {
-  //       const m = dy / dx;
-  //       const mb = -1.0 / m;
-  //       // consoleDebug("m: ", m);
-  //       if (Math.abs(m) < 0.05) {
-  //         // Segment is horizontal
-  //         if (dx > 0) {
-  //           // console.error("C");
-  //           moveLeftX = 0;
-  //           moveLeftY = offset;
-  //           moveRightX = 0;
-  //           moveRightY = -offset;
-  //           // left[0].move(0, offset);
-  //           // left[1].move(0, offset);
-  //           // right[0].move(0, -offset);
-  //           // right[1].move(0, -offset);
-  //         } else {
-  //           // console.error("D");
-  //           moveLeftX = 0;
-  //           moveLeftY = -offset;
-  //           moveRightX = 0;
-  //           moveRightY = offset;
-  //           // left[0].move(0, -offset);
-  //           // left[1].move(0, -offset);
-  //           // right[0].move(0, offset);
-  //           // right[1].move(0, offset);
-  //         }
-  //       } else {
-  //         let appliedOffset = offset;
-  //         if ((dy > 0 && dx > 0) || (dx < 0 && dy > 0)) {
-  //           // 1st and 4th q.
-  //           appliedOffset = -offset;
-  //         }
-  //         // console.log(offset);
-  //         const temp = Math.sqrt(1 + mb * mb);
-  //         // console.error("E");
-  //         // console.dir(left[0]);
-  //         moveLeftX = appliedOffset / temp;
-  //         moveLeftY = appliedOffset * (mb / temp);
-  //         moveRightX = -appliedOffset / temp;
-  //         moveRightY = -appliedOffset * (mb / temp);
-  //         // left[0].move(appliedOffset / temp, appliedOffset * (mb / temp));
-  //         // // console.dir(left[0]);
-  //         // left[1].move(appliedOffset / temp, appliedOffset * (mb / temp));
-  //         // right[0].move(-appliedOffset / temp, -appliedOffset * (mb / temp));
-  //         // right[1].move(-appliedOffset / temp, -appliedOffset * (mb / temp));
-  //       }
-  //     }
-
-  //     if (leftGeometry.length === 0) {
-  //       left[0].move(moveLeftX, moveLeftY);
-  //       leftGeometry.push(left[0]);
-  //       right[0].move(moveRightX, moveRightY);
-  //       rightGeometry.push(right[0]);
-  //     } else {
-  //       left[0].move(moveLeftX + previousLeftX, moveLeftY + previousLeftY);
-  //       leftGeometry.push(left[0]);
-  //       right[0].move(moveRightX + previousRightX, moveRightY + previousRightY);
-  //       rightGeometry.push(right[0]);
-  //     }
-
-  //     previousLeftX = moveLeftX;
-  //     previousLeftY = moveLeftY;
-
-  //     previousRightX = moveRightX;
-  //     previousRightY = moveRightY;
-  //   }
-  //   left[1].move(moveLeftX, moveLeftY);
-  //   right[1].move(moveRightX, moveRightY);
-  //   leftGeometry.push(left[1]);
-  //   rightGeometry.push(right[1]);
-  //   console.dir(leftGeometry);
-  //   return { leftGeometry, rightGeometry };
-  // }
-
   /**
    *
    * @param {Waze.Feature.Vector.Node} model
    */
-  function drawNode(model) {
-    if (model.getState() === 'DELETE') return {};
+  function drawNode(model: Waze.Feature.Vector.Node): OpenLayers.Feature.Vector | null {
+    if (model.getState() === 'DELETE') return null;
     const attributes = model.getAttributes();
+    assertFeatureDoesNotExist(attributes.id, nodesVector);
     const geoPoints = model.getGeometry();
     const point = new OpenLayers.Geometry.Point(geoPoints.coordinates[0], geoPoints.coordinates[1]).transform(gmapsProjection, OLMap.projection);
     const pointFeature = new OpenLayers.Feature.Vector(
@@ -2045,8 +1952,8 @@
    *
    * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
    */
-  function createInput({ id, type, className, title, min, max, step }) {
-    const input = document.createElement('input');
+  function createInput({ id, type, className, title, min, max, step }: { id: string; type: string; className: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; }) {
+    const input = <HTMLInputElement>document.createElement('input');
     input.id = 'svl_' + id;
     if (className) {
       input.className = className;
@@ -2056,9 +1963,9 @@
     }
     input.type = type;
     if (type === 'range' || type === 'number') {
-      input.min = min;
-      input.max = max;
-      input.step = step;
+      input.min = min?.toString() || "";
+      input.max = max?.toString() || "";
+      input.step = step?.toString() || "";
     }
     return input;
   }
@@ -2075,8 +1982,7 @@
         return;
       }
       // Show the routing panel
-      let routingModeDiv;
-      routingModeDiv = document.createElement('div');
+      let routingModeDiv = <HTMLDivElement>document.createElement('div');
       routingModeDiv.id = ID;
       routingModeDiv.className = 'routingDiv';
       routingModeDiv.innerHTML = `${_(
@@ -2112,17 +2018,30 @@
     }
   }
 
+  function handleWMESettingsUpdated(shouldRefresh = true) {
+    let refreshRequested = false;
+    const settings = wmeSDK.Settings.getUserSettings();
+    if (settings.isImperial !== preferences['isImperial']) {
+      preferences['isImperial'] = settings.isImperial;
+      refreshRequested = true;
+    }
+    // Maybe in the future there will be more settings to check
+    if (refreshRequested && shouldRefresh) {
+      redrawAllSegments();
+    }
+  }
+
   function updateValuesFromPreferences() {
-    document.getElementById('svl_saveNewPref').classList.remove('disabled');
-    document.getElementById('svl_saveNewPref').disabled = false;
-    document.getElementById('svl_saveNewPref').classList.add('btn-primary');
-    document.getElementById('svl_rollbackButton').classList.remove('disabled');
-    document.getElementById('svl_rollbackButton').disabled = false;
-    document.getElementById('svl_buttons').classList.add('svl_unsaved');
+    (<HTMLButtonElement>document.getElementById('svl_saveNewPref')).classList.remove('disabled');
+    (<HTMLButtonElement>document.getElementById('svl_saveNewPref')).disabled = false;
+    (<HTMLButtonElement>document.getElementById('svl_saveNewPref')).classList.add('btn-primary');
+    (<HTMLButtonElement>document.getElementById('svl_rollbackButton')).classList.remove('disabled');
+    (<HTMLButtonElement>document.getElementById('svl_rollbackButton')).disabled = false;
+    (<HTMLButtonElement>document.getElementById('svl_buttons')).classList.add('svl_unsaved');
     // $("#svl_saveNewPref").removeClass("btn-primary").addClass("btn-warning");
 
-    const presetSelect = document.getElementById('svl_presets');
-    const presetValue = document.getElementById('svl_presets').value;
+    const presetSelect = <HTMLSelectElement>document.getElementById('svl_presets');
+    const presetValue = presetSelect.value;
     let presetApplied = false;
     if (presetValue === 'wme_colors') {
       presetApplied = true;
@@ -2140,34 +2059,34 @@
       for (let i = 0; i < preferences['streets'].length; i += 1) {
         if (preferences['streets'][i]) {
           preferences['streets'][i] = {};
-          preferences['streets'][i]['strokeColor'] = document.getElementById(
+          preferences['streets'][i]['strokeColor'] = (<HTMLInputElement>document.getElementById(
             `svl_streetColor_${i}`
-          ).value;
-          preferences['streets'][i]['strokeWidth'] = document.getElementById(
+          )).value;
+          preferences['streets'][i]['strokeWidth'] = (<HTMLInputElement>document.getElementById(
             `svl_streetWidth_${i}`
-          ).value;
-          preferences['streets'][i]['strokeDashstyle'] = document.querySelector(
+          )).value;
+          preferences['streets'][i]['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
             `#svl_strokeDashstyle_${i} option:checked`
-          ).value;
+          )).value;
         }
       }
     }
 
-    preferences['fakelock'] = document.getElementById('svl_fakelock').value;
+    preferences['fakelock'] = (<HTMLInputElement>document.getElementById('svl_fakelock')).value;
 
-    const type = W.prefs.attributes['isImperial'] ? 'imperial' : 'metric';
+    const type = wmeSDK.Settings.getUserSettings().isImperial === true ? 'imperial' : 'metric';
     const speeds = Object.keys(preferences['speeds'][type]);
     preferences['speeds'][type] = {};
     for (let i = 1; i < speeds.length + 1; i += 1) {
-      const { value } = document.getElementById(`svl_slValue_${type}_${i}`);
-      preferences['speeds'][type][value] = document.getElementById(
+      const { value } = <HTMLInputElement>document.getElementById(`svl_slValue_${type}_${i}`);
+      preferences['speeds'][type][value] = <HTMLInputElement>(document.getElementById(
         `svl_slColor_${type}_${i}`
-      ).value;
+      )).value;
     }
 
-    preferences['speeds']['default'] = document.getElementById(
+    preferences['speeds']['default'] = <HTMLInputElement>(document.getElementById(
       `svl_slColor_${type}_Default`
-    ).value;
+    )).value;
 
     // Red
     preferences['red'] = {};
@@ -2386,23 +2305,23 @@
     );
   }
 
-  function createDropdownOption({ id, title, description, options, isNew }) {
-    const line = document.createElement('div');
+  function createDropdownOption({ id, title, description, options, isNew }: { id: string, title: string, description: string, options: { text: string; value: string }[], isNew?: string }) {
+    const line = <HTMLDivElement>document.createElement('div');
     line.className = 'prefLineSelect';
     if (typeof isNew === 'string') {
       line.classList.add('newOption');
       line.dataset.version = isNew;
     }
 
-    const newSelect = document.createElement('select');
+    const newSelect = <HTMLSelectElement>document.createElement('select');
     newSelect.className = 'prefElement';
 
-    const label = document.createElement('label');
+    const label = <HTMLLabelElement>document.createElement('label');
     label.innerText = title;
     newSelect.id = `svl_${id}`;
     if (options && options.length > 0) {
       options.forEach((o) => {
-        const option = document.createElement('option');
+        const option = <HTMLOptionElement>document.createElement('option');
         option.text = o.text;
         option.value = o.value;
         newSelect.add(option);
@@ -2416,8 +2335,8 @@
     return line;
   }
 
-  function createDashStyleDropdown(id) {
-    const newSelect = document.createElement('select');
+  function createDashStyleDropdown(id: string) {
+    const newSelect = <HTMLSelectElement>document.createElement('select');
     newSelect.className = 'prefElement';
     newSelect.title = 'Stroke style';
     newSelect.id = `svl_${id}`;
@@ -2430,7 +2349,7 @@
     return newSelect;
   }
 
-  function getLocalisedString(i) {
+  function getLocalisedString(i: (string | number)) {
     const locale = I18n.translations[I18n.locale];
     switch (i) {
       case 'red':
@@ -2464,7 +2383,7 @@
     i,
     showWidth = true,
     showOpacity = false,
-  }) {
+  }: { i: (string | number), showWidth?: boolean, showOpacity?: boolean }) {
     const title = document.createElement('h6');
     title.innerText = getLocalisedString(i);
 
@@ -2523,13 +2442,13 @@
     return line;
   }
 
-  function createSpeedOptionLine(i, metric = true) {
+  function createSpeedOptionLine(i: (number | string), metric = true) {
     const type = metric ? 'metric' : 'imperial';
     // const title = document.createElement("h6");
     // title.innerText = getLocalisedString("speed limit");
     // title.inner
     const label = document.createElement('label');
-    label.innerText = i !== -1 ? i : 'Default';
+    label.innerText = i !== -1 ? String(i) : 'Default';
 
     const inputs = document.createElement('div');
     inputs.appendChild(label);
@@ -2603,18 +2522,21 @@
    *
    */
   function updatePreferenceValues() {
-    document.getElementById('svl_saveNewPref').classList.add('disabled');
-    document.getElementById('svl_saveNewPref').disabled = true;
-    document.getElementById('svl_rollbackButton').classList.add('disabled');
-    document.getElementById('svl_rollbackButton').disabled = true;
-    document.getElementById('svl_saveNewPref').classList.remove('btn-primary');
+    const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
+    saveNewButton.classList.add('disabled');
+    saveNewButton.disabled = true;
+    saveNewButton.classList.remove('btn-primary');
+
+    const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
+    rollbackButton.classList.add('disabled');
+    rollbackButton.disabled = true;
     document.getElementById('svl_buttons').classList.remove('svl_unsaved');
     updateStreetsPreferenceValues();
 
     const options = getOptions();
     options['streets'].forEach((o) => {
       if (o !== 'red') {
-        document.getElementById(`svl_streetWidth_${o}`).value =
+        (<HTMLInputElement>document.getElementById(`svl_streetWidth_${o}`)).value =
           preferences[o]['strokeWidth'];
       }
       document.getElementById(`svl_streetColor_${o}`).value =
@@ -2683,12 +2605,12 @@
       preferences['showUnderGPSPoints'];
     document.getElementById('svl_routingModeEnabled').checked =
       preferences['routingModeEnabled'];
-    document.getElementById('svl_hideRoutingModeBlock').checked =
+    (<HTMLInputElement>document.getElementById('svl_hideRoutingModeBlock')).checked =
       preferences['hideRoutingModeBlock'];
-    document.getElementById('svl_showANs').checked = preferences['showANs'];
+    (<HTMLInputElement>document.getElementById('svl_showANs')).checked = preferences['showANs'];
 
-    document.getElementById('svl_layerOpacity').value =
-      preferences['layerOpacity'] * 100;
+    (<HTMLInputElement>document.getElementById('svl_layerOpacity')).value =
+      String(preferences['layerOpacity'] * 100);
 
     // Speed limits
     document.getElementById('svl_showSLtext').checked =
@@ -2735,7 +2657,7 @@
    *
    * @param {{id:string,title:string,description:string,isNew:(string|undefined)}} param0
    */
-  function createCheckboxOption({ id, title, description, isNew }) {
+  function createCheckboxOption({ id, title, description, isNew }: { id: string; title: string; description: string; isNew?: (string | undefined); }) {
     const line = document.createElement('div');
     line.className = 'prefLineCheckbox';
     if (typeof isNew === 'string') {
@@ -2774,7 +2696,7 @@
     max,
     step,
     isNew,
-  }) {
+  }: { id: string; title: string; description: string; min: number; max: number; step: (number | undefined); isNew?: (string | undefined); }) {
     const line = document.createElement('div');
     line.className = 'prefLineInteger';
     if (typeof isNew === 'string') {
@@ -2818,7 +2740,7 @@
     max,
     step,
     isNew,
-  }) {
+  }: { id: string; title: string; description: string; min: number; max: number; step?: (number | undefined); isNew?: (string | undefined); }) {
     const line = document.createElement('div');
     line.className = 'prefLineSlider';
     if (typeof isNew === 'string') {
@@ -2850,7 +2772,7 @@
     return line;
   }
 
-  function createPreferencesSection(name, open = false) {
+  function createPreferencesSection(name: string, open = false) {
     const details = document.createElement('details');
     details.open = open;
     const summary = document.createElement('summary');
@@ -2859,9 +2781,9 @@
     return details;
   }
 
-  function initPreferencePanel() {
+  async function initPreferencePanel() {
     //console.debug('Init Preference Panel');
-    const style = document.createElement('style');
+    const style = <HTMLStyleElement>document.createElement('style');
     style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
         .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
         .prefLineSelect{width:100%; margin-bottom:1vh;}
@@ -3439,45 +3361,41 @@
     utilityButtons.appendChild(exportButton);
     mainDiv.appendChild(utilityButtons);
 
-    const { tabLabel, tabPane } = W.userscripts.registerSidebarTab("svl-v2");
-
+    const { tabLabel, tabPane } = await wmeSDK.Sidebar.registerScriptTab();
     tabLabel.innerText = 'SVL 🗺️';
     tabLabel.title = 'Street Vector Layer';
 
     tabPane.innerHTML = panelDiv.innerHTML;
-
-    // Once the panel has been added...
-    W.userscripts.waitForElementConnected(tabPane).then(() => {
-      // Add event listeners
-      const prefElements = document.querySelectorAll('.prefElement');
-      prefElements.forEach((element) => {
-        element.addEventListener('change', updateValuesFromPreferences);
-      });
-
-      document
-        .getElementById('svl_saveNewPref')
-        .addEventListener('click', saveNewPref);
-      document
-        .getElementById('svl_rollbackButton')
-        .addEventListener('click', rollbackPreferences);
-      document
-        .getElementById('svl_resetButton')
-        .addEventListener('click', resetPreferencesCallback);
-      document
-        .getElementById('svl_importButton')
-        .addEventListener('click', importPreferencesCallback);
-      document
-        .getElementById('svl_exportButton')
-        .addEventListener('click', exportPreferences);
-      updatePreferenceValues();
+    // Add event listeners
+    const prefElements = document.querySelectorAll('.prefElement');
+    prefElements.forEach((element) => {
+      element.addEventListener('change', updateValuesFromPreferences);
     });
+
+    (<HTMLButtonElement>document
+      .getElementById('svl_saveNewPref')
+    ).addEventListener('click', saveNewPref);
+    (<HTMLButtonElement>document
+      .getElementById('svl_rollbackButton'))
+      .addEventListener('click', rollbackPreferences);
+    (<HTMLButtonElement>document
+      .getElementById('svl_resetButton'))
+      .addEventListener('click', resetPreferencesCallback);
+    (<HTMLButtonElement>document
+      .getElementById('svl_importButton'))
+      .addEventListener('click', importPreferencesCallback);
+    (<HTMLButtonElement>document
+      .getElementById('svl_exportButton'))
+      .addEventListener('click', exportPreferences);
+    updatePreferenceValues();
+
   }
 
   /**
    *
    * @param {number} id
    */
-  function removeNodeById(id) {
+  function removeNodeById(id: number) {
     nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute('sID', id), {
       'silent': true,
     });
@@ -3486,10 +3404,11 @@
   /**
    *
    * @param {Array<Waze.Feature.Vector.Node>} nodes
+   * @deprecated
    */
-  function removeNodes(nodes) {
+  function removeNodes(nodes: Array<Waze.Feature.Vector.Node>) {
     consoleDebug(`Removing ${nodes.length} nodes`);
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Destroy all nodes');
       nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
       return;
@@ -3500,9 +3419,30 @@
       }
       return;
     }
-    let i;
+    let i: number;
     for (i = 0; i < nodes.length; i += 1) {
       removeNodeById(nodes[i].attributes.id);
+    }
+  }
+
+  function removeNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
+    if (d.dataModelName !== 'nodes') return;
+    consoleDebug(`removeNodesSDK - Removing ${d.objectIds.length} nodes`);
+    consoleDebug(d);
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
+      consoleDebug('Destroy all nodes');
+      nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
+      return;
+    }
+    if (drawingAborted || d.objectIds.length > preferences['nodesThreshold']) {
+      if (!drawingAborted) {
+        abortDrawing();
+      }
+      return;
+    }
+    let i: number;
+    for (i = 0; i < d.objectIds.length; i += 1) {
+      removeNodeById(d.objectIds[i]);
     }
   }
 
@@ -3517,8 +3457,9 @@
   /**
  *
  * @param {Array<Waze.Feature.Vector.Node>} nodes
+ * @deprecated
  */
-  function changeNodes(nodes) {
+  function changeNodes(nodes: Array<Waze.Feature.Vector.Node>) {
     consoleDebug('Change nodes');
     nodes.forEach((node) => {
       const { attributes } = node;
@@ -3534,7 +3475,37 @@
         );
       } else if (attributes.id > 0) {
         // The node has just been saved
-        nodesVector.addFeatures(Array.of(drawNode(node)), { 'silent': true });
+        const newNode = drawNode(node);
+        if (newNode) {
+          nodesVector.addFeatures([newNode], { 'silent': true });
+        }
+      } // Else it is a temporary node, we won't draw it.});
+    });
+  }
+
+  function editNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
+    if (d.dataModelName !== 'nodes') return;
+    consoleDebug(d);
+    consoleDebug('Change nodes SDK');
+    d.objectIds.forEach((nodeId) => {
+      const node = W.model.nodes.getObjectById(nodeId);
+      const { attributes } = node;
+      const nodeFeature = nodesVector.getFeaturesByAttribute(
+        'sID',
+        attributes.id
+      )[0];
+      if (nodeFeature) {
+        nodeFeature.style = getNodeStyle(attributes);
+        const olGeo = node.getOLGeometry();
+        nodeFeature.move(
+          new OpenLayers.LonLat(olGeo.x, olGeo.y)
+        );
+      } else if (attributes.id > 0) {
+        // The node has just been saved
+        const newNode = drawNode(node);
+        if (newNode) {
+          nodesVector.addFeatures([newNode], { 'silent': true });
+        }
       } // Else it is a temporary node, we won't draw it.});
     });
   }
@@ -3543,7 +3514,7 @@
    *
    * @param {Array<Waze.Feature.Vector.Node>} nodes
    */
-  function nodeStateDeleted(nodes) {
+  function nodeStateDeleted(nodes: Array<Waze.Feature.Vector.Node>) {
     consoleDebug('Node state deleted');
     for (let i = 0; i < nodes.length; i += 1) {
       removeNodeById(nodes[i].getID());
@@ -3554,34 +3525,43 @@
    *
    * @param {Array<Waze.Feature.Vector.Segment>} segments
    */
-  function segmentsStateDeleted(segments) {
+  function segmentsStateDeleted(segments: Array<Waze.Feature.Vector.Segment>) {
     for (let i = 0; i < segments.length; i += 1) {
       removeSegmentById(segments[i].getID());
     }
   }
 
-  /**
-   *
-   * @param {Array<Waze.Feature.Vector.Node>} nodes
-   */
-  function addNodes(nodes) {
-    consoleDebug(`Adding ${nodes.length} nodes`);
-    if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
+  /*function saveNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
+    if (d.dataModelName !== 'nodes') return;
+    consoleDebug('Save node SDK');
+    consoleDebug(d);
+    // TODO
+  }*/
+
+  function addNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
+    if (d.dataModelName !== 'nodes') return;
+    consoleDebug(`Adding ${d.objectIds.length} nodes`);
+    consoleDebug(d);
+    if (drawingAborted || d.objectIds.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
       return;
     }
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Not adding them because of the zoom');
       return;
     }
 
-    const myFeatures = [];
-    for (let i = 0; i < nodes.length; i += 1) {
-      if (nodes[i].getOLGeometry() !== undefined) {
+    const myFeatures: OpenLayers.Feature.Vector[] = [];
+    for (let i = 0; i < d.objectIds.length; i += 1) {
+      const node = W.model.nodes.getObjectById(d.objectIds[i]);
+      if (node && node.getOLGeometry() !== undefined) {
         //if (nodes[i].attributes.id > 0) {
-        myFeatures.push(drawNode(nodes[i]));
+        const newNode = drawNode(node);
+        if (newNode) {
+          myFeatures.push(newNode);
+        }
         //}
       } else {
         console.warn('[SVL] Geometry of node is undefined');
@@ -3597,7 +3577,7 @@
     return !event['svl'];
   }
 
-  function updateStatusBasedOnZoom() {
+  function updateStatusBasedOnZoom(): boolean {
     consoleDebug('updateStatusBasedOnZoom running');
     let mustRefresh = true;
     if (drawingAborted) {
@@ -3613,19 +3593,22 @@
         redrawAllSegments();
       } else {
         console.warn(
-          `[SVL] Still too many elements to draw: Segments: ${Object.keys(W.model.segments.objects).length
-          }/${preferences['segmentsThreshold']}, Nodes: ${Object.keys(W.model.nodes.objects).length
+          `[SVL] Still too many elements to draw: Segments: ${wmeSDK.DataModel.Segments.getAll().length}/${preferences['segmentsThreshold']}, Nodes: ${wmeSDK.DataModel.Nodes.getAll().length})
           }/${preferences['nodesThreshold']
           } - You can change these thresholds in the preference panel.`
         );
       }
     }
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+    if (wmeSDK.Map.getZoomLevel() <= +preferences['useWMERoadLayerAtZoom']) {
       // There is nothing to draw, enable road layer
       consoleDebug('Road layer automatically enabled because of zoom out');
       // consoleDebug("Vector visibility: ", streetVector.visibility);
       if (streetVectorLayer.visibility === true) {
         SVLAutomDisabled = true;
+        if (manageWMEStreetLayerCallback) {
+          manageWMEStreetLayerCallback();
+          manageWMEStreetLayerCallback = null;
+        }
         setLayerVisibility(ROAD_LAYER, true);
         setLayerVisibility(SVL_LAYER, false);
       }
@@ -3635,6 +3618,7 @@
       consoleDebug('Re-enabling SVL after zoom in');
       setLayerVisibility(SVL_LAYER, true);
       setLayerVisibility(ROAD_LAYER, false);
+      manageSVLRoadLayer();
       SVLAutomDisabled = false;
     }
     //console.log("REDRAW00");
@@ -3642,36 +3626,47 @@
     return mustRefresh;
   }
 
-  let timer = null;
+  let timer: number;
   //let previousZoom = 30;
   function manageZoom() {
+    consoleDebug("EVENT Zoomend")
     // Event deferring
     clearTimeout(timer);
     //timer = null;
     consoleDebug('manageZoom clearing timer');
-    timer = setTimeout(updateStatusBasedOnZoom, 800);
+    timer = setTimeout(updateStatusBasedOnZoom, 1000);
   }
 
   function registerSegmentsEvents() {
     // console.debug("SVL: Registering segment events");
+
+    wmeSDK.Events.trackDataModelEvents({ dataModelName: "segments" });
+    segmentEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-added",
+        eventHandler: ({ dataModelName, objectIds }) => { addSegmentsSDK({ dataModelName, objectIds }) },
+      }));
+
+    segmentEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-changed",
+        eventHandler: ({ dataModelName, objectIds }) => { editSegmentsSDK({ dataModelName, objectIds }) },
+      }));
+
+    segmentEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-removed",
+        eventHandler: ({ dataModelName, objectIds }) => { removeSegmentsSDK({ dataModelName, objectIds }) },
+      }));
+
+    segmentEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-saved",
+        eventHandler: ({ dataModelName, objectIds }) => { saveSegmentsSDK({ dataModelName, objectIds }) },
+      }));
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.segments._events;
     if (typeof events === 'object') {
-      events.objectsadded.push({
-        'context': streetVectorLayer,
-        'callback': addSegments,
-        'svl': true,
-      });
-      events.objectschanged.push({
-        'context': streetVectorLayer,
-        'callback': editSegments,
-        'svl': true,
-      });
-      events.objectsremoved.push({
-        'context': streetVectorLayer,
-        'callback': removeSegments,
-        'svl': true,
-      });
       events['objects-state-deleted'].push({
         'context': streetVectorLayer,
         'callback': segmentsStateDeleted,
@@ -3682,13 +3677,18 @@
   }
 
   function removeSegmentsEvents() {
-    consoleDebug('SVL: Removing segments events');
+    consoleDebug('Removing segments events');
+    wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "segments" });
     // eslint-disable-next-line no-underscore-dangle
+    while (segmentEventsRemoveCallbacks.length > 0) {
+      let callback = segmentEventsRemoveCallbacks.pop();
+      if (callback) {
+        callback();
+      }
+    }
+
     const events = W.model.segments._events;
     if (typeof events === 'object') {
-      events.objectsadded = events.objectsadded.filter(removeSVLEvents);
-      events.objectschanged = events.objectschanged.filter(removeSVLEvents);
-      events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
       events['objects-state-deleted'] =
         events['objects-state-deleted'].filter(removeSVLEvents);
     }
@@ -3696,23 +3696,53 @@
   }
 
   function removeNodeEvents() {
-    consoleDebug('SVL: Removing node events');
+    consoleDebug('Removing node events');
+    wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "nodes" });
+    while (nodeEventsRemoveCallbacks.length > 0) {
+      let callback = nodeEventsRemoveCallbacks.pop();
+      if (callback) {
+        callback();
+      }
+    }
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.nodes._events;
     if (typeof events === 'object') {
-      events.objectsremoved = events.objectsremoved.filter(removeSVLEvents);
-      events.objectsadded = events.objectsadded.filter(removeSVLEvents);
-      events.objectschanged = events.objectschanged.filter(removeSVLEvents);
       events['objects-state-deleted'] =
         events['objects-state-deleted'].filter(removeSVLEvents);
     }
   }
 
   function registerNodeEvents() {
-    consoleDebug('SVL: Registering node events');
+    consoleDebug('Registering node events');
+    wmeSDK.Events.trackDataModelEvents({ dataModelName: "nodes" });
+    nodeEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-added",
+        eventHandler: ({ dataModelName, objectIds }) => { addNodesSDK({ dataModelName, objectIds }) },
+      }));
+
+    nodeEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-changed",
+        eventHandler: ({ dataModelName, objectIds }) => { editNodesSDK({ dataModelName, objectIds }) },
+      }));
+
+    nodeEventsRemoveCallbacks.push(
+      wmeSDK.Events.on({
+        eventName: "wme-data-model-objects-removed",
+        eventHandler: ({ dataModelName, objectIds }) => { removeNodesSDK({ dataModelName, objectIds }) },
+      }));
+
+    /*
+    When a segment gets saved, all segments are redrawn.
+    wmeSDK.Events.on({
+      eventName: "wme-data-model-objects-saved",
+      eventHandler: ({ dataModelName, objectIds }) => { saveNodesSDK({ dataModelName, objectIds }) },
+    });*/
     // eslint-disable-next-line no-underscore-dangle
     const events = W.model.nodes._events;
     if (typeof events === 'object') {
+      /*
       events.objectsremoved.push({
         'context': nodesVector,
         'callback': removeNodes,
@@ -3727,12 +3757,13 @@
         'context': nodesVector,
         'callback': changeNodes,
         'svl': true,
-      });
+      });      */
       events['objects-state-deleted'].push({
         'context': nodesVector,
         'callback': nodeStateDeleted,
         'svl': true,
       });
+
     }
   }
 
@@ -3756,32 +3787,30 @@
     destroyAllFeatures();
   }
 
-  /**
-   *
-   * @param {Array<Waze.Feature.Vector.Segment>} segments
-   */
-  function addSegments(segments) {
-    consoleDebug(`Adding ${segments.length} segments`);
+  function addSegmentsSDK(d: { dataModelName: DataModelName, objectIds: (string | number)[] }) {
+    if (!countryID) return;
+    if (d.dataModelName !== 'segments') return;
+    consoleDebug(`addSegmentsSDK - Adding ${d.objectIds.length} segments`);
 
-    if (drawingAborted || segments.length > preferences['segmentsThreshold']) {
+    if (drawingAborted || d.objectIds.length > preferences['segmentsThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
       }
       return;
     }
 
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Not adding them because of the zoom');
       return;
     }
 
     consoleGroup();
-    let segmentsFeatures = [];
-    let labelsFeatures = [];
+    let segmentsFeatures: OpenLayers.Feature.Vector[] = [];
+    let labelsFeatures: OpenLayers.Feature.Vector[] = [];
     // console.log("Size: " + e.length);
-    segments.forEach((el) => {
+    d.objectIds.forEach((el) => {
       if (el !== null) {
-        const res = drawSegment(el);
+        const res = drawSegment(W.model.segments.getObjectById(el));
         if (res.segmentFeatures) {
           segmentsFeatures.push(...res.segmentFeatures); //this should be way more efficient than "concat"
         }
@@ -3810,7 +3839,7 @@
    *
    * @param {number} id
    */
-  function removeSegmentById(id) {
+  function removeSegmentById(id: number) {
     consoleDebug(`RemoveSegmentById: ${id}`);
     streetVectorLayer.destroyFeatures(
       streetVectorLayer.getFeaturesByAttribute('sID', id),
@@ -3822,32 +3851,29 @@
     );
   }
 
-  /**
-   *
-   * @param {Array<Waze.Feature.Vector.Segment>} segments
-   */
-  function editSegments(segments) {
+  function saveSegmentsSDK(d: { dataModelName: DataModelName, objectIds: (string | number)[] }) {
+    redrawAllSegments();
+    if (d.dataModelName !== 'segments') return;
+    consoleDebug(`saveSegmentsSDK - Saving ${d.objectIds.length} segments`);
+    consoleDebug(d);
+    // TODO
+  }
+
+  function editSegmentsSDK(d: { dataModelName: DataModelName, objectIds: (string | number)[] }) {
     // console.debug("Changed Segment");
-    consoleDebug(`Edit ${segments.length} segments`);
-    segments.forEach((s) => {
-      /*const oldID = s.getOldID();
-      if (oldID) {
-        removeSegmentById(parseInt(oldID, 10));
-      }*/
-      removeSegmentById(s.getID());
-      // console.debug(e[i]);
-      if (s.state !== 'DELETE') {
-        addSegments([s]);
-      }
+    if (d.dataModelName !== 'segments') return;
+    consoleDebug(`editSegmentsSDK - Edit ${d.objectIds.length} segments`);
+    d.objectIds.forEach((segmID) => {
+      removeSegmentById(segmID);
+      // before, we checked that the state of the segment was not "DELETE"
+      addSegmentsSDK({ dataModelName: d.dataModelName, objectIds: [segmID] });
     });
   }
 
-  /**
-   * @param {Array<Waze.Feature.Vector.Segment>} segments
-   */
-  function removeSegments(segments) {
-    consoleDebug(`Removing ${segments.length} segments`);
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+  function removeSegmentsSDK(d: { dataModelName: DataModelName, objectIds: (string | number)[] }) {
+    if (d.dataModelName !== 'segments') return;
+    consoleDebug(`removeSegmentsSDK - Removing ${d.objectIds.length} segments`);
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Destroy all segments and labels because of zoom out');
       streetVectorLayer.destroyFeatures(streetVectorLayer.features, {
         'silent': true,
@@ -3855,15 +3881,16 @@
       labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
       return;
     }
-    if (drawingAborted || segments.length > preferences['segmentsThreshold']) {
+    if (drawingAborted || d.objectIds.length > preferences['segmentsThreshold']) {
+      // TODO: I do not think we should check if we are deleting too many segments
       if (!drawingAborted) {
         abortDrawing();
       }
       return;
     }
     consoleGroup();
-    segments.forEach((s) => {
-      removeSegmentById(s.attributes.id);
+    d.objectIds.forEach((segmID) => {
+      removeSegmentById(segmID);
     });
     consoleGroupEnd();
   }
@@ -3898,12 +3925,13 @@
    *
    * @param {number} ms
    */
-  function sleep(ms) {
+  function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function waitForWazeWrap() {
     let trials = 1;
+    wmeSDK.State.getUserInfo()
     let sleepTime = 150;
     do {
       if (
@@ -3926,17 +3954,15 @@
     console.log('SVL: initializing WazeWrap');
     // Adding keyboard shortcut
     try {
-      new WazeWrap.Interface.Shortcut(
-        'SVLToggleLayer',
-        'Toggle SVL',
-        'svl',
-        'Street Vector Layer',
-        'A+l',
-        () => {
+      const toggleShortcut: KeyboardShortcut = {
+        callback: () => {
           setLayerVisibility(SVL_LAYER, !streetVectorLayer.visibility);
         },
-        null
-      ).add();
+        description: "Toggle SVL",
+        shortcutId: "svl",
+        shortcutKeys: "l",
+      };
+      wmeSDK.Shortcuts.createShortcut(toggleShortcut);
       console.log('SVL: Keyboard shortcut successfully added.');
     } catch (e) {
       console.error('SVL: Error while adding the keyboard shortcut:');
@@ -3966,6 +3992,8 @@
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 6.0.0 - Start using the new WME SDK. SVL is likely to be discontinued if Waze quits supporting OpenLayers.
+      <br>- 6.0.0 - Fix: no more road layer automatically enabled by the WME, when SVL is on.
       <br>- 5.5.3 & 4: Fix for WME Beta. <b>Warning: SVL may stop working for good in the future due to WME internal changes</b>
       <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)`,
       '',
@@ -3973,7 +4001,7 @@
     );
   }
 
-  function invalidTranslation(key) {
+  function invalidTranslation(key: string): string {
     console.error('[SVL] Invalid translation key: ' + key);
     return '<invalid translation key>';
   }
@@ -3983,7 +4011,7 @@
    * @param {string} key
    * @returns {string}
    */
-  function _(key) {
+  function _(key: string): string {
     const key_index = tr_keys[key];
     if (typeof key_index === 'undefined' && Object.keys(tr).length > 0) {
       return invalidTranslation(key);
@@ -4007,7 +4035,7 @@
    * @param {Object} opt
    * @return {Promise}
    */
-  function request(url, opt = {}) {
+  function request(url: string, opt: object = {}): Promise<any> {
     if (opt) {
       Object.assign(opt, {
         url,
@@ -4023,9 +4051,9 @@
   }
 
   /**@type{!Object<string,Array<string>>} */
-  const tr = [];
+  const tr: { [s: string]: Array<string>; } = [];
   /**@type{!Object<string,number>} */
-  const tr_keys = [];
+  const tr_keys: { [s: string]: number; } = [];
   async function loadTranslations() {
     //console.debug('Loading translations...');
     const response = await request(
@@ -4063,7 +4091,7 @@
    * Returns the geodetic pixel size in meters, optimized for the Waze Map
    * @returns {number}
    */
-  function getGeodesicPixelSizeSVL() {
+  function getGeodesicPixelSizeSVL(): number {
     const lonlat = OLMap.getCachedCenter();
     const res = OLMap.resolution;
     const left = lonlat.add(-res / 2, 0);
@@ -4085,8 +4113,9 @@
  *
  * @param {Object} source
  * @return {Object}
+ * 
  */
-  function svlExtend(source) {
+  function svlExtend(source: object): object {
     let destination = {};
     if (source) {
       for (let property in source) {
@@ -4106,7 +4135,7 @@
     // Override OpenLayers function
     OpenLayers.Util.getElement = function () {
       const elements = [];
-  
+
       for (let i = 0, len = arguments.length; i < len; i++) {
         var element = arguments[i];
         if (typeof element == 'string') {
@@ -4178,7 +4207,7 @@
      * @param {number} index
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index) {
+    OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index: number): Element {
       // const nextIndex = index + 1;
       // console.log(`Order length: ${this.order.length}` );
       for (let i = index + 1; i < this.order.length; i++) {
@@ -4194,33 +4223,33 @@
      * @param {HTMLElement} newNode
      * @return {Element}
      */
-    OpenLayers.ElementsIndexer.prototype.insert = function (newNode) {
+    OpenLayers.ElementsIndexer.prototype.insert = function (newNode: HTMLElement): Element {
       // If the node is known to the indexer, remove it so we can
       // recalculate where it should go.
       const nodeId = newNode.id;
       // if newNode exists
       if (this.indices[nodeId] != null) {
-          this.remove(newNode);
+        this.remove(newNode);
       }
 
       this.determineZIndex(newNode);
 
-      var leftIndex = -1;
-      var rightIndex = this.order.length;
+      var leftIndex: number = -1;
+      var rightIndex: number = this.order.length;
       var middle;
 
       while (rightIndex - leftIndex > 1) {
-          middle = parseInt((leftIndex + rightIndex) / 2, 10);
+        middle = Math.trunc((leftIndex + rightIndex) / 2);
 
-          // Changed here, great performance improvement by not using Utils.getElement
-          var placement = this.compare(this, newNode,
-              document.getElementById(this.order[middle]));
+        // Changed here, great performance improvement by not using Utils.getElement
+        var placement = this.compare(this, newNode,
+          document.getElementById(this.order[middle]));
 
-          if (placement > 0) {
-              leftIndex = middle;
-          } else {
-              rightIndex = middle;
-          }
+        if (placement > 0) {
+          leftIndex = middle;
+        } else {
+          rightIndex = middle;
+        }
       }
 
       this.order.splice(rightIndex, 0, nodeId);
@@ -4230,7 +4259,7 @@
       // order, return the node before which we have to insert the new one;
       // else, return null to indicate that the new node can be appended.
       return this.svlGetNextElement(rightIndex);
-  };
+    };
 
     /**
      *
@@ -4240,7 +4269,7 @@
      * @param {string} featureId
      * @returns
      */
-    streetVectorLayer.renderer.redrawNode = function (id, geometry, style, featureId) {
+    streetVectorLayer.renderer.redrawNode = function (id: string, geometry: OpenLayers.IGeometry, style: object, featureId: string) {
       style = this.applyDefaultSymbolizer(style);
       // Get the node if it's already on the map.
       var node = this.nodeFactory(id, this.getNodeType(geometry, style));
@@ -4283,7 +4312,7 @@
       return drawResult.complete;
     };
 
-    streetVectorLayer.renderer.drawGeometry = function (geometry, style, featureId) {
+    streetVectorLayer.renderer.drawGeometry = function (geometry: OpenLayers.IGeometry, style: Partial<StyleObject>, featureId) {
       let rendered = false;
       let removeBackground = false;
       if (style.display != "none") {
@@ -4316,8 +4345,8 @@
     };
 
     streetVectorLayer.renderer.drawFeature = function drawFeature(
-      feature,
-      style,
+      feature: OpenLayers.Feature.Vector,
+      style: Partial<StyleObject>,
       farZoom = isFarZoom()
     ) {
       if (style == null) {
@@ -4327,14 +4356,14 @@
       if (feature.geometry) {
         // if (bounds) {
         if (
-          OLMap.zoom < 2 ||
+          wmeSDK.Map.getZoomLevel() < 2 ||
           (feature.attributes.closeZoomOnly && farZoom) ||
           (feature.attributes.farZoomOnly && !farZoom)
         ) {
           style = { 'display': 'none' };
         } else {
           const bounds = feature.geometry.getBounds();
-          if (!bounds.intersectsBounds(streetVectorLayer.renderer.extent)) {
+          if (!bounds || !bounds.intersectsBounds(streetVectorLayer.renderer.extent)) {
             style = { 'display': 'none' };
           } else {
             streetVectorLayer.renderer.featureDx = 0;
@@ -4359,7 +4388,7 @@
       return undefined;
     };
 
-    streetVectorLayer.drawFeature = function (feature, style, farZoom = isFarZoom()) {
+    streetVectorLayer.drawFeature = function (feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>, farZoom = isFarZoom()) {
       // don't try to draw the feature with the renderer if the layer is not
       // drawn itself
       if (!this.drawn) {
@@ -4386,7 +4415,7 @@
     }
 
 
-    streetVectorLayer.moveTo = function (bounds, zoomChanged, dragging) {
+    streetVectorLayer.moveTo = function (bounds: OpenLayers.Bounds, zoomChanged: boolean, dragging: boolean) {
       OpenLayers.Layer.prototype.moveTo.apply(this, arguments);
 
       var coordSysUnchanged = true;
@@ -4430,7 +4459,7 @@
       if (!this.drawn || zoomChanged || !coordSysUnchanged) {
         this.drawn = true;
         var feature;
-        for (var i = 0, len = this.features.length; i < len; i++) {
+        for (let i: number = 0, len = this.features.length; i < len; i++) {
           this.renderer.locked = (i !== (len - 1));
           feature = this.features[i];
           this.drawFeature(feature, undefined, farZoom);
@@ -4438,79 +4467,81 @@
       }
     };
 
-    streetVectorLayer.svlAddFeatures = 
-    /**
-     * 
-     * @param {Array.<OpenLayers.Feature.Vector|null> | null} features 
-     * @param {(Object|null)=} options 
-     * @returns {?}
-     */
-    function (features, options) {
-      // For us features is guaranteed to be an array
-      //if (!(OpenLayers.Util.isArray(features))) {
-      //    features = [features];
-      //}
+    streetVectorLayer.svlAddFeatures =
+      /**
+       * 
+       * @param {Array.<OpenLayers.Feature.Vector|null> | null} features 
+       * @param {(Object|null)=} options 
+       * @returns {?}
+       */
+      function (features: Array<OpenLayers.Feature.Vector | null> | null, options: (object | null) | undefined): void {
+        if (!features || features.length === 0) return;
+        // For us features is guaranteed to be an array
+        //if (!(OpenLayers.Util.isArray(features))) {
+        //    features = [features];
+        //}
 
-      /*     var notify = !options || !options.silent;
-          if(notify) {
-              var event = {features: features};
-              var ret = this.events.triggerEvent("beforefeaturesadded", event);
-              if(ret === false) {
-                  return;
-              }
-              features = event.features;
-          } */
+        /*     var notify = !options || !options.silent;
+            if(notify) {
+                var event = {features: features};
+                var ret = this.events.triggerEvent("beforefeaturesadded", event);
+                if(ret === false) {
+                    return;
+                }
+                features = event.features;
+            } */
 
-      const farZoom = isFarZoom();
+        const farZoom = isFarZoom();
 
-      // Track successfully added features for featuresadded event, since
-      // beforefeatureadded can veto single features.
-      var featuresAdded = [];
-      for (var i = 0, len = features.length; i < len; i++) {
-        if (i != (features.length - 1)) {
-          this.renderer.locked = true;
-        } else {
-          this.renderer.locked = false;
+        // Track successfully added features for featuresadded event, since
+        // beforefeatureadded can veto single features.
+        const featuresAdded: OpenLayers.Feature.Vector[] = [];
+        for (let i = 0, len = features.length; i < len; i += 1) {
+          if (i != (features.length - 1)) {
+            this.renderer.locked = true;
+          } else {
+            this.renderer.locked = false;
+          }
+          let feature = features[i];
+          if (!feature) continue;
+
+          if (this.geometryType &&
+            !(feature.geometry instanceof this.geometryType)) {
+            throw new TypeError('addFeatures: component should be an ' +
+              this.geometryType.prototype.CLASS_NAME);
+          }
+
+          //give feature reference to its layer
+          feature.layer = this;
+
+          if (!feature.style && this.style) {
+            feature.style = svlExtend(this.style);
+          }
+
+          /*         if (notify) {
+                      if(this.events.triggerEvent("beforefeatureadded",
+                                                  {feature: feature}) === false) {
+                          continue;
+                      }
+                      this.preFeatureInsert(feature);
+                  } */
+
+          featuresAdded.push(feature);
+          this.features.push(feature);
+          this.drawFeature(feature, undefined, farZoom);
+
+          /*         if (notify) {
+                      this.events.triggerEvent("featureadded", {
+                          feature: feature
+                      });
+                      this.onFeatureInsert(feature);
+                  } */
         }
-        var feature = features[i];
 
-        if (this.geometryType &&
-          !(feature.geometry instanceof this.geometryType)) {
-          throw new TypeError('addFeatures: component should be an ' +
-            this.geometryType.prototype.CLASS_NAME);
-        }
-
-        //give feature reference to its layer
-        feature.layer = this;
-
-        if (!feature.style && this.style) {
-          feature.style = svlExtend(this.style);
-        }
-
-        /*         if (notify) {
-                    if(this.events.triggerEvent("beforefeatureadded",
-                                                {feature: feature}) === false) {
-                        continue;
-                    }
-                    this.preFeatureInsert(feature);
-                } */
-
-        featuresAdded.push(feature);
-        this.features.push(feature);
-        this.drawFeature(feature, undefined, farZoom);
-
-        /*         if (notify) {
-                    this.events.triggerEvent("featureadded", {
-                        feature: feature
-                    });
-                    this.onFeatureInsert(feature);
-                } */
-      }
-
-      /*     if(notify) {
-              this.events.triggerEvent("featuresadded", {features: featuresAdded});
-          } */
-    };
+        /*     if(notify) {
+                this.events.triggerEvent("featuresadded", {features: featuresAdded});
+            } */
+      };
 
     nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
       'visibility': !preferences['startDisabled'],
@@ -4520,9 +4551,9 @@
     nodesVector.addFeatures = streetVectorLayer.svlAddFeatures;
     nodesVector.moveTo = streetVectorLayer.moveTo;
 
-    nodesVector.renderer.drawFeature = function drawFeature(feature, style,
+    nodesVector.renderer.drawFeature = function drawFeature(feature, style: Partial<StyleObject>,
       farZoom = isFarZoom()) {
-      if (OLMap.zoom < 2) {
+      if (wmeSDK.Map.getZoomLevel() < 2) {
         style = { 'display': 'none' };
         return nodesVector.renderer.drawGeometry(
           feature.geometry,
@@ -4571,7 +4602,7 @@
     labelsVector.addFeatures = streetVectorLayer.svlAddFeatures;
     labelsVector.moveTo = streetVectorLayer.moveTo;
 
-    labelsVector.renderer.drawFeature = function drawFeature(feature, style,
+    labelsVector.renderer.drawFeature = function drawFeature(feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>,
       farZoom = isFarZoom()) {
       const { zoom } = OLMap;
       if (zoom < 2) {
@@ -4591,7 +4622,7 @@
           style = { 'display': 'none' };
         } else {
           const bounds = feature.geometry.getBounds();
-          if (!bounds.intersectsBounds(labelsVector.renderer.extent)) {
+          if (!bounds || !bounds.intersectsBounds(labelsVector.renderer.extent)) {
             style = { 'display': 'none' };
           } else {
             labelsVector.renderer.featureDx = 0;
@@ -4637,14 +4668,14 @@
 
     labelsVector.renderer.drawText = function drawText(
       featureId,
-      style,
-      location
+      style: { [key: string]: any },
+      location: OpenLayers.Geometry.Point
     ) {
       const drawOutline = !!style['labelOutlineWidth'];
       // First draw text in halo color and size and overlay the
       // normal text afterwards
       if (drawOutline) {
-        const outlineStyle = svlExtend(style);
+        const outlineStyle = <Partial<StyleObject>>svlExtend(style);
         outlineStyle['fontColor'] = outlineStyle['labelOutlineColor'];
         outlineStyle['fontStrokeColor'] = outlineStyle['labelOutlineColor'];
         outlineStyle['fontStrokeWidth'] = style['labelOutlineWidth'];
@@ -4657,7 +4688,7 @@
 
       const resolution = labelsVector.renderer.getResolution();
 
-      const x =
+      const x: number =
         (location.x - labelsVector.renderer.featureDx) / resolution +
         labelsVector.renderer.left;
       const y = location.y / resolution - labelsVector.renderer.top;
@@ -4670,8 +4701,8 @@
         'text'
       );
 
-      label.setAttribute('x', x);
-      label.setAttribute('y', -y);
+      label.setAttribute('x', x.toString());
+      label.setAttribute('y', (-y).toString());
 
       if (style['angle'] || style['angle'] === 0) {
         const rotate = `rotate(${style['angle']},${x},${-y})`;
@@ -4738,7 +4769,7 @@
             OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
           );
         }
-        tspan.setAttribute('x', x);
+        tspan.setAttribute('x', String(x));
         if (i === 0) {
           let vfactor = OpenLayers.Renderer.SVG.LABEL_VFACTOR[align[1]];
           if (vfactor == null) {
@@ -4759,14 +4790,15 @@
       }
     };
 
-    updateStylesFromPreferences(preferences);
+    handleWMESettingsUpdated(false);
+    updateStylesFromPreferences(preferences, false);
 
     // Add layers to the map
     OLMap.addLayer(streetVectorLayer);
     OLMap.addLayer(labelsVector);
     OLMap.addLayer(nodesVector);
 
-    if (window.localStorage.getItem('svlDebugOn') === 'true') {
+    if (DEBUG) {
       document['sv'] = streetVectorLayer;
       document['lv'] = labelsVector;
       document['nv'] = nodesVector;
@@ -4791,7 +4823,14 @@
     updateRoutingModePanel();
     updateRefreshStatus();
 
-    OLMap.events.register('zoomend', null, manageZoom, true);
+    wmeSDK.Events.on({
+      eventName: "wme-map-zoom-changed",
+      eventHandler: manageZoom
+    });
+    wmeSDK.Events.trackLayerEvents({
+      layerName: "roads"
+    });
+    manageSVLRoadLayer();
 
     waitForWazeWrap().then((result) => {
       if (result === true) {
@@ -4799,10 +4838,10 @@
       }
     });
 
-    if (OLMap.zoom <= preferences['useWMERoadLayerAtZoom']) {
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       setLayerVisibility(ROAD_LAYER, true);
     } else if (
-      WMERoadLayer.getVisibility() &&
+      WMERoadLayer?.getVisibility() &&
       preferences['disableRoadLayers']
     ) {
       setLayerVisibility(ROAD_LAYER, false);
@@ -4822,25 +4861,30 @@
     });
 
     // eslint-disable-next-line no-underscore-dangle
-    const events = W.prefs._events;
-    if (typeof events === 'object') {
-      events['change:isImperial'].push({
-        'callback': redrawAllSegments,
-      });
-    }
+    wmeSDK.Events.on({
+      eventName: 'wme-user-settings-changed',
+      eventHandler: handleWMESettingsUpdated,
+    });
 
-    mergeEndCallback();
+    //mergeEndCallback();
     console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
+  }
+
+  function manageSVLRoadLayer() {
+    manageWMEStreetLayerCallback = wmeSDK.Events.on({
+      eventName: "wme-layer-visibility-changed",
+      eventHandler: manageLayerChanged
+    });
   }
 
   function redrawAllSegments() {
     consoleDebug('DrawAllSegments');
     destroyAllFeatures();
-    addSegments(Object.values(W.model.segments.objects));
-    addNodes(Object.values(W.model.nodes.objects));
+    addSegmentsSDK({ dataModelName: 'segments', objectIds: wmeSDK.DataModel.Segments.getAll().map((e) => e.id) }); // TODO: here we are getting all data, and discarding it
+    addNodesSDK({ dataModelName: 'nodes', objectIds: wmeSDK.DataModel.Nodes.getAll().map((e) => e.id) });
   }
 
-  function updateStylesFromPreferences(pref) {
+  function updateStylesFromPreferences(pref: PreferenceObject, shouldRedraw = true) {
     streetStyles = [];
     for (let i = 0; i < pref['streets'].length; i += 1) {
       if (pref['streets'][i]) {
@@ -4855,15 +4899,18 @@
     clutterConstant = pref['clutterConstant'];
     streetVectorLayer.setOpacity(preferences['layerOpacity']);
     updateRoutingModePanel();
-    redrawAllSegments();
+    if (shouldRedraw) {
+      redrawAllSegments();
+    }
   }
 
   function initCountry() {
-    if (!W.model.topCountry) {
+    const topCountry = wmeSDK.DataModel.Countries.getTopCountry()
+    if (!topCountry) {
       console.error('SVL: could not find topCountry');
       return;
     }
-    const defaultLaneWidth = W.model.topCountry?.defaultLaneWidthPerRoadType ?? W.model.topCountry.attributes.defaultLaneWidthPerRoadType;
+    const defaultLaneWidth = topCountry.defaultLaneWidthPerRoadType;
     if (defaultLaneWidth) {
       Object.keys(defaultLaneWidth).forEach((e) => {
         defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
@@ -4877,20 +4924,16 @@
     }
   }
 
-  function bootstrapSVL() {
-    if (typeof W !== 'undefined' && W.userscripts?.state?.isReady) {
-      initSVL();
-    } else {
-      document.addEventListener("wme-ready", initSVL, {
-        once: true,
-      });
+  function manageLayerChanged(e: { layerName: string }) {
+    if (SVLAutomDisabled || drawingAborted) return;
+    consoleDebug("Layer changed: " + e.layerName);
+    if (e.layerName === "roads" && streetVectorLayer.getVisibility()) {
+      // if SVL is currently enabled, disable it
+      wmeSDK.Map.setLayerVisibility({ layerName: "roads", visibility: false })
     }
   }
 
-  /**
-   * @type {!Object<string,string>}
-   */
-  const fallback = [];
+  const fallback: Record<string, string> = {};
   fallback[`completition_percentage`] = `100%`;
   fallback[`language_code`] = `en`;
   fallback[`translation_thanks`] = `translated in your language thanks to:`;
@@ -5115,5 +5158,5 @@ Please paste it in a file (CTRL+V) to store it.`;
     `show_unverified_dashed_descr`
   ] = `If the speed limit is not verified, it will be shown with a different style.`;
 
-  bootstrapSVL();
-})();
+  initSVL();
+}
