@@ -1,4 +1,5 @@
-import { DataModelName, KeyboardShortcut, SegmentPermission, WmeSDK } from "wme-sdk-typings";
+import { Point } from "geojson";
+import { DataModelName, KeyboardShortcut, Node, SdkFeature, WmeSDK, ZoomLevel } from "wme-sdk-typings";
 
 // the sdk initScript function will be called after the SDK is initialized
 unsafeWindow.SDK_INITIALIZED.then(initScript);
@@ -80,8 +81,7 @@ function initScript() {
   let streetStyles: Array<{ strokeColor: string; strokeWidth: number; strokeDashstyle: string; outlineColor: string }> = [];
   /** @type {OpenLayers.Layer.Vector} */
   let streetVectorLayer: OpenLayers.Layer.Vector;
-  /** @type {OpenLayers.Layer.Vector} */
-  let nodesVector: OpenLayers.Layer.Vector;
+  const LAYERNAME_NODES = "SVL_NODES_SDK";
   /** @type {OpenLayers.Layer.Vector} */
   let labelsVector: OpenLayers.Layer.Vector;
   /** @type {boolean} */
@@ -140,7 +140,7 @@ function initScript() {
 
   const nodeStyle = {
     'stroke': false,
-    'fillColor': '#0015FF',
+    'fillColor': '#00FF00',
     'fillOpacity': 0.9,
     'pointRadius': 3,
     'pointerEvents': 'none',
@@ -149,7 +149,7 @@ function initScript() {
   // note: nodes inside JB cannot be styled consistently (WME's function does not always work)
   const nodeStyleDeadEnd = {
     'stroke': false,
-    'fillColor': '#C31CFF',
+    'fillColor': '#FF0000',
     'fillOpacity': 0.9,
     'pointRadius': 3,
     'pointerEvents': 'none',
@@ -191,7 +191,14 @@ function initScript() {
 
   // End of global variable declaration
 
-  const safeAlert = (level, message) => {
+  enum AlertType {
+    INFO = 'info',
+    ERROR = 'error',
+    SUCCESS = 'success',
+    WARNING = 'warning',
+    DEBUG = 'debug',
+  };
+  const safeAlert = (level: AlertType, message: string) => {
     try {
       WazeWrap.Alerts[level](GM_info.script.name, message);
     } catch (e) {
@@ -282,11 +289,11 @@ function initScript() {
     try {
       unsafeWindow.localStorage.setItem('svl', JSON.stringify(pref));
       if (!silent) {
-        safeAlert('success', _('preferences_saved'));
+        safeAlert(AlertType.SUCCESS, _('preferences_saved'));
       }
     } catch (e) {
       console.error(e);
-      safeAlert('error', _('preferences_saving_error'));
+      safeAlert(AlertType.ERROR, _('preferences_saving_error'));
     }
   }
 
@@ -558,7 +565,6 @@ function initScript() {
     }
     // else: preference read from localstorage
 
-
     preferences = {};
     preferences['autoReload'] = {};
     // jshint ignore: start
@@ -571,8 +577,12 @@ function initScript() {
       loadedPreferences?.['showSLSinglecolor'] ?? false;
     preferences['SLColor'] = loadedPreferences?.['SLColor'] ?? '#ffdf00';
 
+    let userLevel = wmeSDK.State.getUserInfo()?.rank;
+    if (typeof userLevel !== 'undefined') {
+      userLevel += 1;
+    }
     preferences['fakelock'] =
-      loadedPreferences?.['fakelock'] ?? wmeSDK.State.getUserInfo()?.rank ?? 6; // jshint ignore:line
+      loadedPreferences?.['fakelock'] ?? userLevel ?? 6;
     preferences['hideMinorRoads'] =
       loadedPreferences?.['hideMinorRoads'] ?? true;
     preferences['showDashedUnverifiedSL'] =
@@ -1862,53 +1872,33 @@ function initScript() {
     return { segmentFeatures, labels };
   }
 
-  /**
-   *
-   * @param {Waze.Feature.Vector.Node} model
-   */
-  function drawNode(model: Waze.Feature.Vector.Node): OpenLayers.Feature.Vector | null {
-    if (model.getState() === 'DELETE') return null;
-    const attributes = model.getAttributes();
-    assertFeatureDoesNotExist(attributes.id, nodesVector);
-    const geoPoints = model.getGeometry();
-    const point = new OpenLayers.Geometry.Point(geoPoints.coordinates[0], geoPoints.coordinates[1]).transform(gmapsProjection, OLMap.projection);
-    const pointFeature = new OpenLayers.Feature.Vector(
-      point,
-      {
-        'sID': attributes.id,
-      },
-      getNodeStyle(attributes)
-    );
-    return pointFeature;
-  }
-
   function rollbackPreferences() {
     loadPreferences();
     updateStylesFromPreferences(preferences);
     updatePreferenceValues();
-    safeAlert('info', _('preferences_rollback'));
+    safeAlert(AlertType.INFO, _('preferences_rollback'));
   }
 
   function exportPreferences() {
     GM_setClipboard(JSON.stringify(preferences));
-    safeAlert('info', _('export_preferences_message'));
+    safeAlert(AlertType.INFO, _('export_preferences_message'));
   }
 
-  function importPreferences(e, pastedText) {
+  function importPreferences(e, pastedText: string | null) {
     if (pastedText !== null && pastedText !== '') {
       try {
         preferences = JSON.parse(pastedText);
       } catch (ex) {
-        safeAlert('error', _('preferences_parsing_error'));
+        safeAlert(AlertType.ERROR, _('preferences_parsing_error'));
         return;
       }
       if (preferences !== null && preferences['streets']) {
         updateStylesFromPreferences(preferences);
         savePreferences(preferences);
         updatePreferenceValues();
-        safeAlert('success', _('preferences_imported'));
+        safeAlert(AlertType.SUCCESS, _('preferences_imported'));
       } else {
-        safeAlert('error', 'preferences_importing_error');
+        safeAlert(AlertType.ERROR, 'preferences_importing_error');
       }
     }
   }
@@ -1932,10 +1922,16 @@ function initScript() {
       consoleDebug(`GPS Layer index: ${gpsLayerIndex}`);
       if (preferences['showUnderGPSPoints']) {
         streetVectorLayer.setZIndex(gpsLayerIndex - 20);
-        nodesVector.setZIndex(gpsLayerIndex - 15);
+        wmeSDK.Map.setLayerZIndex({
+          layerName: LAYERNAME_NODES,
+          zIndex: gpsLayerIndex - 15,
+        })
       } else {
         streetVectorLayer.setZIndex(gpsLayerIndex + 15);
-        nodesVector.setZIndex(gpsLayerIndex + 20);
+        wmeSDK.Map.setLayerZIndex({
+          layerName: LAYERNAME_NODES,
+          zIndex: gpsLayerIndex + 20,
+        })
       }
     } else {
       // The GPS layer is not available
@@ -1952,7 +1948,7 @@ function initScript() {
    *
    * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
    */
-  function createInput({ id, type, className, title, min, max, step }: { id: string; type: string; className: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; }) {
+  function createInput({ id, type, className, title, min, max, step }: { id: string; type: string; className?: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; }) {
     const input = <HTMLInputElement>document.createElement('input');
     input.id = 'svl_' + id;
     if (className) {
@@ -2054,7 +2050,7 @@ function initScript() {
     if (presetApplied) {
       updateStreetsPreferenceValues();
       presetSelect.value = '';
-      safeAlert('info', _('preset_applied'));
+      safeAlert(AlertType.INFO, _('preset_applied'));
     } else {
       for (let i = 0; i < preferences['streets'].length; i += 1) {
         if (preferences['streets'][i]) {
@@ -2288,7 +2284,7 @@ function initScript() {
     saveDefaultPreferences();
     updateStylesFromPreferences(preferences);
     updatePreferenceValues();
-    safeAlert('success', _('preferences_reset_message'));
+    safeAlert(AlertType.SUCCESS, _('preferences_reset_message'));
   };
 
   function resetPreferencesCallback() {
@@ -2507,11 +2503,11 @@ function initScript() {
   function updateStreetsPreferenceValues() {
     for (let i = 0; i < preferences['streets'].length; i += 1) {
       if (preferences['streets'][i]) {
-        document.getElementById(`svl_streetWidth_${i}`).value =
+        (<HTMLInputElement>document.getElementById(`svl_streetWidth_${i}`)).value =
           preferences['streets'][i]['strokeWidth'];
-        document.getElementById(`svl_streetColor_${i}`).value =
+        (<HTMLInputElement>document.getElementById(`svl_streetColor_${i}`)).value =
           preferences['streets'][i]['strokeColor'];
-        document.getElementById(`svl_strokeDashstyle_${i}`).value =
+        (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${i}`)).value =
           preferences['streets'][i]['strokeDashstyle'];
       }
     }
@@ -2530,7 +2526,7 @@ function initScript() {
     const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
     rollbackButton.classList.add('disabled');
     rollbackButton.disabled = true;
-    document.getElementById('svl_buttons').classList.remove('svl_unsaved');
+    (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
     updateStreetsPreferenceValues();
 
     const options = getOptions();
@@ -2539,9 +2535,9 @@ function initScript() {
         (<HTMLInputElement>document.getElementById(`svl_streetWidth_${o}`)).value =
           preferences[o]['strokeWidth'];
       }
-      document.getElementById(`svl_streetColor_${o}`).value =
+      (<HTMLInputElement>document.getElementById(`svl_streetColor_${o}`)).value =
         preferences[o]['strokeColor'];
-      document.getElementById(`svl_strokeDashstyle_${o}`).value =
+      (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${o}`)).value =
         preferences[o]['strokeDashstyle'];
     });
 
@@ -2557,53 +2553,54 @@ function initScript() {
           'nearbyHOV',
         ].includes(o)
       ) {
-        document.getElementById(`svl_streetOpacity_${o}`).value =
-          preferences[o]['strokeOpacity'] * 100.0;
+        (<HTMLInputElement>document.getElementById(`svl_streetOpacity_${o}`)).value =
+          (preferences[o]['strokeOpacity'] * 100.0).toString();
       } else {
-        document.getElementById(`svl_streetWidth_${o}`).value =
+        (<HTMLInputElement>document.getElementById(`svl_streetWidth_${o}`)).value =
           preferences[o]['strokeWidth'];
       }
-      document.getElementById(`svl_streetColor_${o}`).value =
+      (<HTMLInputElement>document.getElementById(`svl_streetColor_${o}`)).value =
         preferences[o]['strokeColor'];
-      document.getElementById(`svl_strokeDashstyle_${o}`).value =
+      (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${o}`)).value =
         preferences[o]['strokeDashstyle'];
     });
 
-    document.getElementById('svl_fakelock').value = WazeWrap?.User?.Rank() ?? 7;
-    document.getElementById('svl_autoReload_enabled').checked =
+    (<HTMLInputElement>document.getElementById('svl_fakelock')).value = preferences['fakelock'] ?? 6;
+    (<HTMLInputElement>document.getElementById('svl_autoReload_enabled')).checked =
       preferences['autoReload']['enabled'];
-    document.getElementById('svl_renderGeomNodes').checked =
+    (<HTMLInputElement>document.getElementById('svl_renderGeomNodes')).checked =
       preferences['renderGeomNodes'];
-    document.getElementById('svl_labelOutlineWidth').value =
+    (<HTMLInputElement>document.getElementById('svl_labelOutlineWidth')).value =
       preferences['labelOutlineWidth'];
-    document.getElementById('svl_hideMinorRoads').checked =
+    (<HTMLInputElement>document.getElementById('svl_hideMinorRoads')).checked =
       preferences['hideMinorRoads'];
-    document.getElementById('svl_autoReload_interval').value =
-      preferences['autoReload']['interval'] / 1000;
+    (<HTMLInputElement>document.getElementById('svl_autoReload_interval')).value =
+      (preferences['autoReload']['interval'] / 1000).toString();
 
-    document.getElementById('svl_clutterConstant').value =
+    (<HTMLInputElement>document.getElementById('svl_clutterConstant')).value =
       preferences['clutterConstant'];
-    document.getElementById('svl_closeZoomLabelSize').value =
+    (<HTMLInputElement>document.getElementById('svl_closeZoomLabelSize')).value =
       preferences['closeZoomLabelSize'];
-    document.getElementById('svl_farZoomLabelSize').value =
+    (<HTMLInputElement>document.getElementById('svl_farZoomLabelSize')).value =
       preferences['farZoomLabelSize'];
-    document.getElementById('svl_arrowDeclutter').value =
+    (<HTMLInputElement>document.getElementById('svl_arrowDeclutter')).value =
       preferences['arrowDeclutter'];
-    document.getElementById('svl_useWMERoadLayerAtZoom').value =
+    (<HTMLInputElement>document.getElementById('svl_useWMERoadLayerAtZoom')).value =
       preferences['useWMERoadLayerAtZoom'];
-    document.getElementById('svl_switchZoom').value = preferences['switchZoom'];
-    document.getElementById('svl_nodesThreshold').value =
+    (<HTMLInputElement>document.getElementById('svl_switchZoom')).value =
+      preferences['switchZoom'];
+    (<HTMLInputElement>document.getElementById('svl_nodesThreshold')).value =
       preferences['nodesThreshold'];
-    document.getElementById('svl_segmentsThreshold').value =
+    (<HTMLInputElement>document.getElementById('svl_segmentsThreshold')).value =
       preferences['segmentsThreshold'];
 
-    document.getElementById('svl_disableRoadLayers').checked =
+    (<HTMLInputElement>document.getElementById('svl_disableRoadLayers')).checked =
       preferences['disableRoadLayers'];
-    document.getElementById('svl_startDisabled').checked =
+    (<HTMLInputElement>document.getElementById('svl_startDisabled')).checked =
       preferences['startDisabled'];
-    document.getElementById('svl_showUnderGPSPoints').checked =
+    (<HTMLInputElement>document.getElementById('svl_showUnderGPSPoints')).checked =
       preferences['showUnderGPSPoints'];
-    document.getElementById('svl_routingModeEnabled').checked =
+    (<HTMLInputElement>document.getElementById('svl_routingModeEnabled')).checked =
       preferences['routingModeEnabled'];
     (<HTMLInputElement>document.getElementById('svl_hideRoutingModeBlock')).checked =
       preferences['hideRoutingModeBlock'];
@@ -2613,16 +2610,16 @@ function initScript() {
       String(preferences['layerOpacity'] * 100);
 
     // Speed limits
-    document.getElementById('svl_showSLtext').checked =
+    (<HTMLInputElement>document.getElementById('svl_showSLtext')).checked =
       preferences['showSLtext'];
-    document.getElementById('svl_showSLcolor').checked =
+    (<HTMLInputElement>document.getElementById('svl_showSLcolor')).checked =
       preferences['showSLcolor'];
-    document.getElementById('svl_showSLSinglecolor').checked =
+    (<HTMLInputElement>document.getElementById('svl_showSLSinglecolor')).checked =
       preferences['showSLSinglecolor'];
-    document.getElementById('svl_showDashedUnverifiedSL').checked =
+    (<HTMLInputElement>document.getElementById('svl_showDashedUnverifiedSL')).checked =
       preferences['showDashedUnverifiedSL'];
-    document.getElementById('svl_SLColor').value = preferences['SLColor'];
-    document.getElementById('svl_realsize').checked = preferences['realsize'];
+    (<HTMLInputElement>document.getElementById('svl_SLColor')).value = preferences['SLColor'];
+    (<HTMLInputElement>document.getElementById('svl_realsize')).checked = preferences['realsize'];
 
     const segmentWidths = document.querySelectorAll('.segmentsWidth');
     segmentWidths.forEach((el) => {
@@ -3392,38 +3389,31 @@ function initScript() {
   }
 
   /**
-   *
-   * @param {number} id
+   * Rather use removeNodesById when possible
    */
   function removeNodeById(id: number) {
-    nodesVector.destroyFeatures(nodesVector.getFeaturesByAttribute('sID', id), {
-      'silent': true,
-    });
+    consoleDebug(`Removing node: ${id}`);
+    wmeSDK.Map.removeFeatureFromLayer({
+      featureId: id,
+      layerName: LAYERNAME_NODES
+    })
   }
 
-  /**
-   *
-   * @param {Array<Waze.Feature.Vector.Node>} nodes
-   * @deprecated
-   */
-  function removeNodes(nodes: Array<Waze.Feature.Vector.Node>) {
-    consoleDebug(`Removing ${nodes.length} nodes`);
-    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
-      consoleDebug('Destroy all nodes');
-      nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
-      return;
-    }
-    if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
-      if (!drawingAborted) {
-        abortDrawing();
-      }
-      return;
-    }
-    let i: number;
-    for (i = 0; i < nodes.length; i += 1) {
-      removeNodeById(nodes[i].attributes.id);
-    }
+  function removeNodesById(ids: number[]) {
+    consoleDebug(`Removing ${ids.length} nodes: ${ids.join()}`);
+    /*if (wmeSDK.Map.getFeatureDomElement({
+      featureId: ids[0],
+      layerName: LAYERNAME_NODES
+    }) === null) {
+      alert("Error");
+      console.error(ids[0] + ' not found in layer ' + LAYERNAME_NODES);
+    }*/
+    wmeSDK.Map.removeFeaturesFromLayer({
+      featureIds: ids,
+      layerName: LAYERNAME_NODES
+    })
   }
+
 
   function removeNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
     if (d.dataModelName !== 'nodes') return;
@@ -3431,7 +3421,7 @@ function initScript() {
     consoleDebug(d);
     if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       consoleDebug('Destroy all nodes');
-      nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
+      removeAllNodesFromLayer();
       return;
     }
     if (drawingAborted || d.objectIds.length > preferences['nodesThreshold']) {
@@ -3440,12 +3430,15 @@ function initScript() {
       }
       return;
     }
-    let i: number;
-    for (i = 0; i < d.objectIds.length; i += 1) {
-      removeNodeById(d.objectIds[i]);
-    }
+    removeNodesById(d.objectIds as number[]);
   }
 
+  /**
+   * 
+   * @param attributes 
+   * @deprecated
+   * @returns 
+   */
   function getNodeStyle(attributes) {
     if (attributes.segIDs?.length === 1) {
       // jshint ignore:line
@@ -3454,71 +3447,22 @@ function initScript() {
     return nodeStyle;
   }
 
-  /**
- *
- * @param {Array<Waze.Feature.Vector.Node>} nodes
- * @deprecated
- */
-  function changeNodes(nodes: Array<Waze.Feature.Vector.Node>) {
-    consoleDebug('Change nodes');
-    nodes.forEach((node) => {
-      const { attributes } = node;
-      const nodeFeature = nodesVector.getFeaturesByAttribute(
-        'sID',
-        attributes.id
-      )[0];
-      if (nodeFeature) {
-        nodeFeature.style = getNodeStyle(attributes);
-        const olGeo = node.getOLGeometry();
-        nodeFeature.move(
-          new OpenLayers.LonLat(olGeo.x, olGeo.y)
-        );
-      } else if (attributes.id > 0) {
-        // The node has just been saved
-        const newNode = drawNode(node);
-        if (newNode) {
-          nodesVector.addFeatures([newNode], { 'silent': true });
-        }
-      } // Else it is a temporary node, we won't draw it.});
-    });
-  }
-
-  function editNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
-    if (d.dataModelName !== 'nodes') return;
-    consoleDebug(d);
-    consoleDebug('Change nodes SDK');
-    d.objectIds.forEach((nodeId) => {
-      const node = W.model.nodes.getObjectById(nodeId);
-      const { attributes } = node;
-      const nodeFeature = nodesVector.getFeaturesByAttribute(
-        'sID',
-        attributes.id
-      )[0];
-      if (nodeFeature) {
-        nodeFeature.style = getNodeStyle(attributes);
-        const olGeo = node.getOLGeometry();
-        nodeFeature.move(
-          new OpenLayers.LonLat(olGeo.x, olGeo.y)
-        );
-      } else if (attributes.id > 0) {
-        // The node has just been saved
-        const newNode = drawNode(node);
-        if (newNode) {
-          nodesVector.addFeatures([newNode], { 'silent': true });
-        }
-      } // Else it is a temporary node, we won't draw it.});
-    });
-  }
-
-  /**
-   *
-   * @param {Array<Waze.Feature.Vector.Node>} nodes
-   */
-  function nodeStateDeleted(nodes: Array<Waze.Feature.Vector.Node>) {
-    consoleDebug('Node state deleted');
-    for (let i = 0; i < nodes.length; i += 1) {
-      removeNodeById(nodes[i].getID());
+  function handleNodesUpdated(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
+    consoleDebug(`handleNodesUpdated called. ${d.objectIds.length} nodes to edit: ${d.objectIds.join()}`);
+    if (d.objectIds.length === 0) return;
+    if (d.dataModelName !== 'nodes') {
+      console.error("[SVL] Invalid dataModelName: expected: 'nodes', got: " + d.dataModelName);
+      return
+    };
+    let nodes = d.objectIds.map((nodeId) => {
+      return wmeSDK.DataModel.Nodes.getById({ nodeId: nodeId as number });
+    }).filter((n) => n !== null) as Node[];
+    if (nodes.length == 0) {
+      consoleDebug("No nodes found to update");
+      return;
     }
+    removeNodesById(d.objectIds as number[]);
+    addNodesSDK(nodes);
   }
 
   /**
@@ -3538,10 +3482,29 @@ function initScript() {
     // TODO
   }*/
 
-  function addNodesSDK(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
-    if (d.dataModelName !== 'nodes') return;
-    consoleDebug(`Adding ${d.objectIds.length} nodes`);
-    consoleDebug(d);
+  function addNodesSDK(node: Node[]) {
+    let sdkFeatures: SdkFeature<Point>[] = [];
+    node.forEach((n) => {
+      consoleDebug(`Adding node ${n.id}`);
+      sdkFeatures.push(
+        {
+          id: n.id,
+          geometry: n.geometry,
+          properties: {
+            "conSegm": n.connectedSegmentIds.length
+          },
+          type: "Feature",
+        }
+      );
+    });
+
+    wmeSDK.Map.addFeaturesToLayer({
+      features: sdkFeatures,
+      layerName: LAYERNAME_NODES
+    })
+  }
+
+  function handleNodeAddEvent(d: { dataModelName: string; objectIds: Array<(string | number)>; }) {
     if (drawingAborted || d.objectIds.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
         abortDrawing();
@@ -3553,22 +3516,24 @@ function initScript() {
       return;
     }
 
-    const myFeatures: OpenLayers.Feature.Vector[] = [];
-    for (let i = 0; i < d.objectIds.length; i += 1) {
-      const node = W.model.nodes.getObjectById(d.objectIds[i]);
-      if (node && node.getOLGeometry() !== undefined) {
-        //if (nodes[i].attributes.id > 0) {
-        const newNode = drawNode(node);
-        if (newNode) {
-          myFeatures.push(newNode);
-        }
-        //}
-      } else {
-        console.warn('[SVL] Geometry of node is undefined');
+    const nodes = d.objectIds.map((nodeId) => wmeSDK.DataModel.Nodes.getById({ nodeId: nodeId as number })).filter((n) => n !== null);
+    addNodesSDK(nodes);
+  }
+
+  function addAllNodesSDK() {
+    const nodes = wmeSDK.DataModel.Nodes.getAll();
+    if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
+      if (!drawingAborted) {
+        abortDrawing();
       }
+      return;
+    }
+    if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
+      consoleDebug('Not adding them because of the zoom');
+      return;
     }
 
-    nodesVector.addFeatures(myFeatures, { 'silent': true });
+    addNodesSDK(nodes);
     return true;
   }
 
@@ -3718,19 +3683,19 @@ function initScript() {
     nodeEventsRemoveCallbacks.push(
       wmeSDK.Events.on({
         eventName: "wme-data-model-objects-added",
-        eventHandler: ({ dataModelName, objectIds }) => { addNodesSDK({ dataModelName, objectIds }) },
+        eventHandler: ({ dataModelName, objectIds }) => { consoleDebug(`[EVENTS] Node add: ${objectIds.length}, ${JSON.stringify(objectIds)}`); handleNodeAddEvent({ dataModelName, objectIds }) },
       }));
 
     nodeEventsRemoveCallbacks.push(
       wmeSDK.Events.on({
         eventName: "wme-data-model-objects-changed",
-        eventHandler: ({ dataModelName, objectIds }) => { editNodesSDK({ dataModelName, objectIds }) },
+        eventHandler: ({ dataModelName, objectIds }) => { consoleDebug(`[EVENTS] Node changed: ${objectIds.length}, ${JSON.stringify(objectIds)}`); handleNodesUpdated({ dataModelName, objectIds }) },
       }));
 
     nodeEventsRemoveCallbacks.push(
       wmeSDK.Events.on({
         eventName: "wme-data-model-objects-removed",
-        eventHandler: ({ dataModelName, objectIds }) => { removeNodesSDK({ dataModelName, objectIds }) },
+        eventHandler: ({ dataModelName, objectIds }) => { consoleDebug(`[EVENTS] Node removed: ${objectIds.length}, ${JSON.stringify(objectIds)}`); removeNodesSDK({ dataModelName, objectIds }) },
       }));
 
     /*
@@ -3739,32 +3704,6 @@ function initScript() {
       eventName: "wme-data-model-objects-saved",
       eventHandler: ({ dataModelName, objectIds }) => { saveNodesSDK({ dataModelName, objectIds }) },
     });*/
-    // eslint-disable-next-line no-underscore-dangle
-    const events = W.model.nodes._events;
-    if (typeof events === 'object') {
-      /*
-      events.objectsremoved.push({
-        'context': nodesVector,
-        'callback': removeNodes,
-        'svl': true,
-      });
-      events.objectsadded.push({
-        'context': nodesVector,
-        'callback': addNodes,
-        'svl': true,
-      });
-      events.objectschanged.push({
-        'context': nodesVector,
-        'callback': changeNodes,
-        'svl': true,
-      });      */
-      events['objects-state-deleted'].push({
-        'context': nodesVector,
-        'callback': nodeStateDeleted,
-        'svl': true,
-      });
-
-    }
   }
 
   /**
@@ -3776,10 +3715,17 @@ function initScript() {
       'silent': true,
     });
     labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
-    nodesVector.destroyFeatures(nodesVector.features, { 'silent': true });
+    removeAllNodesFromLayer();
   };
 
+  function removeAllNodesFromLayer() {
+    wmeSDK.Map.removeAllFeaturesFromLayer({
+      layerName: LAYERNAME_NODES
+    });
+  }
+
   function abortDrawing() {
+    console.trace();
     console.warn('[SVL] Abort drawing, too many elements');
     drawingAborted = true;
     setLayerVisibility(ROAD_LAYER, true);
@@ -3898,7 +3844,10 @@ function initScript() {
   function manageVisibilityChanged(event) {
     // Toggle node layer visibility accordingly
     consoleDebug('ManageVisibilityChanged', event);
-    nodesVector.setVisibility(event['object'].visibility);
+    wmeSDK.Map.setLayerVisibility({
+      layerName: LAYERNAME_NODES,
+      visibility: event['object'].visibility
+    });
     labelsVector.setVisibility(event['object'].visibility);
     if (event['object'].visibility) {
       // SVL was just enabled
@@ -3953,18 +3902,19 @@ function initScript() {
   function initWazeWrapElements() {
     console.log('SVL: initializing WazeWrap');
     // Adding keyboard shortcut
+    const toggleShortcut: KeyboardShortcut = {
+      callback: () => {
+        setLayerVisibility(SVL_LAYER, !streetVectorLayer.visibility);
+      },
+      description: "Toggle SVL",
+      shortcutId: "svl",
+      shortcutKeys: "l",
+    };
     try {
-      const toggleShortcut: KeyboardShortcut = {
-        callback: () => {
-          setLayerVisibility(SVL_LAYER, !streetVectorLayer.visibility);
-        },
-        description: "Toggle SVL",
-        shortcutId: "svl",
-        shortcutKeys: "l",
-      };
       wmeSDK.Shortcuts.createShortcut(toggleShortcut);
       console.log('SVL: Keyboard shortcut successfully added.');
     } catch (e) {
+      safeAlert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut. Open the WME shortcut section to set it to your favorite key combination.');
       console.error('SVL: Error while adding the keyboard shortcut:');
       console.error(e);
     }
@@ -3992,9 +3942,10 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 6.0.0 - Start using the new WME SDK. SVL is likely to be discontinued if Waze quits supporting OpenLayers.
+      <br>- 6.1.0 - The nodes layer is now a WME SDK layer, instead of an OpenLayers layer. This should improve performance and stability.
+      <br>- 6.0.0 - Start using the new WME SDK. <b>SVL is likely to be discontinued if Waze quits supporting OpenLayers without a viable alternative.</b>
       <br>- 6.0.0 - Fix: no more road layer automatically enabled by the WME, when SVL is on.
-      <br>- 5.5.3 & 4: Fix for WME Beta. <b>Warning: SVL may stop working for good in the future due to WME internal changes</b>
+      <br>- 5.5.3 & 4: Fix for WME Beta.
       <br>- 5.5.1: Use GeoJson instead of OpenLayers (no visible change)`,
       '',
       GM_info.script.supportURL
@@ -4110,11 +4061,11 @@ function initScript() {
   }
 
   /**
- *
- * @param {Object} source
- * @return {Object}
- * 
- */
+  *
+  * @param {Object} source
+  * @return {Object}
+  * 
+  */
   function svlExtend(source: object): object {
     let destination = {};
     if (source) {
@@ -4543,56 +4494,6 @@ function initScript() {
             } */
       };
 
-    nodesVector = new OpenLayers.Layer.Vector('Nodes Vector', {
-      'visibility': !preferences['startDisabled'],
-    });
-
-    nodesVector.drawFeature = streetVectorLayer.drawFeature;
-    nodesVector.addFeatures = streetVectorLayer.svlAddFeatures;
-    nodesVector.moveTo = streetVectorLayer.moveTo;
-
-    nodesVector.renderer.drawFeature = function drawFeature(feature, style: Partial<StyleObject>,
-      farZoom = isFarZoom()) {
-      if (wmeSDK.Map.getZoomLevel() < 2) {
-        style = { 'display': 'none' };
-        return nodesVector.renderer.drawGeometry(
-          feature.geometry,
-          style,
-          feature.id
-        );
-      }
-      if (style == null) {
-        style = feature.style;
-      }
-
-      style = svlExtend(style);
-
-      if (feature.geometry) {
-        // if (bounds) {
-        if (!farZoom) {
-          const bounds = feature.geometry.getBounds();
-          if (!bounds.intersectsBounds(nodesVector.renderer.extent)) {
-            style = { 'display': 'none' };
-          } else {
-            nodesVector.renderer.featureDx = 0;
-            if (preferences['realsize']) {
-              style['pointRadius'] /= OLMap.resolution;
-            }
-          }
-        } else {
-          style = { 'display': 'none' };
-        }
-        return nodesVector.renderer.drawGeometry(
-          feature.geometry,
-          style,
-          feature.id
-        );
-
-        // } else { alert("No bounds!"); }
-      }
-      return undefined;
-    };
-
     labelsVector = new OpenLayers.Layer.Vector('Labels Vector', {
       'name': 'vectorLabels',
       'styleMap': labelStyleMap,
@@ -4796,12 +4697,46 @@ function initScript() {
     // Add layers to the map
     OLMap.addLayer(streetVectorLayer);
     OLMap.addLayer(labelsVector);
-    OLMap.addLayer(nodesVector);
+
+    // Add node layer (SDK)
+    wmeSDK.Map.addLayer({
+      layerName: LAYERNAME_NODES,
+      styleContext: {
+        'getPointRadius': (context) => {
+          return 3.0 / wmeSDK.Map.getMapResolution(); // TODO: consider computing this once instead of doing the math for each node
+        },
+        'shouldDisplay': (context) => {
+          return isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : 'block';
+        }
+      },
+      styleRules: [
+        {
+          style: {
+            'strokeWidth': 2,
+            'fillColor': '#0015FF',
+            'strokeColor': '#210172',
+            'fillOpacity': 0.9,
+            'pointRadius': '${getPointRadius}',
+            'display': '${shouldDisplay}',
+            'pointerEvents': 'none',
+          }
+        },
+        {
+          predicate: (properties, zoomLevel) => {
+            return properties["conSegm"] == 1
+          },
+          style: {
+            'fillColor': '#C31CFF',
+            'strokeColor': '#560d71',
+          }
+        }
+      ],
+      zIndexing: false // default: false
+    });
 
     if (DEBUG) {
       document['sv'] = streetVectorLayer;
       document['lv'] = labelsVector;
-      document['nv'] = nodesVector;
       document['svl_pref'] = preferences;
     }
 
@@ -4881,7 +4816,7 @@ function initScript() {
     consoleDebug('DrawAllSegments');
     destroyAllFeatures();
     addSegmentsSDK({ dataModelName: 'segments', objectIds: wmeSDK.DataModel.Segments.getAll().map((e) => e.id) }); // TODO: here we are getting all data, and discarding it
-    addNodesSDK({ dataModelName: 'nodes', objectIds: wmeSDK.DataModel.Nodes.getAll().map((e) => e.id) });
+    addAllNodesSDK();
   }
 
   function updateStylesFromPreferences(pref: PreferenceObject, shouldRedraw = true) {
