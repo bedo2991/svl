@@ -1439,9 +1439,7 @@ function initScript() {
     ).components;
     */
     const geometryPointArray = model.geometry.coordinates;
-    // Use a more aggressive tolerance for better performance on complex geometries
-    const tolerance = geometryPointArray.length > 10 ? 0.0001 : 0.00001;
-    const simplified = simplify(model.geometry, { tolerance, highQuality: false, mutate: false });
+    const simplified = simplify(model.geometry, { tolerance: 0.00001, highQuality: false, mutate: false });
     /* Visualize simplified, for testing
     let redSegment: SdkFeature<LineString> = {
       type: 'Feature',

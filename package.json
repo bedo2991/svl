@@ -1,5 +1,5 @@
 {
-  "version": "6.2.0",
+  "version": "6.2.1",
   "name": "svl",
   "description": "Street Vector Layer (SVL)\r The Road layer for the Waze editors, made by editors.",
   "devDependencies": {
