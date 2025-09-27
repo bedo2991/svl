@@ -54,6 +54,7 @@ function initScript() {
   /** @type {Function} */
   const consoleGroupEnd: Function = DEBUG ? console.groupEnd : () => { };
 
+  /*
   const assertFeatureDoesNotExist: Function = DEBUG
     ? (id: number, layer: OpenLayers.Layer.Vector) => {
       if (layer.getFeaturesByAttribute("sID", id).length > 0) {
@@ -65,6 +66,7 @@ function initScript() {
       }
     }
     : () => { };
+*/
 
   /** @type{number} */
   const MAX_SEGMENTS: number = 3000;
@@ -76,7 +78,7 @@ function initScript() {
   const segmentsStore = new Map<Segment['id'], Set<string>>();
   const arrowsStore = new Map<Segment['id'], Set<string>>();
   const iconsStore = new Map<Segment['id'], Set<string>>();
-  
+
   // Performance caches
   const geometryCache = new Map<Segment['id'], any>();
   const styleCache = new Map<string, any>();
@@ -296,10 +298,12 @@ function initScript() {
     SVL_PIXEL_SIZE_CACHE.clear();
     const defaultLaneWidth = topCountry.defaultLaneWidthPerRoadType;
     if (defaultLaneWidth) {
-      Object.keys(defaultLaneWidth).forEach((e) => {
+      const keys = Object.keys(defaultLaneWidth);
+      for (let i = 0; i < keys.length; i++) {
+        const e = keys[i];
         defaultSegmentWidthMeters[e] = defaultLaneWidth[e] / 50.0; //50: (width * 2) / 100
         defaultLaneWidthMeters[e] = defaultLaneWidth[e] / 100;
-      });
+      }
       redrawAllSegments();
     } else {
       console.warn(
@@ -312,12 +316,12 @@ function initScript() {
   let redrawTimeout: number | null = null;
   function redrawAllSegments() {
     consoleDebug('DrawAllSegments');
-    
+
     // Clear any pending redraw to avoid multiple rapid redraws
     if (redrawTimeout !== null) {
       clearTimeout(redrawTimeout);
     }
-    
+
     // Throttle redraw operations to improve performance
     redrawTimeout = window.setTimeout(() => {
       destroyAllFeatures();
@@ -1363,14 +1367,14 @@ function initScript() {
   const queuedIcons: Set<SdkFeature<Point>> = new Set();
 
   async function queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-    feature.id = `${id}_arrow_${crypto.randomUUID()}`;
+    feature.id = `${id}_a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     queuedArrows.add(feature);
     // TODO: there might be IDs in the list that have not been drawn yet
     addIDsToArrowsStore(id, feature.id);
   }
 
   async function queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-    feature.id = `${id}_icon_${crypto.randomUUID()}`;
+    feature.id = `${id}_i_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     queuedIcons.add(feature);
     // TODO: there might be IDs in the list that have not been drawn yet
     addIDsToIconsStore(id, feature.id);
@@ -1385,7 +1389,6 @@ function initScript() {
   }
 
   async function queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature) {
-    // Use more efficient ID generation - avoid crypto operations in hot path
     feature.id = `${id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     queuedSegments.add(feature);
     // TODO: there might be IDs in the list that have not been drawn yet
@@ -1396,8 +1399,7 @@ function initScript() {
     if (queuedSegments.size > 0) {
       consoleDebug(`Drawing ${queuedSegments.size} queued segments`);
       // Convert to array once instead of calling Array.from repeatedly
-      const featuresArray = Array.from(queuedSegments);
-      wmeSDK.Map.addFeaturesToLayer({ layerName: LAYERS.SEGMENTS, features: featuresArray });
+      wmeSDK.Map.addFeaturesToLayer({ layerName: LAYERS.SEGMENTS, features: Array.from(queuedSegments) });
       queuedSegments.clear();
     }
   }
@@ -1417,13 +1419,15 @@ function initScript() {
 
 
   function drawSegmentSDK(model: Segment): { labels: any } {
-    // consoleDebug("DrawSegment");
-    if (!model) // TODO: state "DELETED" was ignored
+    if (!model || wmeSDK.DataModel.isDeleted({
+      dataModelName: "segments",
+      objectId: model.id
+    })) {
+      // Skip deleted segments (this happens when the user pans away and comes back on a deleted segment)
       return { labels: [] };
+    }
     consoleDebug(`Drawing segment: ${model.id}`);
     // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
-
-    // TODO: simplify the geometry (factor: 1.5)
 
     //const segmentFeatures: SdkFeature<LineString>[] = [];
 
@@ -3265,18 +3269,6 @@ function initScript() {
       })
     );
 
-    /* options.decorations.forEach((o) => {
-      if (o !== 'dirty') {
-        if (o === 'red') {
-          decorations.appendChild(createStreetOptionLine(o, false));
-        } else {
-          decorations.appendChild(createStreetOptionLine(o));
-        }
-      } else {
-        decorations.appendChild(createStreetOptionLine(o, false, true));
-      }
-    }); */
-
     streets.appendChild(decorations);
 
     streets.appendChild(
@@ -3708,7 +3700,8 @@ function initScript() {
 
   function addNodesSDK(node: Node[]) {
     let sdkFeatures: SdkFeature<Point>[] = [];
-    node.forEach((n) => {
+    for (let i = 0; i < node.length; i++) {
+      let n = node[i];
       if (!wmeSDK.DataModel.isDeleted({
         dataModelName: "nodes",
         objectId: n.id
@@ -3727,7 +3720,7 @@ function initScript() {
       } else {
         // Adding a node that was deleted. This can happen if the map gets moved / zoomed while editing
       }
-    });
+    }
 
     wmeSDK.Map.addFeaturesToLayer({
       features: sdkFeatures,
@@ -3769,12 +3762,12 @@ function initScript() {
     }
     //let features: SdkFeature<LineString>[] = [];
     let labels: any[] = [];
-    // Use for loop instead of forEach for better performance
-    const segmentsLength = segments.length;
-    for (let i = 0; i < segmentsLength; i++) {
-      const res = drawSegmentSDK(segments[i]);
-      if (res && res.labels) {
-        labels.push(...res.labels);
+    for (let i = 0; i < segments.length; i++) {
+      let s = segments[i];
+      const res = drawSegmentSDK(s);
+      if (res) {
+        if (res.labels)
+          labels.push(...res.labels);
       }
     }
     drawAllQueues();
@@ -4087,32 +4080,33 @@ function initScript() {
    */
   function removeSegmentsFromLayer(ids: Segment['id'][]) {
     const segmentsFeatureIds: string[] = [];
-    ids.forEach((id: Segment['id']) => {
-      const set = segmentsStore.get(id);
+    for (let i = 0; i < ids.length; i++) {
+      let set = segmentsStore.get(ids[i]);
       if (set) {
         segmentsFeatureIds.push(...Array.from(set));
       }
       labelsVector.destroyFeatures(
-        labelsVector.getFeaturesByAttribute('sID', id),
+        labelsVector.getFeaturesByAttribute('sID', ids[i]),
         { 'silent': true }
       );
-    });
+    }
+
 
     const arrowsFeatureIds: string[] = [];
-    ids.forEach((id: Segment['id']) => {
-      const set = arrowsStore.get(id);
+    for (let i = 0; i < ids.length; i++) {
+      const set = arrowsStore.get(ids[i]);
       if (set) {
         arrowsFeatureIds.push(...Array.from(set));
       }
-    });
+    }
 
     const iconsFeatureIds: string[] = [];
-    ids.forEach((id: Segment['id']) => {
-      const set = iconsStore.get(id);
+    for (let i = 0; i < ids.length; i++) {
+      const set = iconsStore.get(ids[i]);
       if (set) {
         iconsFeatureIds.push(...Array.from(set));
       }
-    });
+    }
 
     wmeSDK.Map.removeFeaturesFromLayer({
       featureIds: segmentsFeatureIds,
@@ -4267,7 +4261,7 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
-      <br>- 7.0.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).
+      <br>- 6.2.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).
       <br>- 6.1.0 - The nodes layer is now a WME SDK layer, instead of an OpenLayers layer. This should improve performance and stability.
       <br>- 6.0.0 - Start using the new WME SDK. <b>SVL is likely to be discontinued if Waze quits supporting OpenLayers without a viable alternative.</b>
       <br>- 6.0.0 - Fix: no more road layer automatically enabled by the WME, when SVL is on.`,
@@ -4352,11 +4346,9 @@ function initScript() {
           for (const [j, value] of rest.entries()) {
             tr_keys[value.trim()] = parseInt(j, 10);
           }
-          console.dir(tr_keys);
         }
       }
       onlineTranslations = true;
-      console.dir(tr);
       return true;
     }
     throw new Error('Network response for SVL translations was not ok');
@@ -4881,7 +4873,6 @@ function initScript() {
     handleWMESettingsUpdated(false);
 
     // Add layers to the map
-    //OLMap.addLayer(streetVectorLayer);
 
     // Add segment layer (SDK)
     wmeSDK.Map.addLayer({
@@ -5042,6 +5033,10 @@ function initScript() {
         },
         styleRules: [
           {
+            /* Currently unnecessary, as it is the only icon we have
+            predicate: (properties, zoomLevel) => {
+              return properties['isAverageSpeedCamera'] === 1;
+            },*/
             style: {
               'rotation': '${degrees}',
               'externalGraphic': averageSpeedCameraImg,
