@@ -4,7 +4,7 @@ import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import proj4 from "proj4";
 
-import averageSpeedCameraImg from './resources/averagespeed.png';
+//import averageSpeedCameraImg from './resources/averagespeed.png';
 
 // the sdk initScript function will be called after the SDK is initialized
 unsafeWindow.SDK_INITIALIZED.then(initScript);
@@ -2177,9 +2177,10 @@ function initScript() {
         layerName: LAYERS.NODES,
         zIndex: gpsLayerIndex - 15,
       });
+      labelsVector.setZIndex(gpsLayerIndex - 14);
       wmeSDK.Map.setLayerZIndex({
         layerName: LAYERS.ICONS,
-        zIndex: gpsLayerIndex - 14
+        zIndex: gpsLayerIndex - 13
       });
     } else {
       wmeSDK.Map.setLayerZIndex({
@@ -2194,9 +2195,10 @@ function initScript() {
         layerName: LAYERS.NODES,
         zIndex: gpsLayerIndex + 20,
       });
+      labelsVector.setZIndex(gpsLayerIndex + 21);
       wmeSDK.Map.setLayerZIndex({
         layerName: LAYERS.ICONS,
-        zIndex: gpsLayerIndex + 21
+        zIndex: gpsLayerIndex + 22
       });
     }
   }
@@ -4362,8 +4364,9 @@ function initScript() {
   const SVL_PIXEL_SIZE_CACHE = new Map();
 
   function getCachedGeodesicPixelSizeSVL(zoomLevel: ZoomLevel): number {
-    if (SVL_PIXEL_SIZE_CACHE.has(zoomLevel)) {
-      return SVL_PIXEL_SIZE_CACHE.get(zoomLevel) as number;
+    let cachedValue = SVL_PIXEL_SIZE_CACHE.get(zoomLevel);
+    if (cachedValue !== undefined) {
+      return cachedValue as number;
     }
     const size = getGeodesicPixelSizeSVL();
     SVL_PIXEL_SIZE_CACHE.set(zoomLevel, size);
@@ -4977,8 +4980,6 @@ function initScript() {
       zIndexing: true
     });
 
-    OLMap.addLayer(labelsVector);
-
     // Add node layer (SDK)
     wmeSDK.Map.addLayer({
       layerName: LAYERS.NODES,
@@ -5015,6 +5016,9 @@ function initScript() {
       zIndexing: false // default: false
     });
 
+    // Add the labels layer (OpenLayers)
+    OLMap.addLayer(labelsVector);
+
     // Add icons layer (SDK)
     wmeSDK.Map.addLayer(
       {
@@ -5037,7 +5041,7 @@ function initScript() {
             },*/
             style: {
               'rotation': '${degrees}',
-              'externalGraphic': averageSpeedCameraImg,
+              'externalGraphic': 'https://raw.githubusercontent.com/bedo2991/svl/master/resources/averagespeed.png',
               'display': '${display}',
               'graphicWidth': 62,
               'graphicHeight': 62,
