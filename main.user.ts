@@ -154,9 +154,6 @@ function initScript() {
   /** @type {OpenLayers.Map} */
   let OLMap: OpenLayers.Map;
 
-  /** @type{OpenLayers.Projection} */
-  let gmapsProjection: OpenLayers.Projection;
-
   /** @type{number} */
   const ROAD_LAYER: number = 0;
   /** @type{Object} */
@@ -192,42 +189,6 @@ function initScript() {
     strokeWidth: 1,
     strokeDashstyle: 'dash',
     strokeOpacity: 0.6,
-  };
-
-  const nodeStyle = {
-    'stroke': false,
-    'fillColor': '#00FF00',
-    'fillOpacity': 0.9,
-    'pointRadius': 3,
-    'pointerEvents': 'none',
-  };
-
-  // note: nodes inside JB cannot be styled consistently (WME's function does not always work)
-  const nodeStyleDeadEnd = {
-    'stroke': false,
-    'fillColor': '#FF0000',
-    'fillOpacity': 0.9,
-    'pointRadius': 3,
-    'pointerEvents': 'none',
-  };
-
-  const unknownDirStyle = {
-    'graphicName': 'x',
-    'strokeColor': '#f00',
-    'strokeWidth': 1.5,
-    'fillColor': '#FFFF40',
-    'fillOpacity': 0.7,
-    'pointRadius': 7,
-    'pointerEvents': 'none',
-  };
-
-  const geometryNodeStyle = {
-    'stroke': false,
-    'fillColor': '#000',
-    'fillOpacity': 0.5,
-    'pointRadius': 3.5,
-    'graphicZIndex': 179,
-    'pointerEvents': 'none',
   };
 
   const nonEditableStyle = {
@@ -343,8 +304,7 @@ function initScript() {
 
   function svlGlobals() {
     OLMap = W.map.getWazeMap().getOLMap();
-    gmapsProjection = new OpenLayers.Projection('EPSG:4326');
-    preferences = null;
+    //preferences = null;
     OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
   }
 
@@ -386,16 +346,6 @@ function initScript() {
       layerCheckboxes[layer].click();
     }
     //layerCheckboxes[layer].checked = visibility;
-  }
-
-  // TODO
-  function hasToBeSkipped(roadid: Segment['id']): boolean {
-    // TODO: 3 is not the right zoom level anymore
-    return (
-      preferences['hideMinorRoads'] &&
-      wmeSDK.Map.getZoomLevel() === 3 &&
-      svlIgnoredStreets[roadid] === true
-    );
   }
 
   function savePreferences(pref: PreferenceObject, silent = true) {
@@ -698,8 +648,6 @@ function initScript() {
     }
     preferences['fakelock'] =
       loadedPreferences?.['fakelock'] ?? userLevel ?? 6;
-    preferences['hideMinorRoads'] =
-      loadedPreferences?.['hideMinorRoads'] ?? true;
     preferences['showSLcolor'] = loadedPreferences?.['showSLcolor'] ?? true;
     preferences['showSLtext'] = loadedPreferences?.['showSLtext'] ?? true;
     // preferences['version'] = SVL_VERSION; Automatically added by savePreferences
@@ -737,10 +685,13 @@ function initScript() {
     preferences['hideRoutingModeBlock'] =
       loadedPreferences?.['hideRoutingModeBlock'] ?? false;
 
+    preferences['nodeRadius'] = loadedPreferences?.['nodeRadius'] ?? 3.0;
+    preferences['nodeColor'] = loadedPreferences?.['nodeColor'] ?? '#0015FF';
+    preferences['nodeDeadEndColor'] = loadedPreferences?.['nodeDeadEndColor'] ?? '#C31CFF';
+    preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#033a12';
+
     preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
     preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
-    preferences['renderGeomNodes'] =
-      loadedPreferences?.['renderGeomNodes'] ?? false;
 
     preferences['layerOpacity'] = loadedPreferences?.['layerOpacity'] ?? 0.8;
 
@@ -2049,27 +2000,6 @@ function initScript() {
         });
         queueIconFeatureForDrawing(model.id, avg);
       }
-
-      // Show geometry points
-      if (false && preferences['renderGeomNodes'] === true && !isInRoundabout) {
-        // If it's not a roundabout
-        for (let p = 1; p < geometryPointArray.length - 2; p += 1) {
-          // let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(points[p], 2, 6, 0); // origin, size, edges, rotation
-          segmentFeatures.push(
-            new OpenLayers.Feature.Vector(
-              geometryPointArray[p],
-              {
-                'sID': attributes.id,
-                'zIndex': baselevel + 200,
-                closeZoomOnly: true,
-                isArrow: true,
-              },
-              geometryNodeStyle
-            )
-          );
-        }
-      }
-      // 'END': show geometry points
       // 'End': Close Zoom
 
       // In any 'Zoom':
@@ -2255,7 +2185,7 @@ function initScript() {
         redrawAllSegments();
         //                doDraw();
       });
-      document.getElementById('map').appendChild(routingModeDiv);
+      (<HTMLDivElement>document.getElementById('map')).appendChild(routingModeDiv);
     } else {
       // Remove the routing panel
       div?.remove();
@@ -2263,8 +2193,10 @@ function initScript() {
   }
 
   function updateRefreshStatus() {
-    clearInterval(autoLoadInterval);
-    autoLoadInterval = null;
+    if (autoLoadInterval) {
+      clearInterval(autoLoadInterval);
+      autoLoadInterval = null;
+    }
     if (preferences['autoReload'] && preferences['autoReload']['enabled']) {
       autoLoadInterval = setInterval(
         refreshWME,
@@ -2279,7 +2211,7 @@ function initScript() {
     if (settings.isImperial !== preferences['isImperial']) {
       preferences['isImperial'] = settings.isImperial;
       refreshRequested = true;
-    }
+    } preferences['nodeSize']
     // Maybe in the future there will be more settings to check
     if (refreshRequested && shouldRefresh) {
       redrawAllSegments();
@@ -2354,92 +2286,92 @@ function initScript() {
 
     // Dirty
     preferences['dirty'] = {};
-    preferences['dirty']['strokeColor'] = document.getElementById(
+    preferences['dirty']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_dirty'
-    ).value;
+    )).value;
     preferences['dirty']['strokeOpacity'] =
       document.getElementById('svl_streetOpacity_dirty').value / 100.0;
-    preferences['dirty']['strokeDashstyle'] = document.querySelector(
+    preferences['dirty']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_dirty option:checked'
-    ).value;
+    )).value;
 
     // Lanes
     preferences['lanes'] = {};
-    preferences['lanes']['strokeColor'] = document.getElementById(
+    preferences['lanes']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_lanes'
-    ).value;
+    )).value;
     preferences['lanes']['strokeOpacity'] =
       document.getElementById('svl_streetOpacity_lanes').value / 100.0;
-    preferences['lanes']['strokeDashstyle'] = document.querySelector(
+    preferences['lanes']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_lanes option:checked'
-    ).value;
+    )).value;
 
     // Toll
     preferences['toll'] = {};
-    preferences['toll']['strokeColor'] = document.getElementById(
+    preferences['toll']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_toll'
-    ).value;
+    )).value;
     preferences['toll']['strokeOpacity'] =
-      document.getElementById('svl_streetOpacity_toll').value / 100.0;
-    preferences['toll']['strokeDashstyle'] = document.querySelector(
+      Number((<HTMLInputElement>document.getElementById('svl_streetOpacity_toll')).value) / 100.0;
+    preferences['toll']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_toll option:checked'
-    ).value;
+    )).value;
 
     // Restrictions
     preferences['restriction'] = {};
-    preferences['restriction']['strokeColor'] = document.getElementById(
+    preferences['restriction']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_restriction'
-    ).value;
+    )).value;
     preferences['restriction']['strokeOpacity'] =
-      document.getElementById('svl_streetOpacity_restriction').value / 100.0;
-    preferences['restriction']['strokeDashstyle'] = document.querySelector(
+      Number((<HTMLInputElement>document.getElementById('svl_streetOpacity_restriction')).value) / 100.0;
+    preferences['restriction']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_restriction option:checked'
-    ).value;
+    )).value;
 
     // Closures
     preferences['closure'] = {};
-    preferences['closure']['strokeColor'] = document.getElementById(
+    preferences['closure']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_closure'
-    ).value;
+    )).value;
     preferences['closure']['strokeOpacity'] =
-      document.getElementById('svl_streetOpacity_closure').value / 100.0;
-    preferences['closure']['strokeDashstyle'] = document.querySelector(
+      Number((<HTMLInputElement>document.getElementById('svl_streetOpacity_closure')).value) / 100.0;
+    preferences['closure']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_closure option:checked'
-    ).value;
+    )).value;
 
     // HeadlightsRequired
     preferences['headlights'] = {};
-    preferences['headlights']['strokeColor'] = document.getElementById(
+    preferences['headlights']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_headlights'
-    ).value;
+    )).value;
     preferences['headlights']['strokeOpacity'] =
-      document.getElementById('svl_streetOpacity_headlights').value / 100.0;
-    preferences['headlights']['strokeDashstyle'] = document.querySelector(
+      Number((<HTMLInputElement>document.getElementById('svl_streetOpacity_headlights')).value) / 100.0;
+    preferences['headlights']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_headlights option:checked'
-    ).value;
+    )).value;
 
     // HeadlightsRequired
     preferences['nearbyHOV'] = {};
-    preferences['nearbyHOV']['strokeColor'] = document.getElementById(
+    preferences['nearbyHOV']['strokeColor'] = (<HTMLInputElement>document.getElementById(
       'svl_streetColor_nearbyHOV'
-    ).value;
+    )).value;
     preferences['nearbyHOV']['strokeOpacity'] =
-      document.getElementById('svl_streetOpacity_nearbyHOV').value / 100.0;
-    preferences['nearbyHOV']['strokeDashstyle'] = document.querySelector(
+      Number((<HTMLInputElement>document.getElementById('svl_streetOpacity_nearbyHOV')).value) / 100.0;
+    preferences['nearbyHOV']['strokeDashstyle'] = (<HTMLInputElement>document.querySelector(
       '#svl_strokeDashstyle_nearbyHOV option:checked'
-    ).value;
+    )).value;
 
     // AutoReload
     preferences['autoReload'] = {};
     preferences['autoReload']['interval'] =
       document.getElementById('svl_autoReload_interval').value * 1000;
-    preferences['autoReload']['enabled'] = document.getElementById(
+    preferences['autoReload']['enabled'] = (<HTMLInputElement>document.getElementById(
       'svl_autoReload_enabled'
-    ).checked;
+    )).checked;
 
-    preferences['clutterConstant'] = document.getElementById(
+    preferences['clutterConstant'] = (<HTMLInputElement>document.getElementById(
       'svl_clutterConstant'
-    ).value;
+    )).value;
 
     preferences['arrowDeclutter'] =
       document.getElementById('svl_arrowDeclutter').value;
@@ -2461,8 +2393,6 @@ function initScript() {
     ).checked;
     preferences['SLColor'] = document.getElementById('svl_SLColor').value;
 
-    preferences['hideMinorRoads'] =
-      document.getElementById('svl_hideMinorRoads').checked;
     preferences['farZoomLabelSize'] = document.getElementById(
       'svl_farZoomLabelSize'
     ).value;
@@ -2470,52 +2400,54 @@ function initScript() {
       'svl_closeZoomLabelSize'
     ).value;
 
-    preferences['renderGeomNodes'] = document.getElementById(
-      'svl_renderGeomNodes'
-    ).checked;
+    preferences['nodesThreshold'] = (<HTMLInputElement>
+      document.getElementById('svl_nodesThreshold')).value;
+    preferences['segmentsThreshold'] = (<HTMLInputElement>
+      document.getElementById('svl_segmentsThreshold')).value;
 
-    preferences['nodesThreshold'] =
-      document.getElementById('svl_nodesThreshold').value;
-    preferences['segmentsThreshold'] = document.getElementById(
-      'svl_segmentsThreshold'
-    ).value;
+    // Node styling
+    preferences['nodeRadius'] = (<HTMLInputElement>
+      document.getElementById('svl_nodeRadius')).value;
 
-    preferences['layerOpacity'] =
-      document.getElementById('svl_layerOpacity').value / 100.0;
+    preferences['nodeColor'] = (<HTMLInputElement>
+      document.getElementById('svl_nodeColor')).value;
+
+    preferences['nodeDeadEndColor'] = (<HTMLInputElement>
+      document.getElementById('svl_nodeDeadEndColor')).value;
+
+    preferences['virtualNodeColor'] = (<HTMLInputElement>
+      document.getElementById('svl_virtualNodeColor')).value;
+
+    preferences['layerOpacity'] = Number(
+      (<HTMLInputElement>
+        document.getElementById('svl_layerOpacity')).value
+    ) / 100.0;
 
     // Check if showUnderGPSPoints has been toggled
+    const showUnderGPSPoints = (<HTMLInputElement>
+      document.getElementById('svl_showUnderGPSPoints')).checked;
     if (
-      preferences['showUnderGPSPoints'] !==
-      document.getElementById('svl_showUnderGPSPoints').checked
-    ) {
+      preferences['showUnderGPSPoints'] !== showUnderGPSPoints) {
       // This value has been updated, change the layer positions.
-      preferences['showUnderGPSPoints'] = document.getElementById(
-        'svl_showUnderGPSPoints'
-      ).checked;
+      preferences['showUnderGPSPoints'] = showUnderGPSPoints;
       updateLayerPosition();
-    } else {
-      preferences['showUnderGPSPoints'] = document.getElementById(
-        'svl_showUnderGPSPoints'
-      ).checked;
     }
 
     // Routing mode
-    preferences['routingModeEnabled'] = document.getElementById(
-      'svl_routingModeEnabled'
-    ).checked;
+    preferences['routingModeEnabled'] = (<HTMLInputElement>
+      document.getElementById('svl_routingModeEnabled')).checked;
 
-    preferences['hideRoutingModeBlock'] = document.getElementById(
-      'svl_hideRoutingModeBlock'
-    ).checked;
+    preferences['hideRoutingModeBlock'] = (<HTMLInputElement>
+      document.getElementById('svl_hideRoutingModeBlock')).checked;
     updateRoutingModePanel();
     // End: Routing mode
 
-    preferences['useWMERoadLayerAtZoom'] = document.getElementById(
+    preferences['useWMERoadLayerAtZoom'] = (<HTMLInputElement>document.getElementById(
       'svl_useWMERoadLayerAtZoom'
-    ).value;
-    preferences['switchZoom'] = document.getElementById('svl_switchZoom').value;
-    preferences['showANs'] = document.getElementById('svl_showANs').checked;
-    preferences['realsize'] = document.getElementById('svl_realsize').checked;
+    )).value;
+    preferences['switchZoom'] = (<HTMLInputElement>document.getElementById('svl_switchZoom')).value;
+    preferences['showANs'] = (<HTMLInputElement>document.getElementById('svl_showANs')).checked;
+    preferences['realsize'] = (<HTMLInputElement>document.getElementById('svl_realsize')).checked;
 
     if (preferences['realsize']) {
       // Disable all width inputs
@@ -2824,12 +2756,8 @@ function initScript() {
     (<HTMLInputElement>document.getElementById('svl_fakelock')).value = preferences['fakelock'] ?? 6;
     (<HTMLInputElement>document.getElementById('svl_autoReload_enabled')).checked =
       preferences['autoReload']['enabled'];
-    (<HTMLInputElement>document.getElementById('svl_renderGeomNodes')).checked =
-      preferences['renderGeomNodes'];
     (<HTMLInputElement>document.getElementById('svl_labelOutlineWidth')).value =
       preferences['labelOutlineWidth'];
-    (<HTMLInputElement>document.getElementById('svl_hideMinorRoads')).checked =
-      preferences['hideMinorRoads'];
     (<HTMLInputElement>document.getElementById('svl_autoReload_interval')).value =
       (preferences['autoReload']['interval'] / 1000).toString();
 
@@ -2847,6 +2775,16 @@ function initScript() {
       preferences['switchZoom'];
     (<HTMLInputElement>document.getElementById('svl_nodesThreshold')).value =
       preferences['nodesThreshold'];
+
+    (<HTMLInputElement>document.getElementById('svl_nodeRadius')).value =
+      preferences['nodeRadius'];
+    (<HTMLInputElement>document.getElementById('svl_nodeColor')).value =
+      preferences['nodeColor'];
+    (<HTMLInputElement>document.getElementById('svl_nodeDeadEndColor')).value =
+      preferences['nodeDeadEndColor'];
+    (<HTMLInputElement>document.getElementById('svl_virtualNodeColor')).value =
+      preferences['virtualNodeColor'];
+
     (<HTMLInputElement>document.getElementById('svl_segmentsThreshold')).value =
       preferences['segmentsThreshold'];
 
@@ -3023,6 +2961,40 @@ function initScript() {
     return line;
   }
 
+  function createColorOption({
+    id,
+    title,
+    description,
+    isNew,
+  }: { id: string; title: string; description: string; isNew?: (string | undefined); }) {
+    const line = document.createElement('div');
+    line.className = 'prefLineCheckbox';
+    if (typeof isNew === 'string') {
+      line.classList.add('newOption');
+      line.dataset.version = isNew;
+    }
+    const label = document.createElement('label');
+    label.innerText = title;
+
+    const input = createInput({
+      id,
+      title: _('pick_a_color'),
+      className: 'prefElement form-control',
+      type: 'color',
+    });
+
+    label.appendChild(input);
+    line.appendChild(label);
+
+    if (description) {
+      const i = document.createElement('i');
+      i.innerText = description;
+      line.appendChild(i);
+    }
+
+    return line;
+  }
+
   function createPreferencesSection(name: string, open = false) {
     const details = document.createElement('details');
     details.open = open;
@@ -3053,7 +3025,7 @@ function initScript() {
         .svl_logo {width:130px; display:inline-block; float:right}
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
-        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:#fff; top:0; }
+        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:var(--background_variant); top:0; }
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}
@@ -3162,7 +3134,6 @@ function initScript() {
         id: 'realsize',
         title: _('use_reallife_width'),
         description: _('use_reallife_width_descr'),
-        isNew: '5.0.0',
       })
     );
 
@@ -3176,7 +3147,6 @@ function initScript() {
           { 'text': _('svl_standard_layer'), 'value': 'svl_standard' },
           { 'text': _('wme_colors_layer'), 'value': 'wme_colors' },
         ],
-        isNew: '5.0.8',
       })
     );
 
@@ -3289,7 +3259,6 @@ function initScript() {
         min: 10,
         max: 100,
         step: 5,
-        isNew: '5.0.6',
       })
     );
 
@@ -3306,7 +3275,6 @@ function initScript() {
         id: 'hideRoutingModeBlock',
         title: _('hide_routing_mode_panel'),
         description: _('hide_routing_mode_panel_descr'),
-        isNew: '5.0.9',
       })
     );
 
@@ -3328,6 +3296,41 @@ function initScript() {
         step: 1,
       })
     );
+
+    streets.appendChild(
+      createRangeOption(
+        {
+          id: 'nodeRadius',
+          title: _('node_size'),
+          description: _('node_size_descr'),
+          min: 2,
+          max: 10,
+          step: 0.2,
+          isNew: '6.2.3',
+        }
+      )
+    );
+
+    streets.appendChild(createColorOption({
+      id: `nodeColor`,
+      title: _('node_color'),
+      description: _('node_color_descr'),
+      isNew: '6.2.3',
+    }));
+
+    streets.appendChild(createColorOption({
+      id: `nodeDeadEndColor`,
+      title: _('dead_end_node_color'),
+      description: _('dead_end_node_color_descr'),
+      isNew: '6.2.3',
+    }));
+
+    streets.appendChild(createColorOption({
+      id: `virtualNodeColor`,
+      title: _('virtual_node_color'),
+      description: _('virtual_node_color_descr'),
+      isNew: '6.2.3',
+    }));
 
     renderingParameters.appendChild(
       createCheckboxOption({
@@ -3360,14 +3363,6 @@ function initScript() {
     closeZoomTitle.innerText = _('close_zoom_only');
 
     renderingParameters.appendChild(closeZoomTitle);
-
-    renderingParameters.appendChild(
-      createCheckboxOption({
-        id: 'renderGeomNodes',
-        title: _('render_geometry_nodes'),
-        description: _('render_geometry_nodes_descr'),
-      })
-    );
 
     renderingParameters.appendChild(
       createIntegerOption({
@@ -3413,14 +3408,6 @@ function initScript() {
         description: _('font_size_far_descr'),
         min: 8,
         max: fontSizeMax,
-      })
-    );
-
-    renderingParameters.appendChild(
-      createCheckboxOption({
-        id: 'hideMinorRoads',
-        title: _('hide_minor_roads'),
-        description: _('hide_minor_roads_descr'),
       })
     );
 
@@ -3480,7 +3467,6 @@ function initScript() {
         min: 1000,
         max: 10000,
         step: 100,
-        isNew: '5.0.4',
       })
     );
 
@@ -3492,7 +3478,6 @@ function initScript() {
         min: 1000,
         max: 10000,
         step: 100,
-        isNew: '5.0.4',
       })
     );
     mainDiv.appendChild(performance);
@@ -3664,20 +3649,6 @@ function initScript() {
     removeNodesById(objectIds as number[]);
   }
 
-  /**
-   * 
-   * @param attributes 
-   * @deprecated
-   * @returns 
-   */
-  function getNodeStyle(attributes) {
-    if (attributes.segIDs?.length === 1) {
-      // jshint ignore:line
-      return nodeStyleDeadEnd;
-    }
-    return nodeStyle;
-  }
-
   function handleNodesChangeEvent(objectIds: Array<(string | number)>) {
     if (objectIds.length === 0) return;
     let nodes = objectIds.map((nodeId) => {
@@ -3800,6 +3771,10 @@ function initScript() {
         wmeSDK.Map.setLayerVisibility({ layerName: layer, visibility: true });
       }
       labelsVector.setVisibility(true);
+
+      if (preferences['disableRoadLayers']) {
+        setLayerVisibility(ROAD_LAYER, false);
+      }
 
 
       registerSegmentsEvents();
@@ -4261,6 +4236,7 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
       <br>- 6.2.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).
       <br>- 6.1.0 - The nodes layer is now a WME SDK layer, instead of an OpenLayers layer. This should improve performance and stability.
       <br>- 6.0.0 - Start using the new WME SDK. <b>SVL is likely to be discontinued if Waze quits supporting OpenLayers without a viable alternative.</b>
@@ -4283,7 +4259,11 @@ function initScript() {
   function _(key: string): string {
     const key_index = tr_keys[key];
     if (typeof key_index === 'undefined' && Object.keys(tr).length > 0) {
-      return invalidTranslation(key);
+      const local_key = fallback[key];
+      if (typeof local_key === 'undefined') {
+        return invalidTranslation(key);
+      }
+      return fallback[key];
     }
     const locale = I18n.currentLocale();
     if (tr[locale]) {
@@ -4362,6 +4342,21 @@ function initScript() {
   const PI_OVER_2 = Math.PI / 2.0;
 
   const SVL_PIXEL_SIZE_CACHE = new Map();
+  const SVL_RESOLUTION_CACHE = new Map();
+
+  /**
+   * Careful! The returned value is 1.0 / resolution!
+   */
+  function getCachedResolutionFactor(zoomLevel: ZoomLevel): number {
+    let cachedValue = SVL_RESOLUTION_CACHE.get(zoomLevel);
+    if (cachedValue !== undefined) {
+      return cachedValue;
+    }
+    // we do this division here, so that later we can multiply instead of divide, for performance.
+    const resolution_factor = (1.0 / wmeSDK.Map.getMapResolution());
+    SVL_RESOLUTION_CACHE.set(zoomLevel, resolution_factor);
+    return resolution_factor;
+  }
 
   function getCachedGeodesicPixelSizeSVL(zoomLevel: ZoomLevel): number {
     let cachedValue = SVL_PIXEL_SIZE_CACHE.get(zoomLevel);
@@ -4397,7 +4392,7 @@ function initScript() {
     // This value is extremely close to a simple scaling factor used by some legacy systems.
 
     const geodesic_pixel_size_meters = resolution_3857 * Math.cos(lat_radians) * SCALING_FACTOR;
-    consoleDebug("GEODESIC (" + wmeSDK.Map.getZoomLevel() + "): " + geodesic_pixel_size_meters);
+    //consoleDebug("GEODESIC (" + wmeSDK.Map.getZoomLevel() + "): " + geodesic_pixel_size_meters);
     return geodesic_pixel_size_meters;
   }
 
@@ -4985,18 +4980,30 @@ function initScript() {
       layerName: LAYERS.NODES,
       styleContext: {
         'getPointRadius': (context) => {
-          return 3.0 / wmeSDK.Map.getMapResolution(); // TODO: consider computing this once instead of doing the math for each node
+          if (preferences['realsize']) {
+            return (preferences['nodeRadius'] ?? 3.0) * getCachedResolutionFactor(context.zoomLevel as ZoomLevel); // TODO: consider computing this once instead of doing the math for each node
+          }
+          return (preferences['nodeRadius'] ?? 3.0);
         },
         'shouldDisplay': (context) => {
           return isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : 'block';
+        },
+        'getDefaultColor': (context) => {
+          return preferences['nodeColor'] || '#0015FF';
+        },
+        'getDeadEndColor': (context) => {
+          return preferences['nodeDeadEndColor'] || '#C31CFF';
+        },
+        'getVirtualNodeColor': (context) => {
+          return preferences['virtualNodeColor'] || '#033a12';
         }
       },
       styleRules: [
         {
           style: {
             'strokeWidth': 2,
-            'fillColor': '#0015FF',
-            'strokeColor': '#210172',
+            'fillColor': '${getDefaultColor}',
+            'strokeColor': '#444',
             'fillOpacity': 0.9,
             'pointRadius': '${getPointRadius}',
             'display': '${shouldDisplay}',
@@ -5008,8 +5015,7 @@ function initScript() {
             return properties["conSegm"] == 1
           },
           style: {
-            'fillColor': '#C31CFF',
-            'strokeColor': '#560d71',
+            'fillColor': '${getDeadEndColor}',
           }
         }
       ],
@@ -5392,6 +5398,14 @@ Please paste it in a file (CTRL+V) to store it.`;
   ] = `Show the speed limit by coloring the segment's outline with a single color instead of a different color depending on the speed limit's value.`;
   fallback[`shortcut_cannot_be_set`] = `Street Vector Layer could not add its default shortcut (L). Open the WME shortcut section to set it to your favorite key combination.`;
   fallback[`zoom_in_for_svl`] = `Please zoom in to use SVL`;
+  fallback[`node_color`] = `Nodes color`;
+  fallback[`node_color_descr`] = `This is the color of connected nodes`;
+  fallback[`dead_end_node_color`] = `Dead end nodes color.`;
+  fallback[`dead_end_node_color_descr`] = `The color of nodes that are only connected to 1 segment.`;
+  fallback[`virtual_node_color`] = `Virtual nodes color`;
+  fallback[`virtual_node_color_descr`] = `These are nodes that connect non-drivable segments with roads, without splitting them.`;
+  fallback[`node_size`] = `Nodes size`;
+  fallback[`node_size_descr`] = `Increase this value if nodes are too small.`;
 
   initSVL();
 }
