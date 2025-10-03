@@ -541,6 +541,7 @@ declare namespace OpenLayers {
       unrenderedFeatures: Map<number, OpenLayers.Feature.Vector>; // Key type might be string
       style: any | null; // OL style object
       styleMap: OpenLayers.StyleMap;
+      drawn: boolean;
 
       constructor(name: string, properties?: any); // properties is often 'options'
 

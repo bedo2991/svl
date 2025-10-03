@@ -1027,10 +1027,10 @@ function initScript() {
     // The latitude used for scaling is the average of p0 and p1, 
     // or just the starting latitude (startP[1]) for small distances.
     // NOTE: Math.cos expects the angle in RADIANS!
-    const latInRadians = startP[1] * (PI_OVER_180);
+    const latInRadians = startP[1] * PI_OVER_180;
 
     // Calculate the difference in the direction of travel
-    dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
+    dx = (endP[0] - startP[0]) * efficientCos(latInRadians);
     dy = endP[1] - startP[1];
 
     // Math.atan2(dx, dy) returns the bearing from the Y-axis (North)
@@ -1279,38 +1279,13 @@ function initScript() {
     return {
       type: 'Feature',
       id: id,
-      geometry: { type: 'Point', coordinates: [p0[0] + Math.sin(perpendicularAngle) * shiftDegrees, p0[1] + Math.cos(perpendicularAngle) * shiftDegrees] },
+      geometry: { type: 'Point', coordinates: [p0[0] + efficientSin(perpendicularAngle) * shiftDegrees, p0[1] + efficientCos(perpendicularAngle) * shiftDegrees] },
       properties: {
         'isAverageSpeedCamera': 1,
         'closeZoomOnly': 1,
         'degrees': convertRadiansToDegrees(degreesInRadians)
       }
     }
-  }
-
-  function createAverageSpeedCamera({ id, rev, isForward, p0, p1 }: {
-    id: number, rev: boolean, isForward: boolean, p0: OpenLayers.Geometry.Point, p1: OpenLayers.Geometry.Point
-  }) {
-    const degrees = getAngle(isForward, rev ? p1 : p0, rev ? p0 : p1);
-    return new OpenLayers.Feature.Vector(
-      new OpenLayers.Geometry.Point(
-        p0.x + Math.sin(degrees) * 10,
-        p0.y + Math.cos(degrees) * 10
-      ),
-      {
-        'sID': id,
-      },
-      {
-        'rotation': degrees,
-        'externalGraphic':
-          'https://raw.githubusercontent.com/bedo2991/svl/master/average.png',
-        'graphicWidth': 36,
-        'graphicHeight': 36,
-        'graphicZIndex': 300,
-        'fillOpacity': 1,
-        'pointerEvents': 'none',
-      }
-    );
   }
 
   const queuedSegments: Set<SdkFeature> = new Set();
@@ -1462,6 +1437,8 @@ function initScript() {
     }
 
     const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
+    //console.log("TOTAL WIDTH: " + totalSegmentWidth);
+    // roadWidth: the width of the "inner" segment, without decorations around it. It will be modified later
     let roadWidth = totalSegmentWidth;
     if (model.primaryStreetId === null) {
       // consoleDebug("RED segment", model);
@@ -3640,10 +3617,10 @@ function initScript() {
       removeAllNodesFromLayer();
       return;
     }
-    if (drawingAborted || objectIds.length > preferences['nodesThreshold']) {
-      if (!drawingAborted) {
+    if (drawingAborted /*|| objectIds.length > preferences['nodesThreshold']*/) {
+      /*if (!drawingAborted) {
         abortDrawing();
-      }
+      }*/
       return;
     }
     removeNodesById(objectIds as number[]);
@@ -3710,6 +3687,7 @@ function initScript() {
   function handleNodesAddEvent(objectIds: Array<(string | number)>) {
     if (drawingAborted || objectIds.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
+        safeAlert(AlertType.INFO, `Drawing aborted while adding ${objectIds.length} nodes. The current limit is set to ${preferences['nodesThreshold']}.\nYou can change this in the SVL preferences panel.`);
         abortDrawing();
       }
       return;
@@ -3727,6 +3705,7 @@ function initScript() {
     const segments = wmeSDK.DataModel.Segments.getAll();
     if (drawingAborted || segments.length > preferences['segmentsThreshold']) {
       if (!drawingAborted) {
+        safeAlert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${preferences['segmentsThreshold']}.\nYou can change this in the SVL preferences panel.`);
         abortDrawing();
       }
       return;
@@ -3750,6 +3729,8 @@ function initScript() {
     const nodes = wmeSDK.DataModel.Nodes.getAll();
     if (drawingAborted || nodes.length > preferences['nodesThreshold']) {
       if (!drawingAborted) {
+        safeAlert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${preferences['nodesThreshold']}.\nYou can change this in the SVL preferences panel.`);
+
         abortDrawing();
       }
       return;
@@ -3984,6 +3965,7 @@ function initScript() {
 
     if (drawingAborted || objectIds.length > preferences['segmentsThreshold']) {
       if (!drawingAborted) {
+        safeAlert(AlertType.INFO, `Drawing aborted while adding ${objectIds.length} segments. The current limit is set to ${preferences['segmentsThreshold']}.\nYou can change this in the SVL preferences panel.`);
         abortDrawing();
       }
       return;
@@ -4116,11 +4098,11 @@ function initScript() {
       //labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
       return;
     }
-    if (drawingAborted || objectIds.length > preferences['segmentsThreshold']) {
+    if (drawingAborted /*|| objectIds.length > preferences['segmentsThreshold']*/) {
       // TODO: I do not think we should check if we are deleting too many segments
-      if (!drawingAborted) {
-        abortDrawing();
-      }
+      /*if (!drawingAborted) {
+          abortDrawing();
+      }*/
       return;
     }
     consoleGroup();
@@ -4236,6 +4218,7 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 6.2.4 - Fix for road width computation and performance improvements.
       <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
       <br>- 6.2.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).
       <br>- 6.1.0 - The nodes layer is now a WME SDK layer, instead of an OpenLayers layer. This should improve performance and stability.
@@ -4300,9 +4283,9 @@ function initScript() {
   }
 
   /**@type{!Object<string,Array<string>>} */
-  const tr: { [s: string]: Array<string>; } = [];
+  const tr: { [s: string]: Array<string>; } = {};
   /**@type{!Object<string,number>} */
-  const tr_keys: { [s: string]: number; } = [];
+  const tr_keys: { [s: string]: number; } = {};
   async function loadTranslations() {
     //console.debug('Loading translations...');
     const response = await request(
@@ -4320,7 +4303,7 @@ function initScript() {
       for (const [i, line] of temp.entries()) {
         if (i > 0) {
           const [first, ...rest] = line.split('\t');
-          tr[first] = rest.map((e) => e.trim());
+          tr[first] = rest.map((e: string) => e.trim());
         } else {
           const [, ...rest] = line.split('\t');
           for (const [j, value] of rest.entries()) {
@@ -4363,37 +4346,55 @@ function initScript() {
     if (cachedValue !== undefined) {
       return cachedValue as number;
     }
-    const size = getGeodesicPixelSizeSVL();
+    const size = getGeodesicPixelSizeNew();
     SVL_PIXEL_SIZE_CACHE.set(zoomLevel, size);
     return size;
   }
 
-  function getGeodesicPixelSizeSVL(): number {
-    let lonLat = wmeSDK.Map.getMapCenter();
-    let centerCoords_3857 = [lonLat.lon, lonLat.lat];
+  function getGeodesicPixelSizeNew(): number {
+    // 1. Get the center latitude directly from the SDK, which is in WGS84 degrees.
+    const center_lat_4326 = wmeSDK.Map.getMapCenter().lat;
+
+    // 2. Get the resolution in EPSG:3857 (meters/pixel at equator)
     let resolution_3857 = wmeSDK.Map.getMapResolution();
 
-    // 1. Convert the center point to WGS84 [Lon, Lat].
-    const [_, center_lat_4326] = projectionToWGS84.forward(centerCoords_3857);
-
-    // 2. Convert Latitude from degrees to radians for the Math.cos function
+    // 3. Convert Latitude from degrees to radians.
+    // Assuming PI_OVER_180 is Math.PI / 180.
     const lat_radians = center_lat_4326 * PI_OVER_180;
 
-    // 3. Calculate the length of 1 degree of longitude at this latitude
-    // L = 2 * PI * R * cos(Lat) / 360  <-- Simplified, not needed here
+    // 5. Calculate the Geodesic Pixel Size // res * Math.cos(lat_radians);
+    const geodesic_pixel_size_meters = resolution_3857 * efficientCos(lat_radians);
 
-    // 4. The **correct** formula for geodetic distance in meters is:
-    // PixelSize = (Resolution * cos(Lat)) * (Earth Radius / Radius used in OL2 map)
-    // Since OL2 used the same radius (6378137) for the transformation *and* the distance calculation,
-    // the simple formula should still be correct unless the OLMap.resolution is not meters/pixel.
-
-    // Let's assume your OLMap.resolution is **NOT** meters/pixel, but a non-standard unit.
-    // The ratio of your two results is: 0.056 / 0.07464553542274896 ≈ 0.7502...
-    // This value is extremely close to a simple scaling factor used by some legacy systems.
-
-    const geodesic_pixel_size_meters = resolution_3857 * Math.cos(lat_radians) * SCALING_FACTOR;
-    //consoleDebug("GEODESIC (" + wmeSDK.Map.getZoomLevel() + "): " + geodesic_pixel_size_meters);
     return geodesic_pixel_size_meters;
+  }
+
+  /**
+   * Efficiently calculates the sine of an angle (in radians) using a Taylor series expansion.
+   * @param input Angle in radians
+   * @returns Approximation of the sine of the input angle
+   */
+  function efficientSin(input: number): number {
+    // Calculate powers efficiently
+    const x_squared = input * input;
+    const x_cubed = x_squared * input;
+    const x_to_the_fifth = x_cubed * x_squared;
+
+    // Note: 3! = 6, 5! = 120
+    // sin(x) ≈ x - (x^3 / 6) + (x^5 / 120)
+    return input - (x_cubed / 6.0) + (x_to_the_fifth / 120.0);
+  }
+
+  /**
+   * Efficiently calculates the cosine of an angle (in radians) using a Taylor series expansion.
+   * @param input Angle in radians
+   * @returns Approximation of the cosine of the input angle
+   */
+  function efficientCos(input: number): number {
+    const x_squared = input * input;
+    const x_to_the_fourth = x_squared * x_squared;
+
+    // Note: 2! = 2, 4! = 24
+    return 1.0 - (x_squared / 2.0) + (x_to_the_fourth / 24.0);
   }
 
   /**
@@ -4439,7 +4440,7 @@ function initScript() {
     if (loadPreferences() === false) {
       // First run, or new broswer
       safeAlert(
-        'info',
+        AlertType.INFO,
         `${_('first_time')}
 
           ${_('some_info')}
