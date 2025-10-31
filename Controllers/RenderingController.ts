@@ -1,0 +1,22 @@
+import AbstractController from "./AbstractController";
+import SVLMediator from "../SVLMediator";
+
+export default class RenderingController extends AbstractController {
+    // Singleton pattern
+    private static instance: RenderingController | null = null;
+    private constructor({ mediator }: { mediator: SVLMediator }) {
+        super(mediator);
+    }
+    public static getInstance(): RenderingController {
+        if (!RenderingController.instance) {
+            throw new Error("RenderingController not initialized. Call initialize() first.");
+        }
+        return RenderingController.instance;
+    }
+
+    public static initialize({ mediator }: { mediator: SVLMediator }): void {
+        if (!RenderingController.instance) {
+            RenderingController.instance = new RenderingController({ mediator });
+        }
+    }
+}

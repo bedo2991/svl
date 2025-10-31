@@ -1,8 +1,10 @@
 import { LineString, Point } from "geojson";
-import { Country, DataModelName, KeyboardShortcut, Node, SdkFeature, Segment, Street, WmeSDK, ZoomLevel } from "wme-sdk-typings";
+import { Country, DataModelName, KeyboardShortcut, Node, SdkFeature, Segment, Street, WME_LAYER_NAMES, WmeSDK, ZoomLevel } from "wme-sdk-typings";
 import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import proj4 from "proj4";
+import SVLMediator from "./SVLMediator";
+import { AlertType as AlertType2 } from "./Controllers/AbstractMediator";
 
 //import averageSpeedCameraImg from './resources/averagespeed.png';
 
@@ -11,9 +13,7 @@ unsafeWindow.SDK_INITIALIZED.then(initScript);
 
 
 
-interface PreferenceObject {
-  [key: string]: any
-}
+
 interface MeterObject {
   [key: string]: number
 }
@@ -32,6 +32,21 @@ function initScript() {
 
   console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
 
+  SVLMediator.initialize({ wmeSDK });
+  SVLMediator.getInstance().initializationCompleted().then(() => {
+    debugger;
+    waitForWazeWrap().then((result) => {
+      debugger;
+      if (result === true) {
+        SVLMediator.getInstance().setWazeWrap(WazeWrap);
+        //initWazeWrapElements();
+        SVLMediator.getInstance().alert(AlertType2.SUCCESS, "Initialization completed");
+      }
+    });
+
+  });
+
+  return;
   /** @type {string} */
   const SVL_VERSION: string = GM_info.script.version;
   /** @type {boolean} */
@@ -4160,6 +4175,7 @@ function initScript() {
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
       <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
+      <br>- 6.2.6 - Fix: restart drawing after aborting more often.
       <br>- 6.2.5 - Fix a rare bug with labels, more labels will get shown (maybe slightly outside of the segment). It is now possible for other script to know if SVL was initialized.
       <br>- 6.2.4 - Fix for road width computation and performance improvements.
       <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
@@ -4378,7 +4394,7 @@ function initScript() {
     };
 
     if (loadPreferences() === false) {
-      // First run, or new broswer
+      // First run, or new browser
       safeAlert(
         AlertType.INFO,
         `${_('first_time')}
@@ -4807,8 +4823,6 @@ function initScript() {
       }
     };
 
-    handleWMESettingsUpdated(false);
-
     // Add layers to the map
 
     // Add segment layer (SDK)
@@ -5005,7 +5019,9 @@ function initScript() {
       }
     );
 
+
     updateStylesFromPreferences(preferences, false);
+    handleWMESettingsUpdated(false);
 
     if (DEBUG) {
       document['lv'] = labelsVector;
@@ -5013,6 +5029,8 @@ function initScript() {
     }
 
     // initialisation
+    return;
+
     const layers = OLMap.getLayersBy('name', 'roads');
     WMERoadLayer = null;
     if (layers.length === 1) {
@@ -5047,11 +5065,7 @@ function initScript() {
     //  layerName: LAYERS.SEGMENTS
     //});
 
-    waitForWazeWrap().then((result) => {
-      if (result === true) {
-        initWazeWrapElements();
-      }
-    });
+
 
     if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       setLayerVisibility(ROAD_LAYER, true);
