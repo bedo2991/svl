@@ -1,5 +1,5 @@
 import AbstractController from "./AbstractController";
-import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
+import SVLMediator from "../SVLMediator";
 import { AlertType } from "./AbstractMediator";
 
 interface PreferenceObject {

@@ -1,5 +1,5 @@
 import AbstractController from "./AbstractController";
-import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
+import SVLMediator from "../SVLMediator";
 
 export default class LocalizationController extends AbstractController {
     // Singleton pattern
@@ -25,7 +25,9 @@ export default class LocalizationController extends AbstractController {
                 LocalizationController.instance.setAllFallbackTranslations();
             } else {
                 LocalizationController.instance.setMinimalFallbackTranslations();
-                console.info("LocalizationController: Online translations loaded successfully.");
+                if (__DEBUG__) {
+                    console.info("LocalizationController: Online translations loaded successfully.");
+                }
             }
             return LocalizationController.instance;
         } else {
@@ -90,7 +92,6 @@ export default class LocalizationController extends AbstractController {
             }
         );
 
-        //console.error("RESPONSE!");
         if (response.readyState === 4 && response.status === 200) {
             const data = response.responseText;
             let temp = data.split('\n');
@@ -130,8 +131,6 @@ export default class LocalizationController extends AbstractController {
  * @returns {string}
  */
     public translate(key: string, ...args: any[]): string {
-        console.dir(this.fallback);
-        console.dir(this.fallbackSource);
         const key_index = this.tr_keys[key];
         if (typeof key_index === 'undefined' && Object.keys(this.tr).length > 0) {
             const local_key = this.fallback[key];
@@ -150,7 +149,6 @@ export default class LocalizationController extends AbstractController {
             return this.tr['en'][key_index];
         }
         return this.fallback[key];
-        //return tr[I18n.currentLocale()]?.[tr_keys[key]] ?? tr["en"]?.[tr_keys[key]] ?? invalidTranslation(key);
     }
 
     private fallbackSource = [

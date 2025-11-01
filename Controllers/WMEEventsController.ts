@@ -1,5 +1,5 @@
 import { DataModelName } from "wme-sdk-typings";
-import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
+import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
 import { SVLEvents } from "./AbstractMediator";
 
@@ -154,6 +154,7 @@ export default class WMEEventsController extends AbstractController {
 
     public handleLayerEnabled() {
         console.debug('WMEEventsController: Handling layer enabled event');
+        debugger;
         this.disableDrawingAbortedEvents();
 
         this.enableZoomEvents();

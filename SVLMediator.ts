@@ -6,36 +6,7 @@ import LocalizationController from "./Controllers/LocalizationController";
 import { WmeSDK } from "wme-sdk-typings";
 import AbstractMediator, { AlertType, SVLEvents } from "./Controllers/AbstractMediator";
 import UserInterfaceController from "./Controllers/UserInterfaceController";
-
-export const SDK_LAYERS = {
-    SEGMENTS: "Street Vector Layer (SVL)",
-    ARROWS: "SVL_ARROWS_SDK",
-    NODES: "SVL_NODES_SDK",
-    //LABELS: "SVL_LABELS_SDK",
-    ICONS: "SVL_ICONS_SDK" // e.g. average speed cameras
-}
-
-export const OL_LAYERS = {
-    LABELS: "vectorLabels"
-}
-
-// These events are accepted by the mediator from controllers. Then the mediator decides what to do (probably, firing a SVLEvent)
-export enum AcceptedControllerEvents {
-    PREFERENCES_EXPORT_REQUEST = 'PREFERENCES_EXPORT_REQUEST',
-    PREFERENCES_IMPORT_REQUEST = 'PREFERENCES_IMPORT_REQUEST',
-    PREFERENCES_SAVE_REQUEST = 'PREFERENCES_SAVE_REQUEST',
-    PREFERENCES_RESET_REQUEST = 'PREFERENCES_RESET_REQUEST',
-    PREFERENCES_ROLLBACK_REQUEST = 'PREFERENCES_ROLLBACK_REQUEST',
-    REDRAW_ALL_REQUEST = 'REDRAW_ALL_REQUEST',
-    PREFERENCES_UI_REQUIRE_REFRESH = 'PREFERENCES_UI_REQUIRE_REFRESH',
-    PREFERENCES_UPDATED_REQUIRES_REDRAW = 'PREFERENCES_UPDATED_REQUIRES_REDRAW', //updateStylesFromPreferences
-    USER_UPDATED_SVL_PREFERENCES = 'USER_UPDATED_SVL_PREFERENCES',
-    WME_SETTINGS_UPDATED = 'WME_SETTINGS_UPDATED',
-    SVL_SHOULD_AUTOMATICALLY_DISABLE = 'SVL_SHOULD_AUTOMATICALLY_DISABLE',
-    SVL_DRAWING_WAS_ABORTED = 'SVL_DRAWING_WAS_ABORTED',
-    FIRST_RUN = 'FIRST_RUN'
-}
-
+import { AcceptedControllerEvents, SVLLayerState } from "./svlGlobals";
 
 
 export default class SVLMediator extends AbstractMediator {
@@ -63,10 +34,7 @@ export default class SVLMediator extends AbstractMediator {
             SVLMediator.instance.localizationController = await LocalizationController.initialize({ mediator: SVLMediator.instance });
             SVLMediator.instance.preferencesController = await PreferencesController.initialize({ mediator: SVLMediator.instance });
             SVLMediator.instance.layerStateController = await LayerStateController.initialize({
-                mediator: SVLMediator.instance,
-                roadLayerUniqueName: 'roads',
-                svlSDKLayerNames: Object.values(SDK_LAYERS),
-                svlOLLayerNames: Object.values(OL_LAYERS),
+                mediator: SVLMediator.instance
             });
             SVLMediator.instance.renderingController = await RenderingController.initialize({ mediator: SVLMediator.instance });
             SVLMediator.instance.wmeEventsController = await WMEEventsController.initialize({ mediator: SVLMediator.instance });
@@ -77,6 +45,8 @@ export default class SVLMediator extends AbstractMediator {
                 SVLMediator.instance.alert(AlertType.ERROR, `Error initializing SVL User Interface.`);
             }
             SVLMediator.instance.registerCallbacks();
+
+            SVLMediator.instance.layerStateController.enableLayerForTheFirstTime();
 
             SVLMediator.instance.emit(SVLEvents.INITIALIZED);
             return SVLMediator.instance;
@@ -90,10 +60,25 @@ export default class SVLMediator extends AbstractMediator {
             eventType: SVLCallbackEventTypes.COUNTRY_CHANGE,
             sdkName: "wme-map-data-loaded",
             callback: () => {
+                // TODO: check if country changed
                 this.alert(AlertType.INFO, "Merge end");
             },
-            deferInMs: 500
+            deferInMs: 3000
         });
+
+        this.wmeEventsController.registerSVLCallback({
+            eventType: SVLCallbackEventTypes.ZOOM,
+            sdkName: "wme-map-zoom-changed",
+            deferInMs: 500,
+            callback: () => {
+                this.alert(AlertType.WARNING, "Zoom");
+                this.renderingController.zoomChanged();
+            }
+        });
+    }
+
+    public getState(): SVLLayerState {
+        return this.layerStateController.getCurrentState();
     }
 
     public setWazeWrap(wazeWrap: typeof WazeWrap): void {
@@ -115,7 +100,14 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public notify(sender: any, event: AcceptedControllerEvents): void {
+        debugger;
         switch (event) {
+            case AcceptedControllerEvents.REDRAW_ALL_REQUEST:
+                this.renderingController.redrawAll();
+                break;
+            case AcceptedControllerEvents.SVL_LAYER_ENABLED:
+                this.emit(SVLEvents.LAYER_ENABLED);
+                break;
             case AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST:
                 return this.preferencesController.savePreferences();
             case AcceptedControllerEvents.PREFERENCES_RESET_REQUEST:
@@ -135,9 +127,13 @@ export default class SVLMediator extends AbstractMediator {
         //alert(`SVLMediator notified by ${sender} of event ${event}`);
     }
 
-    public prompt(title: string, message: string, defaultValue: string = '', okFunction: (input: string) => void): string | null {
+    public prompt(title: string, message: string, defaultValue: string = '', okFunction: (input: string) => void): void {
         if (!this.wazeWrap) {
-            return prompt(message, defaultValue);
+            let res = prompt(message, defaultValue);
+            if (res !== null) {
+                okFunction(res);
+            }
+            return;
         }
         try {
             this.wazeWrap.Alerts.prompt(title, message, defaultValue, okFunction);

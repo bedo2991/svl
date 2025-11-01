@@ -1,24 +1,17 @@
-import { WmeSDK, ZoomLevel } from "wme-sdk-typings";
+import { ZoomLevel } from "wme-sdk-typings";
 import AbstractController from "./AbstractController";
-import SVLMediator, { AcceptedControllerEvents, SDK_LAYERS } from "../SVLMediator";
+import SVLMediator from "../SVLMediator";
 import { AlertType, SVLEvents } from "./AbstractMediator";
-
-enum State {
-    UNINITIALIZED,
-    INITIALIZED,
-    VISIBLE,
-    DRAWING_ABORTED,
-    AUTOMATICALLY_DISABLED,
-    USER_DISABLED
-}
+import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
 
 export default class LayerStateController extends AbstractController {
     private static instance: LayerStateController;
-    private currentState: State = State.UNINITIALIZED;
+    private currentState: SVLLayerState = SVLLayerState.UNINITIALIZED;
     private roadLayerUniqueName: string = 'roads';
     private svlSDKLayerNames: string[] = [];
     private svlOLLayerNames: string[] = [];
     readonly PI_OVER_180 = Math.PI / 180.0;
+
 
     private SVL_PIXEL_SIZE_CACHE = new Map<ZoomLevel, number>();
     private SVL_RESOLUTION_CACHE = new Map<ZoomLevel, number>();
@@ -26,17 +19,10 @@ export default class LayerStateController extends AbstractController {
 
     private labelsVector!: OpenLayers.Layer.Vector;
 
-    private constructor({ mediator, roadLayerUniqueName, svlSDKLayerNames, svlOLLayerNames }: {
-        mediator: SVLMediator,
-        roadLayerUniqueName: string,
-        svlSDKLayerNames: string[],
-        svlOLLayerNames: string[]
+    private constructor({ mediator }: {
+        mediator: SVLMediator
     }) {
         super(mediator);
-        this.roadLayerUniqueName = roadLayerUniqueName;
-        this.svlSDKLayerNames = svlSDKLayerNames;
-        this.svlOLLayerNames = svlOLLayerNames;
-        this.currentState = State.INITIALIZED;
     }
 
     public static getInstance(): LayerStateController {
@@ -46,17 +32,14 @@ export default class LayerStateController extends AbstractController {
         return LayerStateController.instance;
     }
 
-    public static async initialize({ mediator, roadLayerUniqueName, svlSDKLayerNames, svlOLLayerNames }:
-        { mediator: SVLMediator, roadLayerUniqueName: string, svlSDKLayerNames: string[], svlOLLayerNames: string[] }): Promise<LayerStateController> {
+    public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<LayerStateController> {
         if (!LayerStateController.instance) {
             LayerStateController.instance = new LayerStateController({
-                mediator,
-                roadLayerUniqueName,
-                svlSDKLayerNames,
-                svlOLLayerNames
+                mediator
             });
             LayerStateController.instance.initializeLayers();
-            LayerStateController.instance.enableLayerForTheFirstTime();
+            LayerStateController.instance.currentState = SVLLayerState.INITIALIZED;
+
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, () => {
                 LayerStateController.instance.SVL_PIXEL_SIZE_CACHE.clear();
             });
@@ -704,7 +687,7 @@ export default class LayerStateController extends AbstractController {
         // Add the layer checkbox
         this.mediator.wmeSDK.LayerSwitcher.addLayerCheckbox({
             name: SDK_LAYERS.SEGMENTS,
-            isChecked: this.currentState === State.VISIBLE,
+            isChecked: this.currentState === SVLLayerState.VISIBLE,
         });
         this.mediator.wmeSDK.Events.on({
             eventName: "wme-layer-checkbox-toggled",
@@ -786,17 +769,17 @@ export default class LayerStateController extends AbstractController {
         console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
     }
 
-    private enableLayerForTheFirstTime(): void {
-        if (this.currentState === State.INITIALIZED) {
+    public enableLayerForTheFirstTime(): void {
+        if (this.currentState === SVLLayerState.INITIALIZED) {
             if (!this.mediator.getPreference('startDisabled')) {
                 try {
-                    this.enableAllSVLLayers();
+                    this.tryEnablingSVLRoadLayer();
                 } catch (error) {
                     console.error('Error enabling/disabling layers:', error);
                 }
-                this.currentState = State.VISIBLE;
+                this.currentState = SVLLayerState.VISIBLE;
             } else {
-                this.currentState = State.USER_DISABLED;
+                this.currentState = SVLLayerState.USER_DISABLED;
             }
         }
     }
@@ -817,6 +800,10 @@ export default class LayerStateController extends AbstractController {
         if (this.mediator.getPreference('disableRoadLayers') ?? true) {
             this.disableWMERoadLayer();
         }
+        this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
+        this.currentState = SVLLayerState.VISIBLE;
+        this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+        this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
     }
 
     public disableAllSVLLayers(shouldEnableWMERoadLayer: boolean = false) {
@@ -834,22 +821,21 @@ export default class LayerStateController extends AbstractController {
         if (shouldEnableWMERoadLayer) {
             this.enableWMERoadLayer();
         }
+        this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
     }
 
     public tryEnablingSVLRoadLayer(): boolean {
-        if ([State.DRAWING_ABORTED, State.AUTOMATICALLY_DISABLED, State.USER_DISABLED].includes(this.currentState)) {
-            this.currentState = State.VISIBLE;
+        if ([SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED, SVLLayerState.AUTOMATICALLY_DISABLED, SVLLayerState.USER_DISABLED].includes(this.currentState)) {
             this.enableAllSVLLayers();
-            this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             return true;
         }
         return false;
     }
 
     public disableSVLRoadLayerDueToDrawingAbort(): boolean {
-        if (this.currentState === State.DRAWING_ABORTED) return true;
-        if (this.currentState === State.VISIBLE) {
-            this.currentState = State.DRAWING_ABORTED;
+        if (this.currentState === SVLLayerState.DRAWING_ABORTED) return true;
+        if (this.currentState === SVLLayerState.VISIBLE) {
+            this.currentState = SVLLayerState.DRAWING_ABORTED;
             this.disableAllSVLLayers(true);
             return true;
         }
@@ -857,9 +843,9 @@ export default class LayerStateController extends AbstractController {
     }
 
     public disableSVLRoadLayerAutomatically(): boolean {
-        if (this.currentState === State.AUTOMATICALLY_DISABLED) return true;
-        if (this.currentState === State.VISIBLE) {
-            this.currentState = State.AUTOMATICALLY_DISABLED;
+        if (this.currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return true;
+        if (this.currentState === SVLLayerState.VISIBLE) {
+            this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
             this.disableAllSVLLayers(true);
             return true;
         }
@@ -968,7 +954,7 @@ export default class LayerStateController extends AbstractController {
 
         if (checked) {
             switch (this.currentState) {
-                case State.AUTOMATICALLY_DISABLED:
+                case SVLLayerState.AUTOMATICALLY_DISABLED:
                     this.mediator.alert(AlertType.INFO, this.mediator._('zoom_in_for_svl'));
                     this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
                     return;
@@ -980,10 +966,14 @@ export default class LayerStateController extends AbstractController {
         this.userDisabledSvl();
     }
 
+    public getCurrentState(): SVLLayerState {
+        return this.currentState;
+    }
+
     private userDisabledSvl(): void {
-        if (this.currentState === State.USER_DISABLED) return;
-        if (this.currentState === State.VISIBLE) {
-            this.currentState = State.USER_DISABLED;
+        if (this.currentState === SVLLayerState.USER_DISABLED) return;
+        if (this.currentState === SVLLayerState.VISIBLE) {
+            this.currentState = SVLLayerState.USER_DISABLED;
             this.disableAllSVLLayers(false);
         }
     }

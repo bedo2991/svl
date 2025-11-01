@@ -1,6 +1,7 @@
-import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
+import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
 import PreferencesController from "./PreferencesController";
+
 
 export default class UserInterfaceController extends AbstractController {
     // Singleton pattern
@@ -814,11 +815,11 @@ export default class UserInterfaceController extends AbstractController {
         this.updatePreferenceValues();
     }
     private handleResetPreferencesClick() {
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_RESET);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_RESET_REQUEST);
     }
 
     private handleImportPreferencesClick() {
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_IMPORT);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_IMPORT_REQUEST);
     }
 
     private handleExportPreferencesClick() {
@@ -826,11 +827,11 @@ export default class UserInterfaceController extends AbstractController {
     }
 
     private handleSaveNewPrefClick() {
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_SAVE);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST);
     }
 
     private handleRollbackPreferencesClick() {
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_ROLLBACK);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST);
     }
 
     private handleUserUpdatedSVLPreferences() {
