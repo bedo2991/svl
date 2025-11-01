@@ -32,15 +32,11 @@ function initScript() {
 
   console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
 
-  SVLMediator.initialize({ wmeSDK });
-  SVLMediator.getInstance().initializationCompleted().then(() => {
-    debugger;
+  SVLMediator.initialize({ wmeSDK }).then((mediator) => {
     waitForWazeWrap().then((result) => {
-      debugger;
       if (result === true) {
-        SVLMediator.getInstance().setWazeWrap(WazeWrap);
-        //initWazeWrapElements();
-        SVLMediator.getInstance().alert(AlertType2.SUCCESS, "Initialization completed");
+        mediator.setWazeWrap(WazeWrap);
+        mediator.alert(AlertType2.SUCCESS, "Initialization completed");
       }
     });
 

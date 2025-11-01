@@ -17,7 +17,15 @@ const plugins = [
 if (isProduction) {
     console.warn("Building for RELEASE");
     plugins.push(terser());
+    plugins.push(replace({
+        preventAssignment: true,
+        __DEBUG__: false
+    }));
 } else {
+    plugins.push(replace({
+        preventAssignment: true,
+        __DEBUG__: true
+    }));
     console.log("Building for development");
 }
 

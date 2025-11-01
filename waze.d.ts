@@ -1,5 +1,7 @@
 // waze.d.ts
 
+declare const __DEBUG__: boolean;
+
 declare class Restriction {
   constructor();
   getDefaultType(): string;
@@ -320,7 +322,10 @@ declare namespace OpenLayers {
     insert(newNode: HTMLElement): (HTMLElement | null);
     remove(newNode: HTMLElement): void;
     compare(a: any, b: any, c: any): any; // Define more specific types
-    getNextElement(index: number): HTMLElement;
+    getNextElement(index: number): HTMLElement | null;
+
+    // SVL specific:
+    svlGetNextElement(index: number): HTMLElement | null;
   }
 
   namespace Event {
@@ -339,6 +344,7 @@ declare namespace OpenLayers {
     intersectsBounds(extend: OpenLayers.Bounds): boolean;
     scale(ratio: number, origin?: OpenLayers.Pixel | OpenLayers.LonLat): OpenLayers.Bounds;
     // Add other common Bounds methods like toGeometry, getCenterLonLat, etc. if used
+    bottom: any;
   }
 
   class Projection {
@@ -454,15 +460,15 @@ declare namespace OpenLayers {
 
     getNodeType(geometry: OpenLayers.IGeometry, style: object): string;
     postDraw(node: HTMLElement): void;
-    drawGeometryNode(node: HTMLElement, geometry: OpenLayers.IGeometry, style: object): ({ node: any, complete: boolean } | boolean);
+    drawGeometryNode(node: HTMLElement, geometry: OpenLayers.IGeometry, style: object): ({ node: any, complete: boolean } | false);
     applyDefaultSymbolizer(symbolizer: object): object;
-    redrawNode(id: string, geometry: OpenLayers.Geometry.Point, style: object, featureId: string): void;
+    redrawNode(id: string, geometry: OpenLayers.IGeometry, style: object, featureId: string): boolean;
     redrawBackgroundNode(id: string, geometry: OpenLayers.Geometry.Point, style: object, featureId: string): void;
     removeText(id: number | string): void; // ID could be string based on other methods
     getResolution(): number;
     drawFeature(feature: OpenLayers.Feature.Vector, style?: object): void; // Style often optional
     drawText(id: string, style: object, location: OpenLayers.Geometry.Point): void; // Location can be complex
-    setExtent(extent: OpenLayers.Bounds, resolutionChanged?: boolean): void;
+    setExtent(extent: OpenLayers.Bounds, resolutionChanged?: boolean): boolean;
     drawGeometry(geometry: OpenLayers.IGeometry, style: object, id: string): boolean;
     nodeFactory(id: string, type: string): HTMLLabelElement; // Or SVGElement etc.
 

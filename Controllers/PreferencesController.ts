@@ -1,5 +1,5 @@
 import AbstractController from "./AbstractController";
-import SVLMediator from "../SVLMediator";
+import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
 import { AlertType } from "./AbstractMediator";
 
 interface PreferenceObject {
@@ -13,11 +13,6 @@ export default class PreferencesController extends AbstractController {
         // Private constructor to prevent direct instantiation
         super(mediator);
         this.preferences = {};
-        let oldUser = this.loadPreferences();
-        if (!oldUser) {
-            this.mediator.notify(this, 'newUser');
-        }
-        this.setInitializationCompleted();
     }
     public static getInstance(): PreferencesController {
         if (!PreferencesController.instance) {
@@ -26,13 +21,36 @@ export default class PreferencesController extends AbstractController {
         return PreferencesController.instance;
     }
 
-    public static initialize({ mediator }: { mediator: SVLMediator }): void {
+    public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<PreferencesController> {
         if (!PreferencesController.instance) {
             PreferencesController.instance = new PreferencesController({ mediator });
+            let oldUser = PreferencesController.instance.loadPreferences();
+            if (!oldUser) {
+                PreferencesController.instance.mediator.notify(PreferencesController.instance, AcceptedControllerEvents.FIRST_RUN);
+            }
+            return PreferencesController.instance;
+        } else {
+            throw new Error("PreferencesController is already initialized.");
         }
     }
+    /**
+     * 
+     * @param key In the format key1.key2
+     * @returns 
+     */
     public getPreference(key: string): any {
-        return this.preferences[key];
+        const keys = key.split('.');
+        let value = this.preferences;
+
+        for (const k of keys) {
+            if (value && typeof value === 'object' && k in value) {
+                value = value[k];
+            } else {
+                return undefined;
+            }
+        }
+
+        return value;
     }
 
     public setPreference(key: string, value: any): void {
@@ -412,6 +430,10 @@ export default class PreferencesController extends AbstractController {
         return oldUser;
     }
 
+    public savePreferences() {
+        this.storePreferences(this.preferences, false);
+    }
+
     private storePreferences(pref: PreferenceObject, silent = true) {
         pref.version = this.mediator.SVL_VERSION;
         try {
@@ -423,5 +445,43 @@ export default class PreferencesController extends AbstractController {
             console.error(e);
             this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_saving_error'));
         }
+    }
+
+    public saveDefaultPreferences() {
+        this.loadPreferences(true);
+    }
+
+    public exportPreferences() {
+        GM_setClipboard(JSON.stringify(this.preferences));
+        this.mediator.alert(AlertType.INFO, this.mediator._('export_preferences_message'));
+    }
+
+    public resetPreferences() {
+        console.debug('resetting preferences');
+        this.saveDefaultPreferences();
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+        this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_reset_message'));
+    }
+
+    public importPreferences() {
+        this.mediator.prompt(
+            GM_info.script.name,
+            `${this.mediator._('preferences_import_prompt')}\n\n${this.mediator._(
+                'preferences_import_prompt_2'
+            )}`,
+            '',
+            (input: string) => {
+                try {
+                    const importedPreferences = JSON.parse(input);
+                    this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
+                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+                    //this.updateStylesFromPreferences(importedPreferences);
+                } catch (e) {
+                    console.error(e);
+                    this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_import_error'));
+                }
+            }
+        );
     }
 }

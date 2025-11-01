@@ -1,5 +1,5 @@
 import AbstractController from "./AbstractController";
-import SVLMediator from "../SVLMediator";
+import SVLMediator, { AcceptedControllerEvents } from "../SVLMediator";
 
 export default class LocalizationController extends AbstractController {
     // Singleton pattern
@@ -8,24 +8,33 @@ export default class LocalizationController extends AbstractController {
     readonly tr_keys: { [s: string]: number; } = {};
     private locale: string;
     private readonly fallback: Record<string, string> = {};
+    private areOnlineTranslationsLoaded: boolean = false;
 
     private constructor({ mediator }: { mediator: SVLMediator }) {
         super(mediator);
         // Private constructor to prevent direct instantiation
         this.locale = this.mediator.wmeSDK.Settings.getLocale()?.localeCode || 'en';
-        this.loadTranslations().catch((e) => {
-            console.error(e);
-            this.setAllFallbackTranslations();
-        }).finally(() => {
-            this.setInitializationCompleted();
-        });
-
     }
 
-    public static initialize({ mediator }: { mediator: SVLMediator }): void {
+    public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<LocalizationController> {
         if (!LocalizationController.instance) {
             LocalizationController.instance = new LocalizationController({ mediator });
+            let success = await LocalizationController.instance.loadTranslations();
+            if (!success) {
+                console.warn("LocalizationController: Could not load online translations, using fallback translations.");
+                LocalizationController.instance.setAllFallbackTranslations();
+            } else {
+                LocalizationController.instance.setMinimalFallbackTranslations();
+                console.info("LocalizationController: Online translations loaded successfully.");
+            }
+            return LocalizationController.instance;
+        } else {
+            throw new Error("LocalizationController is already initialized.");
         }
+    }
+
+    public getOnlineTranslationsLoaded(): boolean {
+        return this.areOnlineTranslationsLoaded;
     }
 
 
@@ -36,7 +45,7 @@ export default class LocalizationController extends AbstractController {
         this.fallbackSource = [];
     }
 
-    private setFallbackTranslations(setAll = false) {
+    private setMinimalFallbackTranslations(setAll = false) {
         for (let i = 0; i < this.fallbackSource.length; i++) {
             let item = this.fallbackSource[i];
             const key_index = this.tr_keys[item.key];
@@ -72,7 +81,7 @@ export default class LocalizationController extends AbstractController {
         })
     }
 
-    private async loadTranslations() {
+    private async loadTranslations(): Promise<boolean> {
         //console.debug('Loading translations...');
         const response = await this.request(
             {
@@ -96,12 +105,11 @@ export default class LocalizationController extends AbstractController {
                     }
                 }
             }
-            this.mediator.notify(this, 'onlineTranslationsLoaded');
-            //onlineTranslations = true;
-            this.setFallbackTranslations();
+            this.areOnlineTranslationsLoaded = true;
+            this.setMinimalFallbackTranslations();
             return true;
         }
-        throw new Error('Network response for SVL translations was not ok');
+        return false;
     }
 
     public static getInstance(): LocalizationController {

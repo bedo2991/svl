@@ -14,9 +14,12 @@ export default class RenderingController extends AbstractController {
         return RenderingController.instance;
     }
 
-    public static initialize({ mediator }: { mediator: SVLMediator }): void {
+    public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<RenderingController> {
         if (!RenderingController.instance) {
             RenderingController.instance = new RenderingController({ mediator });
+            return RenderingController.instance;
+        } else {
+            throw new Error("RenderingController is already initialized.");
         }
     }
 }
