@@ -2,6 +2,7 @@ import { DataModelName } from "wme-sdk-typings";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
 import { SVLEvents } from "./AbstractMediator";
+import { AcceptedControllerEvents } from "../svlGlobals";
 
 export enum SVLCallbackEventTypes {
     DATA_MODEL, // Called when data model events occur (nodes, segments, etc.)
@@ -46,7 +47,6 @@ export default class WMEEventsController extends AbstractController {
         [SVLEvents.USER_DISABLED]: this.handleUserDisabled.bind(this),
         [SVLEvents.AUTOMATICALLY_DISABLED]: this.handleSvlAutomaticallyDisabled.bind(this),
         [SVLEvents.DRAWING_ABORTED]: this.handleSvlDrawingAborted.bind(this),
-        [SVLEvents.WME_SETTINGS_CHANGED]: this.handleWmeSettingsChanged.bind(this),
     };
 
     private registeredSVLCallbacks: Map<SVLCallbackEventTypes, Map<SdkEventsWithoutCallbacks,
