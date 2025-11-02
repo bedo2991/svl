@@ -3,6 +3,7 @@ import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
+import Utils from "../Utils";
 
 export default class LayerStateController extends AbstractController {
     private static instance: LayerStateController;
@@ -10,7 +11,6 @@ export default class LayerStateController extends AbstractController {
     private roadLayerUniqueName: string = 'roads';
     private svlSDKLayerNames: string[] = [];
     private svlOLLayerNames: string[] = [];
-    readonly PI_OVER_180 = Math.PI / 180.0;
 
 
     private SVL_PIXEL_SIZE_CACHE = new Map<ZoomLevel, number>();
@@ -909,21 +909,12 @@ export default class LayerStateController extends AbstractController {
 
         // 3. Convert Latitude from degrees to radians.
         // Assuming PI_OVER_180 is Math.PI / 180.
-        const lat_radians = center_lat_4326 * this.PI_OVER_180;
+        const lat_radians = center_lat_4326 * Utils.PI_OVER_180;
 
         // 5. Calculate the Geodesic Pixel Size // res * Math.cos(lat_radians);
-        const geodesic_pixel_size_meters = resolution_3857 * this.efficientCos(lat_radians);
+        const geodesic_pixel_size_meters = resolution_3857 * Utils.efficientCos(lat_radians);
 
         return geodesic_pixel_size_meters;
-    }
-
-    // TODO: maybe move to a Utils class if needed elsewhere
-    private efficientCos(input: number): number {
-        const x_squared = input * input;
-        const x_to_the_fourth = x_squared * x_squared;
-
-        // Note: 2! = 2, 4! = 24
-        return 1.0 - (x_squared / 2.0) + (x_to_the_fourth / 24.0);
     }
 
     // TODO: only receive the event if the opacity was updated
@@ -937,7 +928,7 @@ export default class LayerStateController extends AbstractController {
                     'strokeColor': streetsPref[i]['strokeColor'],
                     'strokeWidth': streetsPref[i]['strokeWidth'],
                     'strokeDashstyle': streetsPref[i]['strokeDashstyle'],
-                    'outlineColor': this.bestBackground(streetsPref[i]['strokeColor']),
+                    'outlineColor': Utils.bestBackground(streetsPref[i]['strokeColor']),
                 };
             }
         }
@@ -976,17 +967,5 @@ export default class LayerStateController extends AbstractController {
             this.currentState = SVLLayerState.USER_DISABLED;
             this.disableAllSVLLayers(false);
         }
-    }
-
-    // TODO: utils class?
-    private bestBackground(color: string) {
-        const oppositeColor =
-            parseInt(color.substring(1, 3), 16) * 0.299 +
-            parseInt(color.substring(3, 5), 16) * 0.587 +
-            parseInt(color.substring(5, 7), 16) * 0.114;
-        if (oppositeColor < 127) {
-            return '#FFF';
-        }
-        return '#000';
     }
 }

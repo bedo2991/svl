@@ -75,6 +75,21 @@ export default class SVLMediator extends AbstractMediator {
                 this.renderingController.zoomChanged();
             }
         });
+
+        this.wmeEventsController.registerSVLCallback({
+            eventType: SVLCallbackEventTypes.WME_SETTINGS_CHANGED,
+            sdkName: "wme-user-settings-changed",
+            callback: () => {
+                this.alert(AlertType.INFO, "WME Settings Changed");
+                this.notify(this, AcceptedControllerEvents.WME_SETTINGS_UPDATED);
+            }
+        })
+    }
+
+    public debugLog(message: string, ...args: any[]): void {
+        if (__DEBUG__) {
+            console.debug(`[SVL DEBUG]: ${message}`, ...args);
+        }
     }
 
     public getState(): SVLLayerState {
@@ -116,6 +131,9 @@ export default class SVLMediator extends AbstractMediator {
                 return this.preferencesController.importPreferences();
             case AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST:
                 return this.preferencesController.exportPreferences();
+            case AcceptedControllerEvents.WME_SETTINGS_UPDATED:
+                return this.emit(SVLEvents.WME_SETTINGS_CHANGED);
+                break;
             case AcceptedControllerEvents.FIRST_RUN:
                 return this.handleFirstRun();
             default:
