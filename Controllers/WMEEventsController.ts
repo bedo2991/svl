@@ -1,7 +1,7 @@
 import { DataModelName } from "wme-sdk-typings";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
-import { SVLEvents } from "./AbstractMediator";
+import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents } from "../svlGlobals";
 
 export enum SVLCallbackEventTypes {
@@ -10,16 +10,18 @@ export enum SVLCallbackEventTypes {
     COUNTRY_CHANGE, // Called when the country changes
     DRAWING_ABORTED, // Called when drawing is aborted
     WME_SETTINGS_CHANGED, // Called when WME settings are changed
+    LAYER_VISIBILITY_CHANGED, // Called when layer visibility changes
 }
 
 type SdkDataModelEvents = "wme-data-model-objects-added" | "wme-data-model-objects-changed" | "wme-data-model-objects-removed" | "wme-data-model-object-state-deleted" | "wme-data-model-objects-saved";
 type SdkEventsWithoutCallbacks = "wme-layer-checkbox-toggled" | "wme-map-zoom-changed" | "wme-map-data-loaded" | "wme-user-settings-changed";
-type SdkEventName = (SdkEventsWithoutCallbacks | SdkDataModelEvents);
+type SdkEventWithStringParameter = "wme-layer-visibility-changed";
+type SdkEventName = (SdkEventsWithoutCallbacks | SdkDataModelEvents | SdkEventWithStringParameter);
 
 type EventExecution = {
     eventType: SVLCallbackEventTypes,
     sdkName: SdkEventName,
-    callback: (() => void) | (({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void),
+    callback: RegisteredEventExecution["callback"] | RegisteredDataModelExecution["callback"] | RegisteredLayerVisibilityExecution["callback"],
     deferInMs?: number,
 }
 
@@ -37,7 +39,18 @@ type RegisteredDataModelExecution = {
     deferInMs?: number,
 }
 
+type RegisteredLayerVisibilityExecution = {
+    cleanUp: (() => void) | null,
+    callback: ({ layerName }: { layerName: string }) => void,
+    timeoutId: number | undefined,
+    deferInMs?: number,
+}
 
+/**
+ * This class manages WME events that should be active based on the SVL state.
+ * It enables or disables event listeners according to whether SVL is enabled,
+ * disabled by the user, or automatically disabled.
+ */
 export default class WMEEventsController extends AbstractController {
     // Singleton pattern
     private static instance: WMEEventsController | null = null;
@@ -53,6 +66,8 @@ export default class WMEEventsController extends AbstractController {
         RegisteredEventExecution>> = new Map();
     private registeredSVLDataModelCallbacks: Map<SdkDataModelEvents,
         RegisteredDataModelExecution> = new Map();
+    private registeredSVLLayerVisibilityCallbacks: Map<SdkEventWithStringParameter,
+        RegisteredLayerVisibilityExecution> = new Map();
 
     private constructor({ mediator }: { mediator: SVLMediator }) {
         // Private constructor to prevent direct instantiation
@@ -68,8 +83,14 @@ export default class WMEEventsController extends AbstractController {
     public registerSVLCallback({ eventType, sdkName, callback, deferInMs }: EventExecution): void {
         if (eventType === SVLCallbackEventTypes.DATA_MODEL) {
             this.registerDataModelCallback(sdkName as SdkDataModelEvents,
-                callback as (({ dataModelName, objectIds }:
-                    { dataModelName: DataModelName, objectIds: Array<string | number> }) => void),
+                callback as RegisteredDataModelExecution["callback"],
+                deferInMs);
+            return;
+        }
+
+        if (eventType === SVLCallbackEventTypes.LAYER_VISIBILITY_CHANGED) {
+            this.registerLayerVisibilityCallback(sdkName as SdkEventWithStringParameter,
+                callback as RegisteredLayerVisibilityExecution["callback"],
                 deferInMs);
             return;
         }
@@ -88,12 +109,11 @@ export default class WMEEventsController extends AbstractController {
                 });
             } else {
                 alert("This event was already set!");
-                debugger;
             }
         }
     }
 
-    private registerDataModelCallback(sdkName: SdkDataModelEvents, callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void, deferInMs?: number): void {
+    private registerDataModelCallback(sdkName: SdkDataModelEvents, callback: RegisteredDataModelExecution["callback"], deferInMs?: number): void {
         if (!this.registeredSVLDataModelCallbacks.has(sdkName)) {
             this.registeredSVLDataModelCallbacks.set(sdkName, {
                 callback: callback,
@@ -104,7 +124,18 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    private unregisterDataModelCallback(sdkName: SdkDataModelEvents, callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void): void {
+    private registerLayerVisibilityCallback(sdkName: SdkEventWithStringParameter, callback: RegisteredLayerVisibilityExecution["callback"], deferInMs?: number): void {
+        if (!this.registeredSVLLayerVisibilityCallbacks.has(sdkName)) {
+            this.registeredSVLLayerVisibilityCallbacks.set(sdkName, {
+                callback: callback,
+                cleanUp: null,
+                deferInMs: deferInMs,
+                timeoutId: undefined
+            });
+        }
+    }
+
+    private unregisterDataModelCallback(sdkName: SdkDataModelEvents, callback: RegisteredDataModelExecution["callback"]): void {
         const callbacks = this.registeredSVLDataModelCallbacks.get(sdkName);
         if (callbacks && callbacks.callback === callback) {
             if (callbacks.timeoutId) {
@@ -116,11 +147,30 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    public unregisterCallback(eventType: SVLCallbackEventTypes, sdkName: SdkEventName, callback: (() => void) | (({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void)): void {
+    private unregisterLayerVisibilityCallback(sdkName: SdkEventWithStringParameter, callback: RegisteredLayerVisibilityExecution["callback"]): void {
+        const callbacks = this.registeredSVLLayerVisibilityCallbacks.get(sdkName);
+        if (callbacks && callbacks.callback === callback) {
+            if (callbacks.timeoutId) {
+                clearTimeout(callbacks.timeoutId);
+                callbacks.timeoutId = undefined;
+            }
+            callbacks.cleanUp?.();
+            this.registeredSVLLayerVisibilityCallbacks.delete(sdkName);
+        }
+    }
+
+
+    public unregisterCallback(eventType: SVLCallbackEventTypes, sdkName: SdkEventName, callback: RegisteredEventExecution["callback"] | RegisteredDataModelExecution["callback"] | RegisteredLayerVisibilityExecution["callback"]): void {
         if (eventType === SVLCallbackEventTypes.DATA_MODEL) {
-            this.unregisterDataModelCallback(sdkName as SdkDataModelEvents, callback as ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void);
+            this.unregisterDataModelCallback(sdkName as SdkDataModelEvents, callback as RegisteredDataModelExecution["callback"]);
             return;
         }
+
+        if (eventType === SVLCallbackEventTypes.LAYER_VISIBILITY_CHANGED) {
+            this.unregisterLayerVisibilityCallback(sdkName as SdkEventWithStringParameter, callback as RegisteredLayerVisibilityExecution["callback"]);
+            return;
+        }
+
         const callbacks = this.registeredSVLCallbacks.get(eventType);
         if (callbacks) {
             const registeredCallback = callbacks.get(sdkName as SdkEventsWithoutCallbacks);
@@ -152,17 +202,79 @@ export default class WMEEventsController extends AbstractController {
 
     }
 
+    private manageState({ zoomEvents, countryChangeEvents, dataModelEvents, wmeSettingsChangedEvents, nodeTrackingEvents, segmentTrackingEvents, drawingAbortedEvents, layerVisibilityChangedEvents }: {
+        zoomEvents: boolean,
+        countryChangeEvents: boolean,
+        dataModelEvents: boolean,
+        wmeSettingsChangedEvents: boolean,
+        nodeTrackingEvents: boolean,
+        segmentTrackingEvents: boolean,
+        drawingAbortedEvents: boolean,
+        layerVisibilityChangedEvents: boolean,
+    }): void {
+        if (zoomEvents) {
+            this.enableZoomEvents();
+        } else {
+            this.disableZoomEvents();
+        }
+
+        if (countryChangeEvents) {
+            this.enableCountryChangeEvent();
+        } else {
+            this.disableCountryChangeEvent();
+        }
+
+        if (dataModelEvents) {
+            this.enableAllDataModelEvents();
+        } else {
+            this.disableDataModelEvents();
+        }
+
+        if (wmeSettingsChangedEvents) {
+            this.enableWmeSettingsChangedEvents();
+        } else {
+            this.disableWmeSettingsChangedEvents();
+        }
+
+        if (nodeTrackingEvents) {
+            this.startTrackingNodesEvents();
+        } else {
+            this.stopTrackingNodesEvents();
+        }
+
+        if (segmentTrackingEvents) {
+            this.startTrackingSegmentsEvents();
+        } else {
+            this.stopTrackingSegmentsEvents();
+        }
+
+        if (drawingAbortedEvents) {
+            this.enableDrawingAbortedEvents();
+        } else {
+            this.disableDrawingAbortedEvents();
+        }
+
+        if (layerVisibilityChangedEvents) {
+            this.startTrackingRoadLayerEvents();
+            this.enableLayerVisibilityChangedEvents();
+        } else {
+            this.stopTrackingRoadLayerEvents();
+            this.disableLayerVisibilityChangedEvents();
+        }
+    }
+
     public handleLayerEnabled() {
         console.debug('WMEEventsController: Handling layer enabled event');
-        debugger;
-        this.disableDrawingAbortedEvents();
-
-        this.enableZoomEvents();
-        this.enableCountryChangeEvent();
-        this.enableAllDataModelEvents();
-        this.enableWmeSettingsChangedEvents();
-        this.startTrackingNodesEvents();
-        this.startTrackingSegmentsEvents();
+        this.manageState({
+            zoomEvents: true,
+            countryChangeEvents: true,
+            dataModelEvents: true,
+            wmeSettingsChangedEvents: true,
+            nodeTrackingEvents: true,
+            segmentTrackingEvents: true,
+            drawingAbortedEvents: false,
+            layerVisibilityChangedEvents: true,
+        });
         this.lastState = SVLEvents.LAYER_ENABLED;
     }
 
@@ -173,34 +285,47 @@ export default class WMEEventsController extends AbstractController {
     }
 
     public handleSvlAutomaticallyDisabled() {
-        this.disableCountryChangeEvent();
-        this.disableWmeSettingsChangedEvents();
-        this.stopTrackingSegmentsEvents();
-        this.stopTrackingNodesEvents();
+        this.manageState({
+            zoomEvents: true,
+            countryChangeEvents: false,
+            dataModelEvents: false,
+            wmeSettingsChangedEvents: false,
+            nodeTrackingEvents: false,
+            segmentTrackingEvents: false,
+            drawingAbortedEvents: false,
+            layerVisibilityChangedEvents: false,
+        });
         this.lastState = SVLEvents.AUTOMATICALLY_DISABLED;
     }
 
     public handleUserDisabled() {
         console.debug('WMEEventsController: Handling user disabled event');
-        this.stopTrackingNodesEvents();
-        this.stopTrackingSegmentsEvents();
-        this.disableZoomEvents();
-        this.disableCountryChangeEvent();
-        this.disableDataModelEvents();
-        this.disableWmeSettingsChangedEvents();
+        this.manageState({
+            zoomEvents: false,
+            countryChangeEvents: false,
+            dataModelEvents: false,
+            wmeSettingsChangedEvents: false,
+            nodeTrackingEvents: false,
+            segmentTrackingEvents: false,
+            drawingAbortedEvents: false,
+            layerVisibilityChangedEvents: false,
+        });
         this.lastState = SVLEvents.USER_DISABLED;
     }
 
     public handleSvlDrawingAborted() {
         console.debug('WMEEventsController: Handling drawing aborted event');
-        this.stopTrackingNodesEvents();
-        this.stopTrackingSegmentsEvents();
-        this.disableZoomEvents();
-        this.disableCountryChangeEvent();
-        this.disableDataModelEvents();
-        this.disableWmeSettingsChangedEvents();
 
-        this.enableDrawingAbortedEvents();
+        this.manageState({
+            zoomEvents: true,
+            countryChangeEvents: true,
+            dataModelEvents: true,
+            wmeSettingsChangedEvents: true,
+            nodeTrackingEvents: true,
+            segmentTrackingEvents: true,
+            drawingAbortedEvents: true,
+            layerVisibilityChangedEvents: false,
+        });
         this.lastState = SVLEvents.DRAWING_ABORTED;
     }
 
@@ -310,6 +435,44 @@ export default class WMEEventsController extends AbstractController {
         this.disableAllCallbacksOfType(SVLCallbackEventTypes.COUNTRY_CHANGE);
     }
 
+    private enableLayerVisibilityChangedEvents(): void {
+        this.enableAllLayerVisibilityChangedEvents();
+    }
+
+    private disableLayerVisibilityChangedEvents(): void {
+        this.disableAllLayerVisibilityChangedEvents();
+    }
+
+    private enableAllLayerVisibilityChangedEvents(): void {
+        this.registeredSVLLayerVisibilityCallbacks.forEach((value, key) => {
+            this.enableLayerVisibilityChangedEventsOfSdkType({ sdkEvent: key });
+        });
+    }
+
+    private enableLayerVisibilityChangedEventsOfSdkType({ sdkEvent }:
+        { sdkEvent: SdkEventWithStringParameter }): void {
+        const callbacks = this.registeredSVLLayerVisibilityCallbacks.get(sdkEvent);
+        if (!callbacks) {
+            return;
+        }
+        if (callbacks.cleanUp) {
+            // Already registered
+            return;
+        }
+        console.debug(`WMEEventsController: Enabling layer visibility changed event ${sdkEvent}`);
+        callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
+            eventName: sdkEvent,
+            eventHandler: callbacks.callback,
+        });
+    }
+
+    private disableAllLayerVisibilityChangedEvents(): void {
+        this.registeredSVLLayerVisibilityCallbacks.forEach((value, key) => {
+            value.cleanUp?.();
+            value.cleanUp = null;
+        });
+    }
+
     private removeCallbacks(callbacks: Array<() => void>): void {
         while (callbacks.length > 0) {
             let callback = callbacks.pop();
@@ -324,6 +487,12 @@ export default class WMEEventsController extends AbstractController {
             this.disableDataModelEvents();
             return;
         }
+
+        if (eventType === SVLCallbackEventTypes.LAYER_VISIBILITY_CHANGED) {
+            this.disableAllLayerVisibilityChangedEvents();
+            return;
+        }
+
         let callbacks = this.registeredSVLCallbacks.get(eventType);
         if (!callbacks) {
             return;
@@ -337,6 +506,18 @@ export default class WMEEventsController extends AbstractController {
                 callback.cleanUp = null;
             }
         }
+    }
+
+    private startTrackingRoadLayerEvents(): void {
+        this.mediator.wmeSDK.Events.trackLayerEvents({
+            layerName: "roads"
+        });
+    }
+
+    private stopTrackingRoadLayerEvents(): void {
+        this.mediator.wmeSDK.Events.stopLayerEventsTracking({
+            layerName: "roads"
+        });
     }
 
     private startTrackingSegmentsEvents(): void {

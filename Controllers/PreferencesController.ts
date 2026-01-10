@@ -1,6 +1,7 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
 import { AlertType } from "./AbstractMediator";
+import { AcceptedControllerEvents } from "../svlGlobals";
 
 interface PreferenceObject {
     [key: string]: any
@@ -471,15 +472,17 @@ export default class PreferencesController extends AbstractController {
                 'preferences_import_prompt_2'
             )}`,
             '',
-            (input: string) => {
+            (_: any, input: string) => {
                 try {
                     const importedPreferences = JSON.parse(input);
+                    this.preferences = importedPreferences;
+                    this.storePreferences(this.preferences, true);
                     this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
                     this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
                     //this.updateStylesFromPreferences(importedPreferences);
                 } catch (e) {
                     console.error(e);
-                    this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_import_error'));
+                    this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_importing_error'));
                 }
             }
         );

@@ -581,7 +581,7 @@ declare namespace WazeWrap {
       name: string,
       message: string,
       defaultText: string | null,
-      okCallback: (text: string) => void,
+      okCallback: (target: EventTarget, text: string) => void,
       cancelCalback?: () => void // Typically optional
     ): void;
     function confirm(

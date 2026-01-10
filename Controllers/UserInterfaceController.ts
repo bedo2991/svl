@@ -1,11 +1,14 @@
+import { KeyboardShortcut } from "wme-sdk-typings";
+import { AcceptedControllerEvents } from "../svlGlobals";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
+import { AlertType } from "./AbstractMediator";
 import PreferencesController from "./PreferencesController";
 
 
 export default class UserInterfaceController extends AbstractController {
     // Singleton pattern
-    private static instance: UserInterfaceController | null = null
+    private static instance: UserInterfaceController;
 
     private preferencesController!: PreferencesController;
 
@@ -26,13 +29,55 @@ export default class UserInterfaceController extends AbstractController {
         }
         return UserInterfaceController.instance;
     }
+
+
     public static async initialize({ mediator, preferencesController }: { mediator: SVLMediator, preferencesController: PreferencesController }): Promise<UserInterfaceController> {
         if (!UserInterfaceController.instance) {
             UserInterfaceController.instance = new UserInterfaceController({ mediator, preferencesController });
+
+            UserInterfaceController.instance.initShortcut();
+
             await UserInterfaceController.instance.initPreferencePanel();
             return UserInterfaceController.instance;
         } else {
             throw new Error("UserInterfaceController is already initialized.");
+        }
+    }
+
+    private initShortcut() {
+        const defaultShortcut = "l";
+
+        const toggleShortcut: KeyboardShortcut = {
+            callback: () => { UserInterfaceController.instance.mediator.notify(UserInterfaceController.instance, AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED); },
+            description: "Toggle SVL",
+            shortcutId: "svl",
+            shortcutKeys: defaultShortcut,
+        };
+
+
+        if (!this.mediator.wmeSDK.Shortcuts.areShortcutKeysInUse({
+            shortcutKeys: defaultShortcut
+        })) {
+            try {
+                this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                console.log('SVL: Keyboard shortcut successfully added.');
+            } catch (e) {
+                this.mediator.alert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
+                console.error('SVL: Error while adding the keyboard shortcut:');
+                console.error(e);
+            }
+        } else {
+            setTimeout(() => {
+                this.mediator.alert(AlertType.WARNING, this.mediator._('shortcut_cannot_be_set'));
+            }, 3000);
+            try {
+                toggleShortcut.shortcutKeys = null;
+                this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                console.log('SVL: Empty Keyboard shortcut successfully added.');
+            } catch (e) {
+                console.error('SVL: Error while adding the empty keyboard shortcut:');
+                console.error(e);
+            }
         }
     }
 
@@ -815,10 +860,12 @@ export default class UserInterfaceController extends AbstractController {
         this.updatePreferenceValues();
     }
     private handleResetPreferencesClick() {
+        this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_RESET_REQUEST);
     }
 
     private handleImportPreferencesClick() {
+        this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_IMPORT_REQUEST);
     }
 
@@ -827,11 +874,25 @@ export default class UserInterfaceController extends AbstractController {
     }
 
     private handleSaveNewPrefClick() {
+        this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST);
     }
 
     private handleRollbackPreferencesClick() {
+        this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST);
+    }
+
+    private resetButtonState() {
+        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
+        const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
+        saveNewButton.classList.add('disabled');
+        saveNewButton.disabled = true;
+        saveNewButton.classList.remove('btn-primary');
+        const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
+        rollbackButton.classList.add('disabled');
+        rollbackButton.disabled = true;
+        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
     }
 
     private handleUserUpdatedSVLPreferences() {
@@ -840,6 +901,8 @@ export default class UserInterfaceController extends AbstractController {
         saveNewButton.classList.remove('disabled');
         saveNewButton.disabled = false;
         saveNewButton.classList.add('btn-primary');
+        // TODO: only do this if the changed element is related to streets preferences
+        this.updateStreetsPreferenceValues();
         this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
     }
 

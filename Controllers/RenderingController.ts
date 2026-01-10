@@ -3,7 +3,7 @@ import SVLMediator from "../SVLMediator";
 import { Node, SdkFeature, Segment } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
-import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
+import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
 import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import Utils from "../Utils";
@@ -33,6 +33,8 @@ export default class RenderingController extends AbstractController {
     private arrowsStore = new Map<Segment['id'], Set<string>>();
     private iconsStore = new Map<Segment['id'], Set<string>>();
 
+    private labelsVector = W.map.getLayerByName(OL_LAYERS.LABELS);
+
     private currentTopCountryId: number | null = null;
 
     private isImperial: boolean = false;
@@ -41,7 +43,7 @@ export default class RenderingController extends AbstractController {
 
     private streetStyles: StreetStyle[] = [];
 
-    private clutterConstant: number = 7; // todo: get the value from the updated preferences
+    private clutterConstant: number = 7;
 
     private roundaboutStyle = {
         strokeColor: '#111111',
@@ -106,14 +108,19 @@ export default class RenderingController extends AbstractController {
             RenderingController.instance.handleSVLSettingsUpdated.call(RenderingController.instance);
 
             // Event subscriptions
-            RenderingController.instance.mediator.subscribe(SVLEvents.COUNTRY_CHANGED, RenderingController.instance.handleCountryChanged.bind(RenderingController.instance));
-            RenderingController.instance.mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, RenderingController.instance.handleSVLSettingsUpdated.bind(RenderingController.instance));
-            RenderingController.instance.mediator.subscribe(SVLEvents.WME_SETTINGS_CHANGED, RenderingController.instance.handleWMESettingsUpdated.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.COUNTRY_CHANGED, RenderingController.instance.handleCountryChanged.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, RenderingController.instance.handleSVLSettingsUpdated.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.WME_SETTINGS_CHANGED, RenderingController.instance.handleWMESettingsUpdated.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.USER_DISABLED, RenderingController.instance.handleUserDisabledLayer.bind(RenderingController.instance));
 
             return RenderingController.instance;
         } else {
             throw new Error("RenderingController is already initialized.");
         }
+    }
+
+    private handleUserDisabledLayer() {
+        this.removeAllSegmentsFromLayer();
     }
 
     private handleWMESettingsUpdated() {
@@ -300,7 +307,6 @@ export default class RenderingController extends AbstractController {
     public redrawAll(): void {
         // Logic to redraw all SVL layers
         console.log("Redrawing all SVL layers…");
-        debugger;
         // Clear any pending redraw to avoid multiple rapid redraws
         if (this.redrawTimeout !== null) {
             clearTimeout(this.redrawTimeout);
@@ -308,27 +314,43 @@ export default class RenderingController extends AbstractController {
 
         // Throttle redraw operations to improve performance
         this.redrawTimeout = window.setTimeout(() => {
-            this.destroyAllFeatures();
-            this.addAllSegmentsSDK();
-            this.addAllNodesSDK();
+            if (this.mediator.getState() === SVLLayerState.VISIBLE) {
+                this.destroyAllFeatures();
+                this.addAllSegmentsSDK();
+                this.addAllNodesSDK();
+            }
             this.redrawTimeout = null;
         }, 100); // 100ms throttle
     }
 
     private destroyAllFeatures(): void {
         this.removeAllSegmentsFromLayer();
-        //labelsVector.destroyFeatures(labelsVector.features, { 'silent': true });
+        this.labelsVector.destroyFeatures(this.labelsVector.features, { 'silent': true });
         this.removeAllNodesFromLayer();
     }
 
     private addAllSegmentsSDK(): void {
+        this.addSegmentsByModel(this.mediator.wmeSDK.DataModel.Segments.getAll());
+    }
+
+    public shouldDrawingResumeAfterAbort() {
+        Utils.debugLog(`Segments: ${this.mediator.wmeSDK.DataModel.Segments.getAll().length}, Nodes: ${this.mediator.wmeSDK.DataModel.Nodes.getAll().length}`);
+        Utils.debugLog(`Limits: Segments: ${this.mediator.getPreference('segmentsThreshold')}, Nodes: ${this.mediator.getPreference('nodesThreshold')}`);
+        if (
+            this.mediator.wmeSDK.DataModel.Segments.getAll().length < this.mediator.getPreference('segmentsThreshold') &&
+            this.mediator.wmeSDK.DataModel.Nodes.getAll().length < this.mediator.getPreference('nodesThreshold')
+        ) {
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+        }
+    }
+
+    private addSegmentsByModel(segments: Segment[]): void {
         const currentState = this.mediator.getState();
         if (__DEBUG__) {
             if (currentState === SVLLayerState.DRAWING_ABORTED) {
-                alert("Drawing aborted state detected in addAllNodesSDK");
+                alert("Drawing aborted state detected in addSegmentsByModel");
             }
         }
-        const segments = this.mediator.wmeSDK.DataModel.Segments.getAll();
         if (segments.length === 0) return;
         if (!(currentState === SVLLayerState.DRAWING_ABORTED) && segments.length > this.mediator.getPreference('segmentsThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
@@ -346,8 +368,10 @@ export default class RenderingController extends AbstractController {
             }
         }
         this.drawAllQueues();
-        if (labels.length === 0) return;
-        // TODO this.labelsVector.addFeatures(labels, { 'silent': true });
+
+        if (labels.length > 0) {
+            this.labelsVector.addFeatures(labels, { 'silent': true });
+        }
     }
 
     private async queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
@@ -394,14 +418,13 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private addAllNodesSDK(): void {
+    private addNodesByModel(nodes: Node[]): void {
         const currentState = this.mediator.getState();
         if (__DEBUG__) {
             if (currentState === SVLLayerState.DRAWING_ABORTED) {
                 alert("Drawing aborted state detected in addAllNodesSDK");
             }
         }
-        const nodes = this.mediator.wmeSDK.DataModel.Nodes.getAll();
         if (nodes.length === 0) return;
         if (!(currentState === SVLLayerState.DRAWING_ABORTED) && nodes.length > this.mediator.getPreference('nodesThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.mediator.getPreference('nodesThreshold')}.\nYou can change this in the SVL preferences panel.`);
@@ -415,6 +438,10 @@ export default class RenderingController extends AbstractController {
         }
 
         this.addNodesSDK(nodes);
+    }
+
+    private addAllNodesSDK(): void {
+        this.addNodesByModel(this.mediator.wmeSDK.DataModel.Nodes.getAll());
     }
 
     private addNodesSDK(nodes: Node[]) {
@@ -475,6 +502,95 @@ export default class RenderingController extends AbstractController {
         this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
             layerName: SDK_LAYERS.NODES
         });
+    }
+
+    public addSegmentsByIds(objectIds: (number)[]): void {
+        Utils.debugLog(`addSegmentsSDK - Adding ${objectIds.length} segments`);
+        if (objectIds.length > this.mediator.getPreference('segmentsThreshold')) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${objectIds.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
+            return;
+        }
+        const segments = objectIds.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id })).filter(s => s !== null) as Segment[];
+        this.addSegmentsByModel(segments);
+    }
+
+    public addNodesByIds(objectIds: (number)[]): void {
+        Utils.debugLog(`addNodesSDK - Adding ${objectIds.length} nodes`);
+        const nodes = objectIds.map(id => this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: id })).filter(n => n !== null) as Node[];
+        this.addNodesByModel(nodes);
+    }
+
+    public removeSegmentsByIds(objectIds: (number)[]): void {
+        Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
+        const segmentsFeatureIds: string[] = [];
+        for (let i = 0; i < objectIds.length; i++) {
+            let set = this.segmentsStore.get(objectIds[i]);
+            if (set) {
+                segmentsFeatureIds.push(...Array.from(set));
+            }
+            this.labelsVector.destroyFeatures(
+                this.labelsVector.getFeaturesByAttribute('sID', objectIds[i]),
+                { 'silent': true }
+            );
+        }
+
+
+        const arrowsFeatureIds: string[] = [];
+        for (let i = 0; i < objectIds.length; i++) {
+            const set = this.arrowsStore.get(objectIds[i]);
+            if (set) {
+                arrowsFeatureIds.push(...Array.from(set));
+            }
+        }
+
+        const iconsFeatureIds: string[] = [];
+        for (let i = 0; i < objectIds.length; i++) {
+            const set = this.iconsStore.get(objectIds[i]);
+            if (set) {
+                iconsFeatureIds.push(...Array.from(set));
+            }
+        }
+
+        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            featureIds: segmentsFeatureIds,
+            layerName: SDK_LAYERS.SEGMENTS
+        });
+        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            featureIds: arrowsFeatureIds,
+            layerName: SDK_LAYERS.ARROWS
+        });
+
+        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            featureIds: iconsFeatureIds,
+            layerName: SDK_LAYERS.ICONS
+        });
+    }
+
+    public removeNodesByIds(objectIds: (number)[]): void {
+        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
+        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            featureIds: objectIds,
+            layerName: SDK_LAYERS.NODES
+        })
+    }
+
+    public updateSegmentsByIds(objectIds: (number)[]): void {
+        this.removeSegmentsByIds(objectIds);
+        this.addSegmentsByIds(objectIds);
+    }
+
+    public updateNodesByIds(objectIds: (number)[]): void {
+        if (objectIds.length === 0) return;
+        let nodes = objectIds.map((nodeId) => {
+            return this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: nodeId as number });
+        }).filter((n) => n !== null) as Node[];
+        if (nodes.length == 0) {
+            Utils.debugLog("No nodes found to update");
+            return;
+        }
+        this.removeNodesByIds(objectIds);
+        this.addNodesSDK(nodes);
     }
 
     // TODO: refactor (Strategy pattern?)

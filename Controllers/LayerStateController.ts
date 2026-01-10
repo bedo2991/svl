@@ -2,13 +2,12 @@ import { ZoomLevel } from "wme-sdk-typings";
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
 import { AlertType, SVLEvents } from "./AbstractMediator";
-import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
+import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
 import Utils from "../Utils";
 
 export default class LayerStateController extends AbstractController {
     private static instance: LayerStateController;
     private currentState: SVLLayerState = SVLLayerState.UNINITIALIZED;
-    private roadLayerUniqueName: string = 'roads';
     private svlSDKLayerNames: string[] = [];
     private svlOLLayerNames: string[] = [];
 
@@ -40,9 +39,22 @@ export default class LayerStateController extends AbstractController {
             LayerStateController.instance.initializeLayers();
             LayerStateController.instance.currentState = SVLLayerState.INITIALIZED;
 
+            LayerStateController.instance.svlSDKLayerNames = Object.values(SDK_LAYERS);
+            LayerStateController.instance.svlOLLayerNames = Object.values(OL_LAYERS);
+
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, () => {
                 LayerStateController.instance.SVL_PIXEL_SIZE_CACHE.clear();
             });
+
+            mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED,
+                LayerStateController.instance.disableSVLRoadLayerAutomatically.bind(LayerStateController.instance));
+
+            mediator.subscribe(SVLEvents.LAYER_ENABLED,
+                LayerStateController.instance.tryEnablingSVLRoadLayer.bind(LayerStateController.instance)
+            );
+
+            mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, LayerStateController.instance.updateAfterPreferencesWereChanged.bind(LayerStateController.instance));
+
             return LayerStateController.instance;
         }
         else {
@@ -83,8 +95,6 @@ export default class LayerStateController extends AbstractController {
             'pointerEvents': 'none',
             'labelAlign': 'cm', // set to center middle
         });
-        /*  eslint-enable no-template-curly-in-string */
-        const layerName = 'Street Vector Layer'; // TODO
 
         /**
          *
@@ -145,8 +155,7 @@ export default class LayerStateController extends AbstractController {
             return this.svlGetNextElement(rightIndex);
         };
 
-        this.labelsVector = new OpenLayers.Layer.Vector('Labels Vector', {
-            'name': 'vectorLabels',
+        this.labelsVector = new OpenLayers.Layer.Vector(OL_LAYERS.LABELS, {
             'styleMap': labelStyleMap,
             'visibility': false,
         });
@@ -695,7 +704,7 @@ export default class LayerStateController extends AbstractController {
         });
 
 
-        this.updateAfterPreferencesWereChanged(false);
+        this.updateAfterPreferencesWereChanged();
 
         if (__DEBUG__) {
             document['lv'] = this.labelsVector;
@@ -821,15 +830,30 @@ export default class LayerStateController extends AbstractController {
         if (shouldEnableWMERoadLayer) {
             this.enableWMERoadLayer();
         }
-        this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
     }
 
     public tryEnablingSVLRoadLayer(): boolean {
         if ([SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED, SVLLayerState.AUTOMATICALLY_DISABLED, SVLLayerState.USER_DISABLED].includes(this.currentState)) {
-            this.enableAllSVLLayers();
-            return true;
+            if (this.mediator.wmeSDK.Map.getZoomLevel() > this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+                this.enableAllSVLLayers();
+                return true;
+            } else if (this.currentState !== SVLLayerState.AUTOMATICALLY_DISABLED) {
+                this.mediator.alert(AlertType.INFO, this.mediator._('zoom_in_for_svl'));
+                this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE);
+                return false;
+            }
         }
         return false;
+    }
+
+    public toggleSVLLayerEnabledState(): void {
+        if ([SVLLayerState.VISIBLE,
+        SVLLayerState.AUTOMATICALLY_DISABLED,
+        SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
+            this.userDisabledSvl();
+        } else {
+            this.tryEnablingSVLRoadLayer();
+        }
     }
 
     public disableSVLRoadLayerDueToDrawingAbort(): boolean {
@@ -847,6 +871,7 @@ export default class LayerStateController extends AbstractController {
         if (this.currentState === SVLLayerState.VISIBLE) {
             this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
             this.disableAllSVLLayers(true);
+            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
             return true;
         }
         return false;
@@ -917,44 +942,20 @@ export default class LayerStateController extends AbstractController {
         return geodesic_pixel_size_meters;
     }
 
-    // TODO: only receive the event if the opacity was updated
-    private updateAfterPreferencesWereChanged(shouldRedraw = true) {
-        // TODO: this belong to the renderer
-        let streetStyles = [];
-        const streetsPref = this.mediator.getPreference('streets');
-        for (let i = 0; i < streetsPref.length; i += 1) {
-            if (streetsPref[i]) {
-                streetStyles[i] = {
-                    'strokeColor': streetsPref[i]['strokeColor'],
-                    'strokeWidth': streetsPref[i]['strokeWidth'],
-                    'strokeDashstyle': streetsPref[i]['strokeDashstyle'],
-                    'outlineColor': Utils.bestBackground(streetsPref[i]['strokeColor']),
-                };
-            }
-        }
-        // TODO: clutterConstant = this.mediator.getPreference('clutterConstant');
+
+    private updateAfterPreferencesWereChanged() {
         this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
-        // TODO updateRoutingModePanel();
-        if (shouldRedraw) {
-            this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST)
-        }
     }
+
     private manageSVLCheckboxUpdated({ checked, name }:
         { checked: boolean, name: string }) {
         if (name !== SDK_LAYERS.SEGMENTS) return;
 
         if (checked) {
-            switch (this.currentState) {
-                case SVLLayerState.AUTOMATICALLY_DISABLED:
-                    this.mediator.alert(AlertType.INFO, this.mediator._('zoom_in_for_svl'));
-                    this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
-                    return;
-                default:
-                    this.tryEnablingSVLRoadLayer();
-                    return;
-            }
+            this.tryEnablingSVLRoadLayer();
+        } else {
+            this.userDisabledSvl();
         }
-        this.userDisabledSvl();
     }
 
     public getCurrentState(): SVLLayerState {
@@ -963,9 +964,13 @@ export default class LayerStateController extends AbstractController {
 
     private userDisabledSvl(): void {
         if (this.currentState === SVLLayerState.USER_DISABLED) return;
-        if (this.currentState === SVLLayerState.VISIBLE) {
+        if ([SVLLayerState.VISIBLE,
+        SVLLayerState.DRAWING_ABORTED,
+        SVLLayerState.AUTOMATICALLY_DISABLED].includes(this.currentState)) {
             this.currentState = SVLLayerState.USER_DISABLED;
             this.disableAllSVLLayers(false);
+            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_DISABLED_BY_USER);
         }
     }
 }
