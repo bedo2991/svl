@@ -4117,7 +4117,7 @@ function initScript() {
   function initWazeWrapElements() {
     console.log('SVL: initializing WazeWrap');
     // Adding keyboard shortcut
-    const defaultShortcut = "l";
+    const defaultShortcut = "S+s";
 
     const toggleShortcut: KeyboardShortcut = {
       callback: keyboardShortcutCallback,
@@ -4159,6 +4159,7 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
       <br>- 6.2.5 - Fix a rare bug with labels, more labels will get shown (maybe slightly outside of the segment). It is now possible for other script to know if SVL was initialized.
       <br>- 6.2.4 - Fix for road width computation and performance improvements.
       <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
@@ -5342,7 +5343,7 @@ Please paste it in a file (CTRL+V) to store it.`;
   fallback[
     `show_sl_with_one_color_descr`
   ] = `Show the speed limit by coloring the segment's outline with a single color instead of a different color depending on the speed limit's value.`;
-  fallback[`shortcut_cannot_be_set`] = `Street Vector Layer could not add its default shortcut (L). Open the WME shortcut section to set it to your favorite key combination.`;
+  fallback[`shortcut_cannot_be_set`] = `Street Vector Layer could not add its default shortcut (Shift+S). Open the WME shortcut section to set it to your favorite key combination.`;
   fallback[`zoom_in_for_svl`] = `Please zoom in to use SVL`;
   fallback[`node_color`] = `Nodes color`;
   fallback[`node_color_descr`] = `This is the color of connected nodes`;
