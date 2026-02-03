@@ -196,6 +196,7 @@ export default class UserInterfaceController extends AbstractController {
         const label = <HTMLLabelElement>document.createElement('label');
         label.innerText = title;
         newSelect.id = `svl_${id}`;
+        newSelect.dataset.uniqueId = id;
         if (options && options.length > 0) {
             options.forEach((o) => {
                 const option = <HTMLOptionElement>document.createElement('option');
@@ -242,12 +243,12 @@ export default class UserInterfaceController extends AbstractController {
             routingModeDiv.addEventListener('mouseenter', () => {
                 // Temporary disable routing mode
                 this.mediator.setPreference('routingModeEnabled', false);
-                // TODO redrawAllSegments();
+                this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             });
             routingModeDiv.addEventListener('mouseleave', () => {
                 // Enable routing mode again
                 this.mediator.setPreference('routingModeEnabled', true);
-                // TODO redrawAllSegments();
+                this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             });
             (<HTMLDivElement>document.getElementById('map')).appendChild(routingModeDiv);
         } else {
@@ -278,7 +279,7 @@ export default class UserInterfaceController extends AbstractController {
         .svl_support-link{display:inline-block; width:100%; text-align:center;}
         .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
         .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:var(--background_variant); top:0; }
-        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
+        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000; z-index: 10000;}
         .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}
         #sidepanel-svl {width:96%;margin:auto;padding-right:13px;}
@@ -789,22 +790,18 @@ export default class UserInterfaceController extends AbstractController {
         //Metric
         let type = 'metric';
         speedLimits.appendChild(this.createSpeedOptionLine('Default', true));
-        for (
-            let i = 1;
-            i < Object.keys(this.mediator.getPreference(`speeds.${type}`)).length + 1;
-            i += 1
-        ) {
-            speedLimits.appendChild(this.createSpeedOptionLine(i, true));
+        let typeKeys = Object.keys(this.mediator.getPreference(`speeds.${type}`)).map(Number).sort((a, b) => a - b);
+        for (const speed of typeKeys) {
+            if (isNaN(speed)) continue;
+            speedLimits.appendChild(this.createSpeedOptionLine(speed, true));
         }
 
         type = 'imperial';
         speedLimits.appendChild(this.createSpeedOptionLine('Default', false));
-        for (
-            let i = 1;
-            i < Object.keys(this.mediator.getPreference(`speeds.${type}`)).length + 1;
-            i += 1
-        ) {
-            speedLimits.appendChild(this.createSpeedOptionLine(i, false));
+        typeKeys = Object.keys(this.mediator.getPreference(`speeds.${type}`)).map(Number).sort((a, b) => a - b);
+        for (const speed of typeKeys) {
+            if (isNaN(speed)) continue;
+            speedLimits.appendChild(this.createSpeedOptionLine(speed, false));
         }
 
         mainDiv.appendChild(speedLimits);
@@ -904,13 +901,20 @@ export default class UserInterfaceController extends AbstractController {
         saveNewButton.disabled = false;
         saveNewButton.classList.add('btn-primary');
 
+        const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
+        rollbackButton.classList.remove('disabled');
+        rollbackButton.disabled = false;
+
         // Check event target
         if (event.target) {
             const t = <HTMLInputElement>event.target;
             const uniqueID = t.dataset.uniqueId;
             if (uniqueID) {
                 console.debug(`Preference changed: ${uniqueID}`);
-                if (uniqueID.startsWith('streets.')) {
+                if (uniqueID === 'presets') {
+                    this.preferencesController.loadPreset(t.value);
+                    this.updatePreferencesUI();
+                } else if (uniqueID.startsWith('streets.')) {
                     const parts = uniqueID.split('.');
                     const streetIndex = parseInt(parts[1], 10);
                     const property = parts[2];
@@ -954,9 +958,23 @@ export default class UserInterfaceController extends AbstractController {
                             this.mediator.setPreference('streets', streetsPreferences);
                         }
                     }
+                } else {
+                    let val: any = t.value;
+                    if (t.type === 'checkbox') {
+                        val = (<HTMLInputElement>t).checked;
+                    } else if (t.type === 'number' || t.type === 'range') {
+                        val = parseFloat(t.value);
+                    }
+
+                    if (uniqueID === 'layerOpacity') {
+                        val = val / 100.0;
+                    }
+
+                    this.mediator.setPreference(uniqueID, val);
                 }
             }
             // TODO: only do this if the changed element is related to streets preferences
+            this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
             this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
         }
     }
@@ -977,6 +995,7 @@ export default class UserInterfaceController extends AbstractController {
 
     public updatePreferencesUI() {
         this.updatePreferenceValues();
+        this.updateRoutingModePanel();
     }
 
     /**
@@ -1104,9 +1123,11 @@ export default class UserInterfaceController extends AbstractController {
         // Toggle metric/decimal
         const WMEUsesImperial = this.mediator.wmeSDK.Settings.getUserSettings().isImperial;
         const type = WMEUsesImperial ? 'imperial' : 'metric';
+        const otherType = WMEUsesImperial ? 'metric' : 'imperial';
         const speeds = Object.keys(this.mediator.getPreference(`speeds.${type}`));
+
         const slLinesToHide = <NodeListOf<HTMLDivElement>>document.querySelectorAll(
-            `div.svl_${type}`
+            `div.svl_${otherType}`
         );
         slLinesToHide.forEach((el) => {
             el.style.display = 'none';
@@ -1115,14 +1136,21 @@ export default class UserInterfaceController extends AbstractController {
         slLinesToShow.forEach((el) => {
             el.style.display = 'block';
         });
-        for (let i = 1; i < speeds.length + 1; i += 1) {
-            (<HTMLInputElement>document.getElementById(`svl_slValue_${type}_${i}`)).value = speeds[i - 1];
-            (<HTMLInputElement>document.getElementById(`svl_slColor_${type}_${i}`)).value =
-                this.mediator.getPreference(`speeds.${type}.${speeds[i - 1]}`);
+        for (const speed of speeds) {
+            const valInput = <HTMLInputElement>document.getElementById(`svl_slValue_${type}_${speed}`);
+            if (valInput) {
+                valInput.value = speed;
+            }
+            const colorInput = <HTMLInputElement>document.getElementById(`svl_slColor_${type}_${speed}`);
+            if (colorInput) {
+                colorInput.value = this.mediator.getPreference(`speeds.${type}.${speed}`);
+            }
         }
 
-        (<HTMLInputElement>document.getElementById(`svl_slColor_${type}_Default`)).value =
-            this.mediator.getPreference(`speeds.default`);
+        const defaultColorInput = (<HTMLInputElement>document.getElementById(`svl_slColor_${type}_Default`));
+        if (defaultColorInput) {
+            defaultColorInput.value = this.mediator.getPreference(`speeds.default`);
+        }
     }
 
     /**
@@ -1305,6 +1333,8 @@ export default class UserInterfaceController extends AbstractController {
                 max: 150,
                 step: 1,
             });
+            slValue.value = String(i);
+            slValue.disabled = true;
             slValue.style['width'] = '50pt';
             inputs.appendChild(slValue);
 
@@ -1313,12 +1343,28 @@ export default class UserInterfaceController extends AbstractController {
             inputs.appendChild(span);
         }
 
+        let uniqueId: string;
+        let val: string;
+        if (i === 'Default') {
+            uniqueId = 'speeds.default';
+            val = this.mediator.getPreference(uniqueId);
+        } else {
+            uniqueId = `speeds.${type}.${i}`;
+            val = this.mediator.getPreference(uniqueId);
+        }
+
         const color = this.createInput({
             id: `slColor_${type}_${i}`,
             className: 'prefElement form-control',
             type: 'color',
             title: this.mediator._('color'),
+            uniqueId: uniqueId,
         });
+
+        if (val) {
+            color.value = val;
+        }
+
         color.style['width'] = '55pt';
 
         inputs.className = 'expand';

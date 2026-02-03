@@ -177,6 +177,8 @@ export default class SVLMediator extends AbstractMediator {
                 const currentState = this.getState();
                 if (currentState === SVLLayerState.USER_DISABLED || currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return;
 
+                if (!(this.getPreference('disableRoadLayers') ?? true)) return;
+
                 // The roadlayer was changed
                 if (currentState === SVLLayerState.VISIBLE) {
                     // if SVL is currently enabled, disable it
@@ -245,11 +247,16 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.SVL_LAYER_DISABLED_BY_USER:
                 this.emit(SVLEvents.USER_DISABLED);
                 break;
+            case AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED:
+                this.emit(SVLEvents.DRAWING_ABORTED);
+                break;
             case AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED:
                 this.layerStateController.toggleSVLLayerEnabledState();
                 break;
             case AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST:
                 return this.preferencesController.savePreferences();
+            case AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST:
+                return this.preferencesController.rollbackPreferences();
             case AcceptedControllerEvents.PREFERENCES_RESET_REQUEST:
                 return this.preferencesController.resetPreferences();
             case AcceptedControllerEvents.PREFERENCES_IMPORT_REQUEST:
@@ -257,6 +264,7 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST:
                 return this.preferencesController.exportPreferences();
             case AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES:
+            case AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW:
                 return this.emit(SVLEvents.SVL_SETTINGS_CHANGED);
             case AcceptedControllerEvents.WME_SETTINGS_UPDATED:
                 return this.emit(SVLEvents.WME_SETTINGS_CHANGED);
@@ -309,7 +317,7 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public alert(type: AlertType, message: string, trial: number = 0): void {
-        debugger;
+        return; // TODO: fix alerts
         if (!this.wazeWrap) {
             if (trial < 10) {
                 this.postponeAlert(type, message, trial + 1);

@@ -1,7 +1,7 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
 import { AlertType } from "./AbstractMediator";
-import { AcceptedControllerEvents } from "../svlGlobals";
+import { AcceptedControllerEvents, PRESETS } from "../svlGlobals";
 
 interface PreferenceObject {
     [key: string]: any
@@ -55,7 +55,47 @@ export default class PreferencesController extends AbstractController {
     }
 
     public setPreference(key: string, value: any): void {
-        this.preferences[key] = value;
+        const keys = key.split('.');
+        let obj = this.preferences;
+
+        for (let i = 0; i < keys.length - 1; i++) {
+            const k = keys[i];
+            if (!obj[k] || typeof obj[k] !== 'object') {
+                obj[k] = {};
+            }
+            obj = obj[k];
+        }
+
+        obj[keys[keys.length - 1]] = value;
+    }
+
+    public loadPreset(val: string) {
+        // @ts-ignore
+        const preset = PRESETS[val];
+        if (preset) {
+            const keys = Object.keys(preset);
+            for (let i = 0; i < keys.length; i += 1) {
+                if (keys[i] === 'streets') {
+                    for (let j = 0; j < preset['streets'].length; j += 1) {
+                        const style = preset['streets'][j];
+                        if (style) {
+                            if (!this.preferences['streets'][j]) {
+                                this.preferences['streets'][j] = {};
+                            }
+                            this.preferences['streets'][j].strokeColor = style.strokeColor;
+                            this.preferences['streets'][j].strokeWidth = style.strokeWidth;
+                            this.preferences['streets'][j].strokeDashstyle =
+                                style.strokeDashstyle;
+                        }
+                    }
+                } else {
+                    // @ts-ignore
+                    this.preferences[keys[i]] = preset[keys[i]];
+                }
+            }
+            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+        }
     }
 
     private loadPreferences(overwrite = false) {
@@ -455,6 +495,12 @@ export default class PreferencesController extends AbstractController {
     public exportPreferences() {
         GM_setClipboard(JSON.stringify(this.preferences));
         this.mediator.alert(AlertType.INFO, this.mediator._('export_preferences_message'));
+    }
+
+    public rollbackPreferences() {
+        this.loadPreferences(false);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
     }
 
     public resetPreferences() {

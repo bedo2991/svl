@@ -393,6 +393,8 @@ declare namespace OpenLayers {
     getGeodesicPixelSize(pixel?: OpenLayers.Pixel): OpenLayers.Size;
     getSize(): OpenLayers.Size;
     getExtent(): OpenLayers.Bounds;
+    getLayerIndex(layer: OpenLayers.Layer.Vector | OpenLayers.Layer.LayerBase): number;
+    setLayerIndex(layer: OpenLayers.Layer.Vector | OpenLayers.Layer.LayerBase, idx: number): void;
     // Add other common Map methods like getZoom, setCenter, addControl, etc. if used
   }
 

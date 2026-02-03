@@ -49,6 +49,9 @@ export default class LayerStateController extends AbstractController {
             mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED,
                 LayerStateController.instance.disableSVLRoadLayerAutomatically.bind(LayerStateController.instance));
 
+            mediator.subscribe(SVLEvents.DRAWING_ABORTED,
+                LayerStateController.instance.disableSVLRoadLayerDueToDrawingAbort.bind(LayerStateController.instance));
+
             mediator.subscribe(SVLEvents.LAYER_ENABLED,
                 LayerStateController.instance.tryEnablingSVLRoadLayer.bind(LayerStateController.instance)
             );
@@ -943,8 +946,55 @@ export default class LayerStateController extends AbstractController {
     }
 
 
+
+    private updateGPSLayerPosition(trial = 0) {
+        if (trial > 20) {
+            console.log('SVL: giving up on getting GPS Layer index');
+            return;
+        }
+
+        let gpsLayerIndex = 0;
+        try {
+            gpsLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
+        } catch (e) {
+            setTimeout(() => {
+                this.updateGPSLayerPosition(trial + 1);
+            }, 500);
+            return;
+        }
+
+        const showUnder = this.mediator.getPreference('showUnderGPSPoints');
+
+        try {
+            if (showUnder) {
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex - 20 });
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex - 19 });
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex - 15 });
+                this.labelsVector.setZIndex(gpsLayerIndex - 14);
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex - 13 });
+            } else {
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
+                this.labelsVector.setZIndex(gpsLayerIndex + 21);
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
+            }
+        } catch (e) {
+            console.error('SVL: Error setting layer z-indexes', e);
+        }
+    }
+
     private updateAfterPreferencesWereChanged() {
         this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
+        this.updateGPSLayerPosition();
+
+        if (this.currentState === SVLLayerState.VISIBLE) {
+            if (this.mediator.getPreference('disableRoadLayers') ?? true) {
+                this.disableWMERoadLayer();
+            } else {
+                this.enableWMERoadLayer();
+            }
+        }
     }
 
     private manageSVLCheckboxUpdated({ checked, name }:
