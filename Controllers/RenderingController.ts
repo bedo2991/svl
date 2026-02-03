@@ -132,7 +132,7 @@ export default class RenderingController extends AbstractController {
     }
 
     private handleSVLSettingsUpdated() {
-        let shouldRedraw = false;
+        let shouldRedraw = true; // TODO: this can be made more efficient
         const newClutterConstant = this.mediator.getPreference('clutterConstant');
         if (this.clutterConstant !== newClutterConstant) {
             this.clutterConstant = newClutterConstant;

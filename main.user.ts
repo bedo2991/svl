@@ -2907,6 +2907,7 @@ function initScript() {
   }
 
   async function initPreferencePanel() {
+    return;
     //console.debug('Init Preference Panel');
     const style = <HTMLStyleElement>document.createElement('style');
     style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
@@ -2931,7 +2932,7 @@ function initScript() {
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}
-        #sidepanel-svl {width:98%;}
+        #sidepanel-svl {width:96%;margin:auto;}
         #sidepanel-svl details{margin-bottom:9pt;}
         #sidepanel-svl i{font-size:small;}`;
 
@@ -4170,12 +4171,9 @@ function initScript() {
       'Street Vector Layer',
       SVL_VERSION,
       `<b>${_('whats_new')}</b>
+      <br>- 7.0.0 - Code deeply rewritten
       <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
-      <br>- 6.2.6 - Fix: restart drawing after aborting more often.
-      <br>- 6.2.5 - Fix a rare bug with labels, more labels will get shown (maybe slightly outside of the segment). It is now possible for other script to know if SVL was initialized.
-      <br>- 6.2.4 - Fix for road width computation and performance improvements.
-      <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
-      <br>- 6.2.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).`,
+      <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
       '',
       GM_info.script.supportURL
     );
@@ -4426,7 +4424,7 @@ function initScript() {
      */
     OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index: number): Element {
       // const nextIndex = index + 1;
-      // console.log(`Order length: ${this.order.length}` );
+      // console.log(`Order length: ${ this.order.length }` );
       for (let i = index + 1; i < this.order.length; i++) {
         let nextElement = document.getElementById(this.order[i]);
         if (nextElement) {
@@ -4734,7 +4732,7 @@ function initScript() {
       label.setAttribute('y', (-y).toString());
 
       if (style['angle'] || style['angle'] === 0) {
-        const rotate = `rotate(${style['angle']},${x},${-y})`;
+        const rotate = `rotate(${style['angle']}, ${x}, ${- y})`;
         label.setAttribute('transform', rotate);
       }
       if (style['fontFamily']) {
@@ -4782,7 +4780,7 @@ function initScript() {
       }
       for (let i = 0; i < numRows; i += 1) {
         const tspan = labelsVector.renderer.nodeFactory(
-          `${featureId + suffix}_tspan_${i}`,
+          `${featureId + suffix}_tspan_${i} `,
           'tspan'
         );
         if (style['labelSelect'] === true) {
@@ -4804,7 +4802,7 @@ function initScript() {
           if (vfactor == null) {
             vfactor = -0.5;
           }
-          tspan.setAttribute('dy', `${vfactor * (numRows - 1)}em`);
+          tspan.setAttribute('dy', `${vfactor * (numRows - 1)} em`);
         } else {
           tspan.setAttribute('dy', '1em');
         }
@@ -5099,7 +5097,7 @@ function initScript() {
     document.dispatchEvent(new CustomEvent('svl-initialized'));
 
     //mergeEndCallback();
-    console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
+    console.log(`[SVL] v.${SVL_VERSION} initialized correctly.`);
   }
 
   function updateStylesFromPreferences(pref: PreferenceObject, shouldRedraw = true) {
@@ -5136,13 +5134,13 @@ function initScript() {
   }
 
   const fallback: Record<string, string> = {};
-  fallback[`completition_percentage`] = `100%`;
+  fallback[`completition_percentage`] = `100 % `;
   fallback[`language_code`] = `en`;
-  fallback[`translation_thanks`] = `translated in your language thanks to:`;
-  fallback[`would_you_like_to_help`] = `Would you like to help?`;
+  fallback[`translation_thanks`] = `translated in your language thanks to: `;
+  fallback[`would_you_like_to_help`] = `Would you like to help ? `;
   fallback[
     `fully_translated_in`
-  ] = `Fully translated in your language thanks to:`;
+  ] = `Fully translated in your language thanks to: `;
   fallback[`translated_by`] = `bedo2991`;
   fallback[`routing_mode_panel_title`] = `SVL's Routing Mode`;
   fallback[`routing_mode_panel_body`] = `Hover to temporary disable it`;

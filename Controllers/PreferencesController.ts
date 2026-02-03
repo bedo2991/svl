@@ -461,7 +461,7 @@ export default class PreferencesController extends AbstractController {
         console.debug('resetting preferences');
         this.saveDefaultPreferences();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+        this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
         this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_reset_message'));
     }
 

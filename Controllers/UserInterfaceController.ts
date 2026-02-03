@@ -163,7 +163,7 @@ export default class UserInterfaceController extends AbstractController {
    *
    * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
    */
-    private createInput({ id, type, className, title, min, max, step }: { id: string; type: string; className?: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; }) {
+    private createInput({ id, type, className, title, min, max, step, uniqueId }: { id: string; type: string; className?: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; uniqueId?: string }) {
         const input = <HTMLInputElement>document.createElement('input');
         input.id = 'svl_' + id;
         if (className) {
@@ -173,6 +173,7 @@ export default class UserInterfaceController extends AbstractController {
             input.title = title;
         }
         input.type = type;
+        input.dataset.uniqueId = uniqueId ?? id;
         if (type === 'range' || type === 'number') {
             input.min = min?.toString() || "";
             input.max = max?.toString() || "";
@@ -280,7 +281,7 @@ export default class UserInterfaceController extends AbstractController {
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}
-        #sidepanel-svl {width:98%;}
+        #sidepanel-svl {width:96%;margin:auto;padding-right:13px;}
         #sidepanel-svl details{margin-bottom:9pt;}
         #sidepanel-svl i{font-size:small;}`;
 
@@ -895,15 +896,69 @@ export default class UserInterfaceController extends AbstractController {
         (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
     }
 
-    private handleUserUpdatedSVLPreferences() {
+    private handleUserUpdatedSVLPreferences(event: Event) {
+        console.debug(event);
         (<HTMLDivElement>document.getElementById('svl_buttons')).classList.add('svl_unsaved');
         const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
         saveNewButton.classList.remove('disabled');
         saveNewButton.disabled = false;
         saveNewButton.classList.add('btn-primary');
-        // TODO: only do this if the changed element is related to streets preferences
-        this.updateStreetsPreferenceValues();
-        this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+
+        // Check event target
+        if (event.target) {
+            const t = <HTMLInputElement>event.target;
+            const uniqueID = t.dataset.uniqueId;
+            if (uniqueID) {
+                console.debug(`Preference changed: ${uniqueID}`);
+                if (uniqueID.startsWith('streets.')) {
+                    const parts = uniqueID.split('.');
+                    const streetIndex = parseInt(parts[1], 10);
+                    const property = parts[2];
+                    if (isNaN(streetIndex)) {
+                        // This is probably a decorator
+                        const decorator = parts[1];
+                        const decPreference = this.mediator.getPreference(decorator);
+                        if (!decPreference) {
+                            console.error(`Decorator preference not found for ${decorator}`);
+                            return;
+                        }
+                        switch (property) {
+                            case 'strokeOpacity':
+                                decPreference[property] = parseFloat(t.value) / 100.0;
+                                break;
+                            case 'strokeWidth':
+                                decPreference[property] = parseFloat(t.value);
+                                break;
+                            default:
+                                decPreference[property] = t.value;
+                                break;
+                        }
+                        this.mediator.setPreference(decorator, decPreference);
+                    } else {
+                        // this is a street preference
+                        const streetsPreferences = this.mediator.getPreference('streets');
+
+
+                        if (streetsPreferences[streetIndex]) {
+                            switch (property) {
+                                case 'strokeOpacity':
+                                    streetsPreferences[streetIndex][property] = parseFloat(t.value) / 100.0;
+                                    break;
+                                case 'strokeWidth':
+                                    streetsPreferences[streetIndex][property] = parseFloat(t.value);
+                                    break;
+                                default:
+                                    streetsPreferences[streetIndex][property] = t.value;
+                                    break;
+                            }
+                            this.mediator.setPreference('streets', streetsPreferences);
+                        }
+                    }
+                }
+            }
+            // TODO: only do this if the changed element is related to streets preferences
+            this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+        }
     }
 
     private updateStreetsPreferenceValues() {
@@ -918,6 +973,10 @@ export default class UserInterfaceController extends AbstractController {
                     streetsPreferences[i]['strokeDashstyle'];
             }
         }
+    }
+
+    public updatePreferencesUI() {
+        this.updatePreferenceValues();
     }
 
     /**
@@ -1111,6 +1170,7 @@ export default class UserInterfaceController extends AbstractController {
             className: 'prefElement form-control',
             title: this.mediator._('color'),
             type: 'color',
+            uniqueId: `streets.${i}.strokeColor`,
         });
         color.style['width'] = '55pt';
 
@@ -1127,6 +1187,7 @@ export default class UserInterfaceController extends AbstractController {
                 min: 1,
                 max: 20,
                 step: 1,
+                uniqueId: `streets.${i}.strokeWidth`,
             });
             width.style['width'] = '40pt';
             inputs.appendChild(width);
@@ -1141,12 +1202,13 @@ export default class UserInterfaceController extends AbstractController {
                 min: 0,
                 max: 100,
                 step: 10,
+                uniqueId: `streets.${i}.strokeOpacity`,
             });
             opacity.style['width'] = '45pt';
             inputs.appendChild(opacity);
         }
 
-        const select = this.createDashStyleDropdown(`strokeDashstyle_${i}`);
+        const select = this.createDashStyleDropdown({ id: `strokeDashstyle_${i}`, uniqueID: `streets.${i}.strokeDashstyle` });
         select.className = 'form-control prefElement';
 
         inputs.className = 'expand';
@@ -1161,11 +1223,12 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-    private createDashStyleDropdown(id: string) {
+    private createDashStyleDropdown({ id, uniqueID }: { id: string, uniqueID?: string }) {
         const newSelect = <HTMLSelectElement>document.createElement('select');
         newSelect.className = 'prefElement';
         newSelect.title = 'Stroke style';
         newSelect.id = `svl_${id}`;
+        newSelect.dataset.uniqueId = uniqueID ?? id;
         newSelect.innerHTML = `<option value="solid">${this.mediator._('line_solid')}</option>
        <option value="dash">${this.mediator._('line_dash')}</option>
        <option value="dashdot">${this.mediator._('line_dashdot')}</option>

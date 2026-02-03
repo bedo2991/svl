@@ -257,11 +257,11 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST:
                 return this.preferencesController.exportPreferences();
             case AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES:
-                this.renderingController.redrawAll();
-                break;
+                return this.emit(SVLEvents.SVL_SETTINGS_CHANGED);
             case AcceptedControllerEvents.WME_SETTINGS_UPDATED:
                 return this.emit(SVLEvents.WME_SETTINGS_CHANGED);
-                break;
+            case AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH:
+                return this.userInterfaceController.updatePreferencesUI();
             case AcceptedControllerEvents.FIRST_RUN:
                 return this.handleFirstRun();
             default:
@@ -309,6 +309,7 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public alert(type: AlertType, message: string, trial: number = 0): void {
+        debugger;
         if (!this.wazeWrap) {
             if (trial < 10) {
                 this.postponeAlert(type, message, trial + 1);
