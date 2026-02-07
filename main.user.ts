@@ -17,7 +17,7 @@ unsafeWindow.SDK_INITIALIZED.then(initScript);
 interface MeterObject {
   [key: string]: number
 }
-function initScript() {
+async function initScript() {
   // initialize the sdk, these should remain here at the top of the script
   if (!unsafeWindow.getWmeSdk) {
     // This block is required for type checking, but it is guaranteed that the function exists.
@@ -32,17 +32,9 @@ function initScript() {
 
   console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
 
-  SVLMediator.initialize({ wmeSDK }).then((mediator) => {
-    waitForWazeWrap().then((result) => {
-      if (result === true) {
-        mediator.setWazeWrap(WazeWrap);
-        mediator.alert(AlertType2.SUCCESS, "Initialization completed");
-      }
-    });
+  const mediator = await SVLMediator.initialize({ wmeSDK });
+  mediator.alertDebug(AlertType2.SUCCESS, "Initialization completed");
 
-  });
-
-  return;
   /** @type {string} */
   const SVL_VERSION: string = GM_info.script.version;
   /** @type {boolean} */
@@ -229,7 +221,15 @@ function initScript() {
   };
   const safeAlert = (level: AlertType, message: string) => {
     try {
-      WazeWrap.Alerts[level](GM_info.script.name, message);
+      if (mediator?.alertController) {
+        if (level === AlertType.INFO) mediator.alertController.info(GM_info.script.name, message);
+        else if (level === AlertType.ERROR) mediator.alertController.error(GM_info.script.name, message);
+        else if (level === AlertType.WARNING) mediator.alertController.warning(GM_info.script.name, message);
+        else if (level === AlertType.SUCCESS) mediator.alertController.success(GM_info.script.name, message);
+        else console.log(message);
+      } else {
+        alert(message);
+      }
     } catch (e) {
       console.error(e);
       alert(message);
@@ -1956,7 +1956,7 @@ function initScript() {
     safeAlert(AlertType.INFO, _('export_preferences_message'));
   }
 
-  function importPreferences(e, pastedText: string | null) {
+  function importPreferences(pastedText: string | null) {
     if (pastedText !== null && pastedText !== '') {
       try {
         preferences = JSON.parse(pastedText);
@@ -1976,14 +1976,13 @@ function initScript() {
   }
 
   const importPreferencesCallback = () => {
-    WazeWrap.Alerts.prompt(
+    mediator.alertController.prompt(
       GM_info.script.name,
       `${_('preferences_import_prompt')}\n\n${_(
         'preferences_import_prompt_2'
       )}`,
       '',
-      importPreferences,
-      null
+      importPreferences
     );
   };
 
@@ -2379,15 +2378,13 @@ function initScript() {
 
   function resetPreferencesCallback() {
     consoleDebug('rollbackDefault');
-    WazeWrap.Alerts.confirm(
+    mediator.alertController.confirm(
       GM_info.script.name,
       `${_('preferences_reset_question')}\n${_(
         'preferences_reset_question_2'
       )}`,
       resetPreferences,
-      null,
-      _('preferences_reset_yes'),
-      _('preferences_reset_cancel')
+      null
     );
   }
 
@@ -4088,27 +4085,6 @@ function initScript() {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function waitForWazeWrap() {
-    let trials = 1;
-    wmeSDK.State.getUserInfo()
-    let sleepTime = 150;
-    do {
-      if (
-        !WazeWrap ||
-        !WazeWrap.Ready ||
-        !WazeWrap.Interface ||
-        !WazeWrap.Alerts
-      ) {
-        console.log('SVL: WazeWrap not ready, retrying in 800ms');
-        await sleep(trials * sleepTime);
-      } else {
-        return true;
-      }
-    } while (trials++ <= 30);
-    console.error('SVL: could not initialize WazeWrap');
-    throw new Error('SVL: could not initialize WazeWrap');
-  }
-
   function keyboardShortcutCallback() {
     // Toggle the layer checkbox
     const enable = !svl_layer_is_visible;
@@ -4124,59 +4100,6 @@ function initScript() {
     } else {
       disableSVLLayers();
     }
-  }
-
-  function initWazeWrapElements() {
-    console.log('SVL: initializing WazeWrap');
-    // Adding keyboard shortcut
-    const defaultShortcut = "S+s";
-
-    const toggleShortcut: KeyboardShortcut = {
-      callback: keyboardShortcutCallback,
-      description: "Toggle SVL",
-      shortcutId: "svl",
-      shortcutKeys: defaultShortcut,
-    };
-
-
-    if (!wmeSDK.Shortcuts.areShortcutKeysInUse({
-      shortcutKeys: defaultShortcut
-    })) {
-      try {
-        wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-        console.log('SVL: Keyboard shortcut successfully added.');
-      } catch (e) {
-        safeAlert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
-        console.error('SVL: Error while adding the keyboard shortcut:');
-        console.error(e);
-      }
-    } else {
-      setTimeout(() => {
-        safeAlert(AlertType.WARNING, _('shortcut_cannot_be_set'));
-      }, 3000);
-      try {
-        toggleShortcut.shortcutKeys = null;
-        wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-        console.log('SVL: Empty Keyboard shortcut successfully added.');
-      } catch (e) {
-        console.error('SVL: Error while adding the empty keyboard shortcut:');
-        console.error(e);
-      }
-    }
-
-
-    loadTranslations().then(() => initPreferencePanel());
-    //initPreferencePanel();
-    WazeWrap.Interface.ShowScriptUpdate(
-      'Street Vector Layer',
-      SVL_VERSION,
-      `<b>${_('whats_new')}</b>
-      <br>- 7.0.0 - Code deeply rewritten
-      <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
-      <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
-      '',
-      GM_info.script.supportURL
-    );
   }
 
   function invalidTranslation(key: string): string {

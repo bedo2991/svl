@@ -837,7 +837,8 @@ export default class LayerStateController extends AbstractController {
 
     public tryEnablingSVLRoadLayer(): boolean {
         if ([SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED, SVLLayerState.AUTOMATICALLY_DISABLED, SVLLayerState.USER_DISABLED].includes(this.currentState)) {
-            if (this.mediator.wmeSDK.Map.getZoomLevel() > this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+            const zoomThreshold = Number(this.mediator.getPreference('useWMERoadLayerAtZoom')) || 16;
+            if (this.mediator.wmeSDK.Map.getZoomLevel() > zoomThreshold) {
                 this.enableAllSVLLayers();
                 return true;
             } else if (this.currentState !== SVLLayerState.AUTOMATICALLY_DISABLED) {
@@ -871,7 +872,7 @@ export default class LayerStateController extends AbstractController {
 
     public disableSVLRoadLayerAutomatically(): boolean {
         if (this.currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return true;
-        if (this.currentState === SVLLayerState.VISIBLE) {
+        if ([SVLLayerState.VISIBLE, SVLLayerState.USER_DISABLED, SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
             this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
             this.disableAllSVLLayers(true);
             this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });

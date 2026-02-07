@@ -7,6 +7,7 @@ import { DataModelName, WmeSDK } from "wme-sdk-typings";
 import AbstractMediator, { AlertType, SVLEvents } from "./Controllers/AbstractMediator";
 import UserInterfaceController from "./Controllers/UserInterfaceController";
 import { AcceptedControllerEvents, SVLLayerState } from "./svlGlobals";
+import AlertController from "./Controllers/AlertController";
 
 
 export default class SVLMediator extends AbstractMediator {
@@ -19,13 +20,16 @@ export default class SVLMediator extends AbstractMediator {
     private preferencesController!: PreferencesController;
     private localizationController!: LocalizationController;
     private userInterfaceController!: UserInterfaceController;
-    private wazeWrap: typeof WazeWrap | null = null;
+    public readonly alertController: AlertController;
 
     private currentTopCountryId: number | null = null;
     public readonly SVL_VERSION: string = GM_info.script.version;
 
+    private autoReloadInterval: number | null = null;
+
     private constructor({ wmeSDK }: { wmeSDK: WmeSDK }) {
         super();
+        this.alertController = new AlertController();
         // Private constructor to prevent direct instantiation
         this.wmeSDK = wmeSDK;
     }
@@ -52,6 +56,8 @@ export default class SVLMediator extends AbstractMediator {
 
             SVLMediator.instance.checkCountryChanged();
 
+            SVLMediator.instance.updateRefreshStatus();
+
             SVLMediator.instance.emit(SVLEvents.INITIALIZED);
             return SVLMediator.instance;
         } else {
@@ -74,6 +80,7 @@ export default class SVLMediator extends AbstractMediator {
             callback: () => {
                 //this.alertDebug(AlertType.WARNING, "Zoom");
                 this.renderingController.zoomChanged();
+                this.emit(SVLEvents.ZOOM_CHANGED);
             }
         });
 
@@ -215,8 +222,9 @@ export default class SVLMediator extends AbstractMediator {
         return this.layerStateController.getCurrentState();
     }
 
-    public setWazeWrap(wazeWrap: typeof WazeWrap): void {
-        this.wazeWrap = wazeWrap;
+    // Deprecated, maintained continuously for compatibility but no-op as we use internal AlertController
+    public setWazeWrap(wazeWrap: any): void {
+        // no-op
     }
 
     private handleFirstRun(): void {
@@ -265,6 +273,7 @@ export default class SVLMediator extends AbstractMediator {
                 return this.preferencesController.exportPreferences();
             case AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES:
             case AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW:
+                this.updateRefreshStatus();
                 return this.emit(SVLEvents.SVL_SETTINGS_CHANGED);
             case AcceptedControllerEvents.WME_SETTINGS_UPDATED:
                 return this.emit(SVLEvents.WME_SETTINGS_CHANGED);
@@ -282,31 +291,18 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public prompt(title: string, message: string, defaultValue: string = '', okFunction: (target: EventTarget | null, input: string) => void): void {
-        if (!this.wazeWrap) {
-            let res = prompt(message, defaultValue);
+        this.alertController.prompt(title, message, defaultValue, (res) => {
             if (res !== null) {
                 okFunction(null, res);
             }
-            return;
-        }
-        try {
-            this.wazeWrap.Alerts.prompt(title, message, defaultValue, okFunction);
-        } catch (e) {
-            console.error(e);
-            let res = prompt(message, defaultValue);
-            if (res !== null) {
-                okFunction(null, res);
-            }
-        }
+        });
     }
 
     public alertDebug(type: AlertType, message: string): void {
         if (__DEBUG__) {
-            if (!this.wazeWrap) {
-                console.error("SVL DEBUG ALERT:", message);
-                return;
-            }
-            this.alert(type, message);
+            this.alertController.debug(type, message);
+            // Also log to console
+            console.debug("SVL DEBUG ALERT:", message);
         }
     }
 
@@ -317,20 +313,26 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public alert(type: AlertType, message: string, trial: number = 0): void {
-        return; // TODO: fix alerts
-        if (!this.wazeWrap) {
-            if (trial < 10) {
-                this.postponeAlert(type, message, trial + 1);
-            } else {
-                window.alert(message)
-            }
-            return;
-        }
-        try {
-            this.wazeWrap.Alerts[type](GM_info.script.name, message + (__DEBUG__ && trial > 0 ? `&nbsp;(Trial #${trial})` : ''));
-        } catch (e) {
-            console.error(e);
-            alert(message);
+        const fullMessage = message + (__DEBUG__ && trial > 0 ? `&nbsp;(Trial #${trial})` : '');
+        switch (type) {
+            case AlertType.INFO:
+                this.alertController.info(GM_info.script.name, fullMessage);
+                break;
+            case AlertType.SUCCESS:
+                this.alertController.success(GM_info.script.name, fullMessage);
+                break;
+            case AlertType.WARNING:
+                this.alertController.warning(GM_info.script.name, fullMessage);
+                break;
+            case AlertType.ERROR:
+                this.alertController.error(GM_info.script.name, fullMessage);
+                break;
+            case AlertType.DEBUG:
+                this.alertController.debug(GM_info.script.name, fullMessage);
+                break;
+            default:
+                this.alertController.info(GM_info.script.name, fullMessage);
+                break;
         }
     }
 
@@ -364,6 +366,38 @@ export default class SVLMediator extends AbstractMediator {
 
     public isFarZoom(zoom = this.wmeSDK.Map.getZoomLevel()) {
         return zoom < this.getPreference('switchZoom');
+    }
+
+    private updateRefreshStatus(): void {
+        if (this.autoReloadInterval) {
+            window.clearInterval(this.autoReloadInterval);
+            this.autoReloadInterval = null;
+        }
+
+        const enabled = this.getPreference('autoReload.enabled');
+        const interval = this.getPreference('autoReload.interval'); // Value in ms
+
+        if (enabled && interval && interval >= 20000) {
+            this.autoReloadInterval = window.setInterval(
+                this.refreshWME.bind(this),
+                interval
+            );
+            this.alertDebug(AlertType.INFO, `Auto refresh enabled. Interval: ${interval / 1000}s`);
+        }
+    }
+
+    private refreshWME(): void {
+        const editing = this.wmeSDK.Editing;
+        if (editing.getUnsavedChangesCount() === 0 &&
+            !editing.getSelection() &&
+            !editing.isDrawingInProgress() &&
+            document.querySelector('#panel-container')?.hasChildNodes() === false
+        ) {
+            this.alertDebug(AlertType.INFO, "Auto refreshing WME data...");
+            this.wmeSDK.DataModel.refreshData();
+        } else {
+            // this.alertDebug(AlertType.INFO, "Auto refresh skipped due to unsaved changes, selection or active panel.");
+        }
     }
 
     public areOnlineTranslationsLoaded(): boolean {

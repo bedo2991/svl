@@ -17,6 +17,7 @@ export enum SVLEvents {
     COUNTRY_CHANGED = 'SVL_COUNTRY_CHANGED',
     WME_SETTINGS_CHANGED = 'WME_SETTINGS_CHANGED',
     SVL_SETTINGS_CHANGED = 'SVL_SETTINGS_CHANGED',
+    ZOOM_CHANGED = 'SVL_ZOOM_CHANGED',
 }
 
 export default abstract class AbstractMediator {

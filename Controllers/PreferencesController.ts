@@ -471,8 +471,8 @@ export default class PreferencesController extends AbstractController {
         return oldUser;
     }
 
-    public savePreferences() {
-        this.storePreferences(this.preferences, false);
+    public savePreferences(silent = false) {
+        this.storePreferences(this.preferences, silent);
     }
 
     private storePreferences(pref: PreferenceObject, silent = true) {

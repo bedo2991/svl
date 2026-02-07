@@ -1,8 +1,8 @@
 import { KeyboardShortcut } from "wme-sdk-typings";
-import { AcceptedControllerEvents } from "../svlGlobals";
+import { AcceptedControllerEvents, SVLLayerState } from "../svlGlobals";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
-import { AlertType } from "./AbstractMediator";
+import { AlertType, SVLEvents } from "./AbstractMediator";
 import PreferencesController from "./PreferencesController";
 
 
@@ -11,6 +11,7 @@ export default class UserInterfaceController extends AbstractController {
     private static instance: UserInterfaceController;
 
     private preferencesController!: PreferencesController;
+    private badgeElement: HTMLElement | null = null;
 
     /** @type{number} */
     private readonly clutterMax: number = 20;
@@ -36,6 +37,9 @@ export default class UserInterfaceController extends AbstractController {
             UserInterfaceController.instance = new UserInterfaceController({ mediator, preferencesController });
 
             UserInterfaceController.instance.initShortcut();
+            UserInterfaceController.instance.checkVersionAndUpdate();
+            UserInterfaceController.instance.createBadge();
+            UserInterfaceController.instance.registerBadgeCallbacks();
 
             await UserInterfaceController.instance.initPreferencePanel();
             return UserInterfaceController.instance;
@@ -44,8 +48,31 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
+    private checkVersionAndUpdate() {
+        const stored = localStorage.getItem('svl');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.version !== this.mediator.SVL_VERSION) {
+                    this.mediator.alertController.showScriptUpdate(
+                        'Street Vector Layer',
+                        this.mediator.SVL_VERSION,
+                        `<b>${this.mediator._('whats_new')}</b>
+                        <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
+                        <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
+                        <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
+                        GM_info.script.supportURL
+                    );
+                    this.preferencesController.savePreferences(true);
+                }
+            } catch (e) {
+                console.error("Error checking version", e);
+            }
+        }
+    }
+
     private initShortcut() {
-        const defaultShortcut = "l";
+        const defaultShortcut = "S+s";
 
         const toggleShortcut: KeyboardShortcut = {
             callback: () => { UserInterfaceController.instance.mediator.notify(UserInterfaceController.instance, AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED); },
@@ -675,6 +702,7 @@ export default class UserInterfaceController extends AbstractController {
                 id: 'autoReload_enabled',
                 title: this.mediator._('automatically_refresh'),
                 description: this.mediator._('automatically_refresh_descr'),
+                uniqueId: 'autoReload.enabled',
             })
         );
 
@@ -686,6 +714,7 @@ export default class UserInterfaceController extends AbstractController {
                 min: 20,
                 max: 3600,
                 step: 1,
+                uniqueId: 'autoReload.interval',
             })
         );
         mainDiv.appendChild(utilities);
@@ -964,10 +993,21 @@ export default class UserInterfaceController extends AbstractController {
                         val = (<HTMLInputElement>t).checked;
                     } else if (t.type === 'number' || t.type === 'range') {
                         val = parseFloat(t.value);
+                        if (t.min && val < parseFloat(t.min)) {
+                            val = parseFloat(t.min);
+                            t.value = val.toString();
+                        }
+                        if (t.max && val > parseFloat(t.max)) {
+                            val = parseFloat(t.max);
+                            t.value = val.toString();
+                        }
                     }
 
                     if (uniqueID === 'layerOpacity') {
                         val = val / 100.0;
+                    }
+                    if (uniqueID === 'autoReload.interval') {
+                        val = val * 1000;
                     }
 
                     this.mediator.setPreference(uniqueID, val);
@@ -1155,9 +1195,9 @@ export default class UserInterfaceController extends AbstractController {
 
     /**
      *
-     * @param {{id:string,title:string,description:string,isNew:(string|undefined)}} param0
+     * @param {{id:string,title:string,description:string,isNew:(string|undefined), uniqueId:(string|undefined)}} param0
      */
-    private createCheckboxOption({ id, title, description, isNew }: { id: string; title: string; description: string; isNew?: (string | undefined); }) {
+    private createCheckboxOption({ id, title, description, isNew, uniqueId }: { id: string; title: string; description: string; isNew?: (string | undefined); uniqueId?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineCheckbox';
         if (typeof isNew === 'string') {
@@ -1172,6 +1212,7 @@ export default class UserInterfaceController extends AbstractController {
             className: 'prefElement',
             type: 'checkbox',
             title: this.mediator._('true_or_false'),
+            uniqueId,
         });
 
         label.appendChild(input);
@@ -1379,7 +1420,7 @@ export default class UserInterfaceController extends AbstractController {
 
     /**
    *
-   * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined)}} param0
+   * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined),uniqueId:(string|undefined)}} param0
    */
     private createIntegerOption({
         id,
@@ -1389,7 +1430,8 @@ export default class UserInterfaceController extends AbstractController {
         max,
         step,
         isNew,
-    }: { id: string; title: string; description: string; min: number; max: number; step: (number | undefined); isNew?: (string | undefined); }) {
+        uniqueId,
+    }: { id: string; title: string; description: string; min: number; max: number; step: (number | undefined); isNew?: (string | undefined); uniqueId?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineInteger';
         if (typeof isNew === 'string') {
@@ -1407,6 +1449,7 @@ export default class UserInterfaceController extends AbstractController {
             type: 'number',
             title: this.mediator._('insert_number'),
             className: 'prefElement form-control',
+            uniqueId,
         });
 
         label.appendChild(input);
@@ -1419,5 +1462,90 @@ export default class UserInterfaceController extends AbstractController {
         }
 
         return line;
+    }
+
+    private createBadge(): void {
+        if (this.badgeElement) return;
+
+        const topbar = document.getElementById('topbar-container');
+        if (!topbar) {
+            console.error('SVL: #topbar-container not found.');
+            return;
+        }
+
+        this.badgeElement = document.createElement('div');
+        this.badgeElement.id = 'svl-status-badge';
+        this.badgeElement.style.display = 'inline-flex';
+        this.badgeElement.style.alignItems = 'center';
+        this.badgeElement.style.padding = '0 8px';
+        this.badgeElement.style.height = '100%';
+        this.badgeElement.style.marginLeft = '10px';
+        this.badgeElement.style.cursor = 'default';
+        this.badgeElement.style.fontWeight = 'bold';
+        this.badgeElement.style.color = '#fff';
+        this.badgeElement.style.textShadow = '1px 1px 2px black';
+
+        // Initial state
+        this.updateBadge(SVLLayerState.UNINITIALIZED);
+
+        topbar.appendChild(this.badgeElement);
+    }
+
+    private updateBadge(state: SVLLayerState): void {
+        if (!this.badgeElement) return;
+
+        let icon = '<i class="fa fa-stop-circle" style="color: red; margin-left: 5px;"></i>';
+        let title = this.mediator._("svl_disabled");
+
+        switch (state) {
+            case SVLLayerState.VISIBLE:
+                if (this.mediator.isFarZoom()) {
+                    icon = '<i class="fa fa-play-circle" style="color: #4DB6AC; margin-left: 5px;"></i>';
+                    title = this.mediator._("svl_active_far_zoom");
+                } else {
+                    icon = '<i class="fa fa-play-circle" style="color: #3FC91C; margin-left: 5px;"></i>';
+                    title = this.mediator._("svl_active");
+                }
+                break;
+            case SVLLayerState.AUTOMATICALLY_DISABLED:
+                icon = '<i class="fa fa-pause-circle" style="color: orange; margin-left: 5px;"></i>';
+                title = this.mediator._("svl_paused_auto");
+                break;
+            case SVLLayerState.DRAWING_ABORTED:
+                icon = '<i class="fa fa-pause-circle" style="color: orange; margin-left: 5px;"></i>';
+                title = this.mediator._("svl_paused_aborted");
+                break;
+            case SVLLayerState.USER_DISABLED:
+                icon = '<i class="fa fa-stop-circle" style="color: red; margin-left: 5px;"></i>';
+                title = this.mediator._("svl_disabled_user");
+                break;
+            default:
+                break;
+        }
+
+        this.badgeElement.innerHTML = `SVL ${icon}`;
+        this.badgeElement.title = title;
+    }
+
+    private registerBadgeCallbacks(): void {
+        this.mediator.subscribe(SVLEvents.LAYER_ENABLED, () => {
+            this.updateBadge(SVLLayerState.VISIBLE);
+        });
+
+        this.mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED, () => {
+            this.updateBadge(SVLLayerState.AUTOMATICALLY_DISABLED);
+        });
+
+        this.mediator.subscribe(SVLEvents.DRAWING_ABORTED, () => {
+            this.updateBadge(SVLLayerState.DRAWING_ABORTED);
+        });
+
+        this.mediator.subscribe(SVLEvents.USER_DISABLED, () => {
+            this.updateBadge(SVLLayerState.USER_DISABLED);
+        });
+
+        this.mediator.subscribe(SVLEvents.ZOOM_CHANGED, () => {
+            this.updateBadge(this.mediator.getState());
+        });
     }
 }
