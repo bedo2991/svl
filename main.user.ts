@@ -1,8 +1,10 @@
 import { LineString, Point } from "geojson";
-import { Country, DataModelName, KeyboardShortcut, Node, SdkFeature, Segment, Street, WmeSDK, ZoomLevel } from "wme-sdk-typings";
+import { Country, DataModelName, KeyboardShortcut, Node, SdkFeature, Segment, Street, WME_LAYER_NAMES, WmeSDK, ZoomLevel } from "wme-sdk-typings";
 import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import proj4 from "proj4";
+import SVLMediator from "./SVLMediator";
+import { AlertType as AlertType2 } from "./Controllers/AbstractMediator";
 
 //import averageSpeedCameraImg from './resources/averagespeed.png';
 
@@ -11,13 +13,11 @@ unsafeWindow.SDK_INITIALIZED.then(initScript);
 
 
 
-interface PreferenceObject {
-  [key: string]: any
-}
+
 interface MeterObject {
   [key: string]: number
 }
-function initScript() {
+async function initScript() {
   // initialize the sdk, these should remain here at the top of the script
   if (!unsafeWindow.getWmeSdk) {
     // This block is required for type checking, but it is guaranteed that the function exists.
@@ -31,6 +31,9 @@ function initScript() {
   )
 
   console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
+
+  const mediator = await SVLMediator.initialize({ wmeSDK });
+  mediator.alertDebug(AlertType2.SUCCESS, "Initialization completed");
 
   /** @type {string} */
   const SVL_VERSION: string = GM_info.script.version;
@@ -218,7 +221,15 @@ function initScript() {
   };
   const safeAlert = (level: AlertType, message: string) => {
     try {
-      WazeWrap.Alerts[level](GM_info.script.name, message);
+      if (mediator?.alertController) {
+        if (level === AlertType.INFO) mediator.alertController.info(GM_info.script.name, message);
+        else if (level === AlertType.ERROR) mediator.alertController.error(GM_info.script.name, message);
+        else if (level === AlertType.WARNING) mediator.alertController.warning(GM_info.script.name, message);
+        else if (level === AlertType.SUCCESS) mediator.alertController.success(GM_info.script.name, message);
+        else console.log(message);
+      } else {
+        alert(message);
+      }
     } catch (e) {
       console.error(e);
       alert(message);
@@ -1945,7 +1956,7 @@ function initScript() {
     safeAlert(AlertType.INFO, _('export_preferences_message'));
   }
 
-  function importPreferences(e, pastedText: string | null) {
+  function importPreferences(pastedText: string | null) {
     if (pastedText !== null && pastedText !== '') {
       try {
         preferences = JSON.parse(pastedText);
@@ -1965,14 +1976,13 @@ function initScript() {
   }
 
   const importPreferencesCallback = () => {
-    WazeWrap.Alerts.prompt(
+    mediator.alertController.prompt(
       GM_info.script.name,
       `${_('preferences_import_prompt')}\n\n${_(
         'preferences_import_prompt_2'
       )}`,
       '',
-      importPreferences,
-      null
+      importPreferences
     );
   };
 
@@ -2368,15 +2378,13 @@ function initScript() {
 
   function resetPreferencesCallback() {
     consoleDebug('rollbackDefault');
-    WazeWrap.Alerts.confirm(
+    mediator.alertController.confirm(
       GM_info.script.name,
       `${_('preferences_reset_question')}\n${_(
         'preferences_reset_question_2'
       )}`,
       resetPreferences,
-      null,
-      _('preferences_reset_yes'),
-      _('preferences_reset_cancel')
+      null
     );
   }
 
@@ -2896,6 +2904,7 @@ function initScript() {
   }
 
   async function initPreferencePanel() {
+    return;
     //console.debug('Init Preference Panel');
     const style = <HTMLStyleElement>document.createElement('style');
     style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
@@ -2920,7 +2929,7 @@ function initScript() {
         .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000;}
         .routingDiv:hover{background-color:#ff3377;}
         #sidepanel-svl summary{font-weight:bold; margin:10px;}
-        #sidepanel-svl {width:98%;}
+        #sidepanel-svl {width:96%;margin:auto;}
         #sidepanel-svl details{margin-bottom:9pt;}
         #sidepanel-svl i{font-size:small;}`;
 
@@ -4076,27 +4085,6 @@ function initScript() {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function waitForWazeWrap() {
-    let trials = 1;
-    wmeSDK.State.getUserInfo()
-    let sleepTime = 150;
-    do {
-      if (
-        !WazeWrap ||
-        !WazeWrap.Ready ||
-        !WazeWrap.Interface ||
-        !WazeWrap.Alerts
-      ) {
-        console.log('SVL: WazeWrap not ready, retrying in 800ms');
-        await sleep(trials * sleepTime);
-      } else {
-        return true;
-      }
-    } while (trials++ <= 30);
-    console.error('SVL: could not initialize WazeWrap');
-    throw new Error('SVL: could not initialize WazeWrap');
-  }
-
   function keyboardShortcutCallback() {
     // Toggle the layer checkbox
     const enable = !svl_layer_is_visible;
@@ -4112,61 +4100,6 @@ function initScript() {
     } else {
       disableSVLLayers();
     }
-  }
-
-  function initWazeWrapElements() {
-    console.log('SVL: initializing WazeWrap');
-    // Adding keyboard shortcut
-    const defaultShortcut = "S+s";
-
-    const toggleShortcut: KeyboardShortcut = {
-      callback: keyboardShortcutCallback,
-      description: "Toggle SVL",
-      shortcutId: "svl",
-      shortcutKeys: defaultShortcut,
-    };
-
-
-    if (!wmeSDK.Shortcuts.areShortcutKeysInUse({
-      shortcutKeys: defaultShortcut
-    })) {
-      try {
-        wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-        console.log('SVL: Keyboard shortcut successfully added.');
-      } catch (e) {
-        safeAlert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
-        console.error('SVL: Error while adding the keyboard shortcut:');
-        console.error(e);
-      }
-    } else {
-      setTimeout(() => {
-        safeAlert(AlertType.WARNING, _('shortcut_cannot_be_set'));
-      }, 3000);
-      try {
-        toggleShortcut.shortcutKeys = null;
-        wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-        console.log('SVL: Empty Keyboard shortcut successfully added.');
-      } catch (e) {
-        console.error('SVL: Error while adding the empty keyboard shortcut:');
-        console.error(e);
-      }
-    }
-
-
-    loadTranslations().then(() => initPreferencePanel());
-    //initPreferencePanel();
-    WazeWrap.Interface.ShowScriptUpdate(
-      'Street Vector Layer',
-      SVL_VERSION,
-      `<b>${_('whats_new')}</b>
-      <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
-      <br>- 6.2.5 - Fix a rare bug with labels, more labels will get shown (maybe slightly outside of the segment). It is now possible for other script to know if SVL was initialized.
-      <br>- 6.2.4 - Fix for road width computation and performance improvements.
-      <br>- 6.2.3 - New: you can now customize how nodes look like (size and color). Please note: virtual nodes are not available yet. Deprecated: "show geometry nodes" and "hide minor roads" options. Bug fixes (road layer not getting hidden, fallback translations not getting used).
-      <br>- 6.2.0 - Major update: the segments layer is now drawn using the SDK. Various bug fixes (average speed cameras, nodes not disappearing).`,
-      '',
-      GM_info.script.supportURL
-    );
   }
 
   function invalidTranslation(key: string): string {
@@ -4378,7 +4311,7 @@ function initScript() {
     };
 
     if (loadPreferences() === false) {
-      // First run, or new broswer
+      // First run, or new browser
       safeAlert(
         AlertType.INFO,
         `${_('first_time')}
@@ -4414,7 +4347,7 @@ function initScript() {
      */
     OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index: number): Element {
       // const nextIndex = index + 1;
-      // console.log(`Order length: ${this.order.length}` );
+      // console.log(`Order length: ${ this.order.length }` );
       for (let i = index + 1; i < this.order.length; i++) {
         let nextElement = document.getElementById(this.order[i]);
         if (nextElement) {
@@ -4722,7 +4655,7 @@ function initScript() {
       label.setAttribute('y', (-y).toString());
 
       if (style['angle'] || style['angle'] === 0) {
-        const rotate = `rotate(${style['angle']},${x},${-y})`;
+        const rotate = `rotate(${style['angle']}, ${x}, ${- y})`;
         label.setAttribute('transform', rotate);
       }
       if (style['fontFamily']) {
@@ -4770,7 +4703,7 @@ function initScript() {
       }
       for (let i = 0; i < numRows; i += 1) {
         const tspan = labelsVector.renderer.nodeFactory(
-          `${featureId + suffix}_tspan_${i}`,
+          `${featureId + suffix}_tspan_${i} `,
           'tspan'
         );
         if (style['labelSelect'] === true) {
@@ -4792,7 +4725,7 @@ function initScript() {
           if (vfactor == null) {
             vfactor = -0.5;
           }
-          tspan.setAttribute('dy', `${vfactor * (numRows - 1)}em`);
+          tspan.setAttribute('dy', `${vfactor * (numRows - 1)} em`);
         } else {
           tspan.setAttribute('dy', '1em');
         }
@@ -4806,8 +4739,6 @@ function initScript() {
         labelsVector.renderer.textRoot.appendChild(label);
       }
     };
-
-    handleWMESettingsUpdated(false);
 
     // Add layers to the map
 
@@ -5005,7 +4936,9 @@ function initScript() {
       }
     );
 
+
     updateStylesFromPreferences(preferences, false);
+    handleWMESettingsUpdated(false);
 
     if (DEBUG) {
       document['lv'] = labelsVector;
@@ -5013,6 +4946,8 @@ function initScript() {
     }
 
     // initialisation
+    return;
+
     const layers = OLMap.getLayersBy('name', 'roads');
     WMERoadLayer = null;
     if (layers.length === 1) {
@@ -5047,11 +4982,7 @@ function initScript() {
     //  layerName: LAYERS.SEGMENTS
     //});
 
-    waitForWazeWrap().then((result) => {
-      if (result === true) {
-        initWazeWrapElements();
-      }
-    });
+
 
     if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
       setLayerVisibility(ROAD_LAYER, true);
@@ -5089,7 +5020,7 @@ function initScript() {
     document.dispatchEvent(new CustomEvent('svl-initialized'));
 
     //mergeEndCallback();
-    console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
+    console.log(`[SVL] v.${SVL_VERSION} initialized correctly.`);
   }
 
   function updateStylesFromPreferences(pref: PreferenceObject, shouldRedraw = true) {
@@ -5126,13 +5057,13 @@ function initScript() {
   }
 
   const fallback: Record<string, string> = {};
-  fallback[`completition_percentage`] = `100%`;
+  fallback[`completition_percentage`] = `100 % `;
   fallback[`language_code`] = `en`;
-  fallback[`translation_thanks`] = `translated in your language thanks to:`;
-  fallback[`would_you_like_to_help`] = `Would you like to help?`;
+  fallback[`translation_thanks`] = `translated in your language thanks to: `;
+  fallback[`would_you_like_to_help`] = `Would you like to help ? `;
   fallback[
     `fully_translated_in`
-  ] = `Fully translated in your language thanks to:`;
+  ] = `Fully translated in your language thanks to: `;
   fallback[`translated_by`] = `bedo2991`;
   fallback[`routing_mode_panel_title`] = `SVL's Routing Mode`;
   fallback[`routing_mode_panel_body`] = `Hover to temporary disable it`;
