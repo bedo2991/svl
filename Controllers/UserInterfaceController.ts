@@ -58,6 +58,7 @@ export default class UserInterfaceController extends AbstractController {
                         'Street Vector Layer',
                         this.mediator.SVL_VERSION,
                         `<b>${this.mediator._('whats_new')}</b>
+                        <br>- 7.0.0 - Fixed: SVL covers the WME's paths. The option "Show GPS layer above roads" now also works consistently. Flickering is possible at every deselection (current SDK limitation).
                         <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
                         <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
                         <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,

@@ -56,6 +56,11 @@ export default class LayerStateController extends AbstractController {
                 LayerStateController.instance.tryEnablingSVLRoadLayer.bind(LayerStateController.instance)
             );
 
+            mediator.wmeSDK.Events.on({
+                eventName: "wme-selection-changed",
+                eventHandler: LayerStateController.instance.handleSelectionChanged.bind(LayerStateController.instance)
+            });
+
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, LayerStateController.instance.updateAfterPreferencesWereChanged.bind(LayerStateController.instance));
 
             return LayerStateController.instance;
@@ -712,73 +717,6 @@ export default class LayerStateController extends AbstractController {
         if (__DEBUG__) {
             document['lv'] = this.labelsVector;
         }
-
-        // initialisation
-        return;
-
-        const layers = OLMap.getLayersBy('name', 'roads');
-        WMERoadLayer = null;
-        if (layers.length === 1) {
-            [WMERoadLayer] = layers;
-        } else {
-            console.error('SVL: Road Layer not found');
-        }
-        SVLAutomDisabled = false;
-
-        if (preferences['showUnderGPSPoints']) {
-            // By default, WME places the GPS points under the layer, no need to move it.
-            updateLayerPosition();
-        }
-
-        updateRoutingModePanel();
-        updateRefreshStatus();
-
-        wmeSDK.Events.on({
-            eventName: "wme-map-zoom-changed",
-            eventHandler: manageZoom
-        });
-        wmeSDK.Events.trackLayerEvents({
-            layerName: "roads"
-        });
-
-        wmeSDK.Events.on({
-            eventName: "wme-layer-visibility-changed",
-            eventHandler: manageLayerChanged
-        });
-        // When this gets enabled, this layer is drawn on top of other layers
-        //wmeSDK.Events.trackLayerEvents({
-        //  layerName: LAYERS.SEGMENTS
-        //});
-
-
-
-        if (wmeSDK.Map.getZoomLevel() <= preferences['useWMERoadLayerAtZoom']) {
-            setLayerVisibility(ROAD_LAYER, true);
-        } else if (
-            WMERoadLayer?.getVisibility() &&
-            preferences['disableRoadLayers']
-        ) {
-            setLayerVisibility(ROAD_LAYER, false);
-            console.log(
-                "SVL: WME's roads layer was disabled by Street Vector Layer. You can change this behaviour in the preference panel."
-            );
-        }
-
-        // eslint-disable-next-line no-underscore-dangle
-        wmeSDK.Events.on({
-            eventName: 'wme-user-settings-changed',
-            eventHandler: handleWMESettingsUpdated,
-        });
-
-        if (!preferences['startDisabled']) {
-            enableSVLLayers();
-        }
-
-        document.svlInitialized = true;
-        document.dispatchEvent(new CustomEvent('svl-initialized'));
-
-        //mergeEndCallback();
-        console.log(`[SVL] v. ${SVL_VERSION} initialized correctly.`);
     }
 
     public enableLayerForTheFirstTime(): void {
@@ -796,6 +734,14 @@ export default class LayerStateController extends AbstractController {
         }
     }
 
+    private handleSelectionChanged(): void {
+        if (!this.mediator.wmeSDK.Editing.getSelection() && [SVLLayerState.VISIBLE, SVLLayerState.AUTOMATICALLY_DISABLED].includes(this.currentState)) {
+            setTimeout(() => {
+                LayerStateController.instance.updateGPSLayerPosition();
+            }, 50);
+
+        }
+    }
     public enableAllSVLLayers() {
         // Enable all SDK Layers
         for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
