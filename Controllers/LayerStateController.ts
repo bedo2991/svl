@@ -57,8 +57,8 @@ export default class LayerStateController extends AbstractController {
             );
 
             mediator.wmeSDK.Events.on({
-                eventName: "wme-selection-changed",
-                eventHandler: LayerStateController.instance.handleSelectionChanged.bind(LayerStateController.instance)
+                eventName: "wme-map-layer-removed",
+                eventHandler: LayerStateController.instance.updateGPSLayerPosition.bind(LayerStateController.instance)
             });
 
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, LayerStateController.instance.updateAfterPreferencesWereChanged.bind(LayerStateController.instance));
@@ -734,14 +734,6 @@ export default class LayerStateController extends AbstractController {
         }
     }
 
-    private handleSelectionChanged(): void {
-        if (!this.mediator.wmeSDK.Editing.getSelection() && [SVLLayerState.VISIBLE, SVLLayerState.AUTOMATICALLY_DISABLED].includes(this.currentState)) {
-            setTimeout(() => {
-                LayerStateController.instance.updateGPSLayerPosition();
-            }, 50);
-
-        }
-    }
     public enableAllSVLLayers() {
         // Enable all SDK Layers
         for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
@@ -901,8 +893,11 @@ export default class LayerStateController extends AbstractController {
         }
 
         let gpsLayerIndex = 0;
+        let currentSVLIndex = 0;
+        let farTurnLayerIndex = 0;
         try {
             gpsLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
+            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
         } catch (e) {
             setTimeout(() => {
                 this.updateGPSLayerPosition(trial + 1);
@@ -910,24 +905,42 @@ export default class LayerStateController extends AbstractController {
             return;
         }
 
-        const showUnder = this.mediator.getPreference('showUnderGPSPoints');
+        const showSVLUnderGPS = this.mediator.getPreference('showUnderGPSPoints');
 
         try {
-            if (showUnder) {
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex - 20 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex - 19 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex - 15 });
-                this.labelsVector.setZIndex(gpsLayerIndex - 14);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex - 13 });
-            } else {
+            if (showSVLUnderGPS && (currentSVLIndex > gpsLayerIndex)) {
+                // alert("SHOWUNDER " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'gps_points', zIndex: currentSVLIndex + 1 });
+
+                // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex - 20 });
+                // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex - 19 });
+                // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex - 15 });
+                // this.labelsVector.setZIndex(gpsLayerIndex - 14);
+                // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex - 13 });
+                // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
+            } else if (!showSVLUnderGPS && (currentSVLIndex < gpsLayerIndex)) {
+                // alert("SHOW_ABOVE " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
                 this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
                 this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
                 this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
                 this.labelsVector.setZIndex(gpsLayerIndex + 21);
                 this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
+                // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
             }
+
         } catch (e) {
             console.error('SVL: Error setting layer z-indexes', e);
+        }
+
+        try {
+            const farTurnLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'farTurnPathLayer' });
+            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
+            if (farTurnLayerIndex < currentSVLIndex) {
+                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'farTurnPathLayer', zIndex: currentSVLIndex + 2 });
+            };
+        } catch (e) {
+            console.error(e);
+            console.error('SVL: Error setting farTurnPathLayer z-indexes', e);
         }
     }
 
