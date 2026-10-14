@@ -181,7 +181,7 @@ export default class LocalizationController extends AbstractController {
         { key: `whats_new`, value: `What's new?` },
         { key: `first_time`, value: `This is the first time that you run Street Vector Layer in this browser.` },
         { key: `some_info`, value: `Some info about it:` },
-        { key: `default_shortcut_instruction`, value: `By default, use ALT+L to toggle the layer.` },
+        { key: `default_shortcut_instruction`, value: `By default, use Shift + s to toggle the layer.` },
         { key: `instructions_1`, value: `You can change the streets color, thickness and style using the panel on the left sidebar.` },
         { key: `instructions_2`, value: `Your preferences will be saved for the next time in your browser.` },
         { key: `instructions_3`, value: `The other road layers will be automatically hidden (you can change this behaviour in the preference panel).` },

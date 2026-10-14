@@ -94,14 +94,21 @@ export default class AlertController {
      * @param okCallback 
      * @param cancelCallback 
      */
-    public confirm(title: string, message: string, okCallback: () => void, cancelCallback?: () => void): void {
+    public confirm(
+        title: string,
+        message: string,
+        okCallback: () => void,
+        cancelCallback?: () => void,
+        confirmButtonText: string = 'OK',
+        cancelButtonText: string = 'Cancel'
+    ): void {
         Swal.fire({
             title: title,
             text: message,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'OK',
-            cancelButtonText: 'Cancel'
+            confirmButtonText,
+            cancelButtonText
         }).then((result: SweetAlertResult) => {
             if (result.isConfirmed) {
                 okCallback();

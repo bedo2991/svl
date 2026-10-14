@@ -49,27 +49,21 @@ export default class UserInterfaceController extends AbstractController {
     }
 
     private checkVersionAndUpdate() {
-        const stored = localStorage.getItem('svl');
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (parsed.version !== this.mediator.SVL_VERSION) {
-                    this.mediator.alertController.showScriptUpdate(
-                        'Street Vector Layer',
-                        this.mediator.SVL_VERSION,
-                        `<b>${this.mediator._('whats_new')}</b>
-                        <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
-                        <br>- 7.0.0 - Fixed: SVL covers the WME's paths. The option "Show GPS layer above roads" now also works consistently. Flickering is possible at every deselection (current SDK limitation).
-                        <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
-                        <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
-                        <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
-                        GM_info.script.supportURL
-                    );
-                    this.preferencesController.savePreferences(true);
-                }
-            } catch (e) {
-                console.error("Error checking version", e);
-            }
+        const previousVersion = this.preferencesController.getPreviousVersion();
+        if (previousVersion && previousVersion !== this.mediator.SVL_VERSION) {
+            this.mediator.alertController.showScriptUpdate(
+                'Street Vector Layer',
+                this.mediator.SVL_VERSION,
+                `<b>${this.mediator._('whats_new')}</b>
+                <br>- 8.0.0 - Various bug fixes and performance improvements.
+                <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
+                <br>- 7.0.0 - Fixed: SVL covers the WME's paths. The option "Show GPS layer above roads" now also works consistently. Flickering is possible at every deselection (current SDK limitation).
+                <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
+                <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
+                <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
+                GM_info.script.supportURL
+            );
+            this.preferencesController.savePreferences(true);
         }
     }
 
@@ -279,7 +273,7 @@ export default class UserInterfaceController extends AbstractController {
                 this.mediator.setPreference('routingModeEnabled', true);
                 this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             });
-            (<HTMLDivElement>document.getElementById('map')).appendChild(routingModeDiv);
+            document.getElementById('map')?.appendChild(routingModeDiv);
         } else {
             // Remove the routing panel
             div?.remove();
@@ -886,11 +880,20 @@ export default class UserInterfaceController extends AbstractController {
         (<HTMLButtonElement>document
             .getElementById('svl_exportButton'))
             .addEventListener('click', this.handleExportPreferencesClick.bind(this));
-        this.updatePreferenceValues();
+        this.updatePreferencesUI();
     }
     private handleResetPreferencesClick() {
-        this.resetButtonState();
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_RESET_REQUEST);
+        this.mediator.alertController.confirm(
+            GM_info.script.name,
+            `${this.mediator._('preferences_reset_question')}\n\n${this.mediator._('preferences_reset_question_2')}`,
+            () => {
+                this.resetButtonState();
+                this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_RESET_REQUEST);
+            },
+            undefined,
+            this.mediator._('preferences_reset_yes'),
+            this.mediator._('preferences_reset_cancel')
+        );
     }
 
     private handleImportPreferencesClick() {
@@ -1311,7 +1314,7 @@ export default class UserInterfaceController extends AbstractController {
 
     // This rather belongs in the localitation controller!
     private getLocalisedString(i: (string | number)) {
-        const locale = I18n.translations[I18n.locale];
+        const locale = I18n.translations[I18n.currentLocale()];
         switch (i) {
             case 'red':
                 return locale?.['segment']?.['address']?.['none'] ?? i;
@@ -1337,7 +1340,7 @@ export default class UserInterfaceController extends AbstractController {
                 return locale?.['edit']?.['segment']?.['fields']?.['nearbyHOV'] ?? i;
             default:
         }
-        return locale?.['segment']?.['road_types'][i] ?? i; // jshint ignore:line
+        return locale?.['segment']?.['road_types']?.[i] ?? i; // jshint ignore:line
     }
 
     private getOptions() {

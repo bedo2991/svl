@@ -10,6 +10,7 @@ export default class PreferencesController extends AbstractController {
     // Singleton pattern
     private static instance: PreferencesController | null = null;
     private preferences: PreferenceObject;
+    private previousVersion: string | null = null;
     private constructor({ mediator }: { mediator: SVLMediator }) {
         // Private constructor to prevent direct instantiation
         super(mediator);
@@ -20,6 +21,10 @@ export default class PreferencesController extends AbstractController {
             throw new Error("PreferencesController is not initialized. Call PreferencesController.initialize() first.");
         }
         return PreferencesController.instance;
+    }
+
+    public getPreviousVersion(): string | null {
+        return this.previousVersion;
     }
 
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<PreferencesController> {
@@ -40,6 +45,9 @@ export default class PreferencesController extends AbstractController {
      * @returns 
      */
     public getPreference(key: string): any {
+        if (!key.includes('.')) {
+            return this.preferences?.[key];
+        }
         const keys = key.split('.');
         let value = this.preferences;
 
@@ -101,15 +109,24 @@ export default class PreferencesController extends AbstractController {
     private loadPreferences(overwrite = false, customPreferences: PreferenceObject | null = null) {
         let oldUser = true;
         let loadedPreferences = null;
+        const storage = unsafeWindow?.localStorage ?? localStorage;
 
         if (overwrite === true) {
-            unsafeWindow.localStorage.removeItem('svl');
+            storage.removeItem('svl');
         } else if (customPreferences !== null) {
             loadedPreferences = customPreferences;
         } else {
-            const pref = unsafeWindow.localStorage.getItem('svl');
+            const pref = storage.getItem('svl');
             if (pref) {
-                loadedPreferences = JSON.parse(pref);
+                try {
+                    loadedPreferences = JSON.parse(pref);
+                    if (this.previousVersion === null && typeof loadedPreferences?.version === 'string') {
+                        this.previousVersion = loadedPreferences.version;
+                    }
+                } catch (e) {
+                    console.error('SVL: Failed to parse stored preferences, resetting to defaults.', e);
+                    loadedPreferences = null;
+                }
             }
         }
 
@@ -480,7 +497,7 @@ export default class PreferencesController extends AbstractController {
     private storePreferences(pref: PreferenceObject, silent = true) {
         pref.version = this.mediator.SVL_VERSION;
         try {
-            unsafeWindow.localStorage.setItem('svl', JSON.stringify(pref));
+            (unsafeWindow?.localStorage ?? localStorage).setItem('svl', JSON.stringify(pref));
             if (!silent) {
                 this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_saved'));
             }

@@ -222,11 +222,6 @@ export default class SVLMediator extends AbstractMediator {
         return this.layerStateController.getCurrentState();
     }
 
-    // Deprecated, maintained continuously for compatibility but no-op as we use internal AlertController
-    public setWazeWrap(wazeWrap: any): void {
-        // no-op
-    }
-
     private handleFirstRun(): void {
         this.alert(
             AlertType.INFO,
@@ -304,12 +299,6 @@ export default class SVLMediator extends AbstractMediator {
             // Also log to console
             console.debug("SVL DEBUG ALERT:", message);
         }
-    }
-
-    private postponeAlert(type: AlertType, message: string, trial: number): void {
-        setTimeout(() => {
-            this.alert(type, message, trial);
-        }, 1000);
     }
 
     public alert(type: AlertType, message: string, trial: number = 0): void {

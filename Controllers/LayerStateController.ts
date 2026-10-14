@@ -15,6 +15,13 @@ export default class LayerStateController extends AbstractController {
     private SVL_PIXEL_SIZE_CACHE = new Map<ZoomLevel, number>();
     private SVL_RESOLUTION_CACHE = new Map<ZoomLevel, number>();
 
+    private prefRealSize: boolean = false;
+    private prefNodeRadius: number = 3.0;
+    private prefNodeColor: string = '#0015FF';
+    private prefNodeDeadEndColor: string = '#C31CFF';
+    private prefVirtualNodeColor: string = '#033a12';
+    private prefFarZoomLabelSize: number = 14;
+    private prefCloseZoomLabelSize: number = 16;
 
     private labelsVector!: OpenLayers.Layer.Vector;
 
@@ -36,6 +43,7 @@ export default class LayerStateController extends AbstractController {
             LayerStateController.instance = new LayerStateController({
                 mediator
             });
+            await LayerStateController.instance.waitForLegacyMap();
             LayerStateController.instance.initializeLayers();
             LayerStateController.instance.currentState = SVLLayerState.INITIALIZED;
 
@@ -67,6 +75,20 @@ export default class LayerStateController extends AbstractController {
         }
         else {
             throw new Error("LayerStateController is already initialized.");
+        }
+    }
+
+    private async waitForLegacyMap(maxWaitMs: number = 10000): Promise<void> {
+        const start = Date.now();
+        while (
+            typeof W === 'undefined' ||
+            typeof OpenLayers === 'undefined' ||
+            !W.map?.getWazeMap?.()?.getOLMap?.()
+        ) {
+            if (Date.now() - start > maxWaitMs) {
+                throw new Error("SVL: Timed out waiting for legacy W.map / OpenLayers to initialize.");
+            }
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
     }
 
@@ -153,7 +175,7 @@ export default class LayerStateController extends AbstractController {
 
             // Set the data for the node, then draw it.
             node['_featureId'] = featureId;
-            node['_boundsBottom'] = geometry.getBounds().bottom;
+            node['_boundsBottom'] = geometry.getBounds()?.bottom;
             node['_geometryClass'] = geometry.CLASS_NAME;
             node['_style'] = style;
 
@@ -182,13 +204,13 @@ export default class LayerStateController extends AbstractController {
             if (rendered === false) {
                 var node = document.getElementById(geometry.id);
                 if (node) {
-                    node.parentNode.removeChild(node);
+                    node.parentNode?.removeChild(node);
                 }
             }
             return rendered;
         };
 
-        this.labelsVector.drawFeature = function (feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>, farZoom = null) {
+        this.labelsVector.drawFeature = function (feature: OpenLayers.Feature.Vector, style?: Partial<StyleObject> | string, farZoom?: boolean) {
             // don't try to draw the feature with the renderer if the layer is not
             // drawn itself
             if (!this.drawn) {
@@ -201,7 +223,7 @@ export default class LayerStateController extends AbstractController {
                 var renderIntent = style || feature.renderIntent;
                 style = feature.style || this.style;
                 if (!style) {
-                    style = this.styleMap.createSymbolizer(feature, renderIntent);
+                    style = this.styleMap.createSymbolizer(feature, renderIntent) as Partial<StyleObject>;
                 }
             }
 
@@ -216,11 +238,11 @@ export default class LayerStateController extends AbstractController {
 
 
         this.labelsVector.moveTo = function (bounds: OpenLayers.Bounds, zoomChanged: boolean, dragging: boolean) {
-            OpenLayers.Layer.prototype.moveTo.apply(this, arguments);
+            OpenLayers.Layer.prototype.moveTo.call(this, bounds, zoomChanged, dragging);
 
             var coordSysUnchanged = true;
             const farZoom = LayerStateController.instance.mediator.isFarZoom();
-            if (!dragging) {
+            if (!dragging && this.map) {
                 this.renderer.root.style.visibility = 'hidden';
 
                 var viewSize = this.map.getSize(),
@@ -250,7 +272,7 @@ export default class LayerStateController extends AbstractController {
 
                 if (!zoomChanged && coordSysUnchanged) {
                     for (var i in this.unrenderedFeatures) {
-                        var feature = this.unrenderedFeatures[i];
+                        const feature = this.unrenderedFeatures[i];
                         this.drawFeature(feature, undefined, farZoom);
                     }
                 }
@@ -258,10 +280,9 @@ export default class LayerStateController extends AbstractController {
 
             if (!this.drawn || zoomChanged || !coordSysUnchanged) {
                 this.drawn = true;
-                var feature;
                 for (let i: number = 0, len = this.features.length; i < len; i++) {
                     this.renderer.locked = (i !== (len - 1));
-                    feature = this.features[i];
+                    const feature = this.features[i];
                     this.drawFeature(feature, undefined, farZoom);
                 }
             }
@@ -302,47 +323,48 @@ export default class LayerStateController extends AbstractController {
                 } */
         };
 
-        this.labelsVector.renderer.drawFeature = function drawFeature(feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>,
+        this.labelsVector.renderer.drawFeature = function drawFeature(feature: OpenLayers.Feature.Vector, style?: Partial<StyleObject> | string | object,
             farZoom = LayerStateController.instance.mediator.isFarZoom()) {
             const { zoom } = OLMap;
-            if (style == null) {
-                style = feature.style;
-            }
+            let resolvedStyle: Partial<StyleObject> = (style && typeof style === 'object' ? style : feature.style) || {};
 
             if (feature.geometry) {
+                const lsc = LayerStateController.instance;
                 // if (bounds) {
                 if (
                     7 - feature.attributes.showAtzoom > zoom ||
                     (feature.attributes.closeZoomOnly && farZoom) ||
                     (feature.attributes.farZoomOnly && !farZoom)
                 ) {
-                    style = { 'display': 'none' };
+                    resolvedStyle = { 'display': 'none' };
                 } else {
                     const bounds = feature.geometry.getBounds();
-                    if (!bounds || !bounds.intersectsBounds(LayerStateController.instance.labelsVector.renderer.extent)) {
-                        style = { 'display': 'none' };
+                    if (!bounds || !bounds.intersectsBounds(lsc.labelsVector.renderer.extent)) {
+                        resolvedStyle = { 'display': 'none' };
                     } else {
-                        LayerStateController.instance.labelsVector.renderer.featureDx = 0;
-                        style['fontSize'] = farZoom
-                            ? LayerStateController.instance.mediator.getPreference('farZoomLabelSize')
-                            : LayerStateController.instance.mediator.getPreference('closeZoomLabelSize');
+                        lsc.labelsVector.renderer.featureDx = 0;
+                        resolvedStyle['fontSize'] = farZoom
+                            ? lsc.prefFarZoomLabelSize
+                            : lsc.prefCloseZoomLabelSize;
                     }
                 }
 
-                const rendered = LayerStateController.instance.labelsVector.renderer.drawGeometry(
+                const rendered = lsc.labelsVector.renderer.drawGeometry(
                     feature.geometry,
-                    style,
+                    resolvedStyle,
                     feature.id
                 );
                 if (
-                    style['display'] !== 'none' &&
-                    style['label'] &&
+                    resolvedStyle['display'] !== 'none' &&
+                    resolvedStyle['label'] &&
                     rendered !== false
                 ) {
-                    const location = feature.geometry.getCentroid();
-                    LayerStateController.instance.labelsVector.renderer.drawText(feature.id, style, location);
+                    const location = feature.geometry instanceof OpenLayers.Geometry.Point
+                        ? feature.geometry
+                        : feature.geometry.getCentroid();
+                    lsc.labelsVector.renderer.drawText(feature.id, resolvedStyle, location);
                 } else {
-                    LayerStateController.instance.labelsVector.renderer.removeText(feature.id);
+                    lsc.labelsVector.renderer.removeText(feature.id);
                 }
                 return rendered;
             }
@@ -487,14 +509,9 @@ export default class LayerStateController extends AbstractController {
                 },
                 'width': (context): number => {
                     const props = context.feature?.properties || {};
-                    if (!this.mediator.isFarZoom(context.zoomLevel as ZoomLevel)) {
-                        if (this.mediator.getPreference('realsize')) {
-                            //console.dir(style['strokeWidth']);
-                            let pixelSize = this.getCachedGeodesicPixelSizeSVL(context.zoomLevel as ZoomLevel);
-                            let width = (props['width'] as number) / pixelSize;
-                            return width;
-                            //console.dir(style['strokeWidth']);
-                        }
+                    if (this.prefRealSize && !this.mediator.isFarZoom(context.zoomLevel as ZoomLevel)) {
+                        let pixelSize = this.getCachedGeodesicPixelSizeSVL(context.zoomLevel as ZoomLevel);
+                        return (props['width'] as number) / pixelSize;
                     }
                     return (props['width'] as number || 1);
                 },
@@ -526,7 +543,7 @@ export default class LayerStateController extends AbstractController {
                         'strokeColor': '${color}',
                         'strokeWidth': '${width}',
                         'strokeOpacity': '${opacity}',
-                        'strokeDashstyle': '${dash}',
+                        'strokeDashstyle': '${dash}' as any,
                         'strokeLinecap': 'butt',
                         //TODO: only add it ^ for segments with road width (or a very large width)
                         'display': '${display}',
@@ -551,7 +568,14 @@ export default class LayerStateController extends AbstractController {
                 },
                 'display': (context): string | undefined => {
                     const props = context.feature?.properties || {};
-                    return props['closeZoomOnly'] === 1 && this.mediator.isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : undefined;
+                    const zoomLevel = context.zoomLevel as ZoomLevel;
+                    if (props['closeZoomOnly'] === 1 && this.mediator.isFarZoom(zoomLevel)) {
+                        return 'none';
+                    }
+                    if (typeof props['minZoom'] === 'number' && zoomLevel < props['minZoom']) {
+                        return 'none';
+                    }
+                    return undefined;
                 },
             },
             styleRules: [
@@ -568,6 +592,7 @@ export default class LayerStateController extends AbstractController {
                         'fillColor': '#fff',
                         'fillOpacity': 0.7,
                         'pointRadius': 5,
+                        'display': '${display}',
                     }
                 },
                 {
@@ -591,22 +616,22 @@ export default class LayerStateController extends AbstractController {
             layerName: SDK_LAYERS.NODES,
             styleContext: {
                 'getPointRadius': (context) => {
-                    if (this.mediator.getPreference('realsize')) {
-                        return (this.mediator.getPreference('nodeRadius') ?? 3.0) * this.getCachedResolutionFactor(context.zoomLevel as ZoomLevel); // TODO: consider computing this once instead of doing the math for each node
+                    if (this.prefRealSize) {
+                        return this.prefNodeRadius * this.getCachedResolutionFactor(context.zoomLevel as ZoomLevel);
                     }
-                    return (this.mediator.getPreference('nodeRadius') ?? 3.0);
+                    return this.prefNodeRadius;
                 },
                 'shouldDisplay': (context) => {
                     return this.mediator.isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : 'block';
                 },
                 'getDefaultColor': (context) => {
-                    return this.mediator.getPreference('nodeColor') || '#0015FF';
+                    return this.prefNodeColor;
                 },
                 'getDeadEndColor': (context) => {
-                    return this.mediator.getPreference('nodeDeadEndColor') || '#C31CFF';
+                    return this.prefNodeDeadEndColor;
                 },
                 'getVirtualNodeColor': (context) => {
-                    return this.mediator.getPreference('virtualNodeColor') || '#033a12';
+                    return this.prefVirtualNodeColor;
                 }
             },
             styleRules: [
@@ -683,10 +708,6 @@ export default class LayerStateController extends AbstractController {
 
 
         this.updateAfterPreferencesWereChanged();
-
-        if (__DEBUG__) {
-            document['lv'] = this.labelsVector;
-        }
     }
 
     public enableLayerForTheFirstTime(): void {
@@ -914,6 +935,14 @@ export default class LayerStateController extends AbstractController {
     }
 
     private updateAfterPreferencesWereChanged() {
+        this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
+        this.prefNodeRadius = this.mediator.getPreference('nodeRadius') ?? 3.0;
+        this.prefNodeColor = this.mediator.getPreference('nodeColor') || '#0015FF';
+        this.prefNodeDeadEndColor = this.mediator.getPreference('nodeDeadEndColor') || '#C31CFF';
+        this.prefVirtualNodeColor = this.mediator.getPreference('virtualNodeColor') || '#033a12';
+        this.prefFarZoomLabelSize = this.mediator.getPreference('farZoomLabelSize') ?? 14;
+        this.prefCloseZoomLabelSize = this.mediator.getPreference('closeZoomLabelSize') ?? 16;
+
         this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
         this.updateGPSLayerPosition();
 

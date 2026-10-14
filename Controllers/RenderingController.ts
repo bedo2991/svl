@@ -4,7 +4,6 @@ import { Node, SdkFeature, Segment } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
-import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import Utils from "../Utils";
 
@@ -32,6 +31,7 @@ export default class RenderingController extends AbstractController {
     private segmentsStore = new Map<Segment['id'], Set<string>>();
     private arrowsStore = new Map<Segment['id'], Set<string>>();
     private iconsStore = new Map<Segment['id'], Set<string>>();
+    private labelsStore = new Map<Segment['id'], OpenLayers.Feature.Vector[]>();
 
     private labelsVector = W.map.getLayerByName(OL_LAYERS.LABELS);
 
@@ -40,6 +40,8 @@ export default class RenderingController extends AbstractController {
     private isImperial: boolean = false;
     private nextFeatureId: number = 0;
     private cachedUserRank: number | undefined = undefined;
+    private speedColorCache = new Map<number | null, string>();
+    private superScriptCache = new Map<number, string>();
 
     private superScript: Array<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
@@ -129,12 +131,15 @@ export default class RenderingController extends AbstractController {
         const newIsImperial = this.mediator.wmeSDK.Settings.getUserSettings().isImperial === true;
         if (this.isImperial !== newIsImperial) {
             this.isImperial = newIsImperial;
+            this.speedColorCache.clear();
+            this.superScriptCache.clear();
             this.redrawAll();
         }
     }
 
     private handleSVLSettingsUpdated() {
         let shouldRedraw = true; // TODO: this can be made more efficient
+        this.speedColorCache.clear();
         const newClutterConstant = this.mediator.getPreference('clutterConstant');
         if (this.clutterConstant !== newClutterConstant) {
             this.clutterConstant = newClutterConstant;
@@ -274,9 +279,136 @@ export default class RenderingController extends AbstractController {
         return (angle * 180) / Math.PI;
     }
 
-    private getCentroid(twoPoints: number[][]): number[] {
-        const res = twoPoints.map(point => [point[0], point[1]]);
-        return [(res[0][0] + res[1][0]) / 2.0, (res[0][1] + res[1][1]) / 2.0];
+    private getCentroid(p0: number[], p1: number[]): [number, number] {
+        return [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5];
+    }
+
+    private sampleArrowPointsAlongSegment(
+        coords: number[][],
+        isInRoundabout: boolean,
+        labels?: OpenLayers.Feature.Vector[]
+    ): { coordinates: [number, number]; p0: number[]; p1: number[]; minZoom: number }[] {
+        if (coords.length < 2) {
+            return [];
+        }
+
+        const firstLatRad = coords[0][1] * Utils.PI_OVER_180;
+        const cosLat = Math.cos(firstLatRad);
+        const metersPerDegLat = 111132.92;
+        const metersPerDegLon = 111412.84 * cosLat;
+
+        const cumDist: number[] = [0];
+        for (let i = 0; i < coords.length - 1; i++) {
+            const dx = (coords[i + 1][0] - coords[i][0]) * metersPerDegLon;
+            const dy = (coords[i + 1][1] - coords[i][1]) * metersPerDegLat;
+            cumDist.push(cumDist[i] + Math.hypot(dx, dy));
+        }
+
+        const totalLength = cumDist[cumDist.length - 1];
+        if (totalLength <= 0) {
+            return [];
+        }
+
+        const rawDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
+        const effectiveDeclutter = Math.max(40, rawDeclutter);
+        const minStepMeters = (effectiveDeclutter / 8) * (isInRoundabout ? 1.5 : 1);
+
+        const labelZones: { lon: number; lat: number; radiusMeters: number }[] = [];
+        if (labels && labels.length > 0) {
+            const MAX_EXTENT = 20037508.342789244;
+            for (const lf of labels) {
+                const geom = lf?.geometry as OpenLayers.Geometry.Point | undefined;
+                if (geom && typeof geom.x === 'number' && typeof geom.y === 'number') {
+                    const lon = (geom.x * 180) / MAX_EXTENT;
+                    const lat = (Math.atan(Math.exp((geom.y * Math.PI) / MAX_EXTENT)) * 360) / Math.PI - 90;
+                    const rawLabel: string = lf.attributes?.label ?? '';
+                    const lines = rawLabel.split('\n');
+                    let maxLineChars = 0;
+                    for (const line of lines) {
+                        if (line.length > maxLineChars) {
+                            maxLineChars = line.length;
+                        }
+                    }
+                    const radiusMeters = Math.min(
+                        totalLength * 0.15,
+                        Math.max(4, Math.min(20, maxLineChars * 1.1))
+                    );
+                    labelZones.push({ lon, lat, radiusMeters });
+                }
+            }
+        }
+
+        let numIntervals = Math.max(2, Math.round(totalLength / minStepMeters));
+        if (numIntervals === 2 && labelZones.length > 0 && totalLength >= 15) {
+            numIntervals = 3;
+        }
+
+        const step = totalLength / numIntervals;
+        const kMid = Math.floor(numIntervals / 2);
+
+        let segIdx = 0;
+        const candidates: {
+            coordinates: [number, number];
+            p0: number[];
+            p1: number[];
+            minZoom: number;
+            collides: boolean;
+        }[] = [];
+
+        for (let k = 1; k < numIntervals; k++) {
+            const targetDist = k * step;
+            while (segIdx < coords.length - 2 && cumDist[segIdx + 1] < targetDist) {
+                segIdx++;
+            }
+            const segStartDist = cumDist[segIdx];
+            const segLen = cumDist[segIdx + 1] - segStartDist;
+            const t = segLen > 0 ? (targetDist - segStartDist) / segLen : 0.5;
+            const p0 = coords[segIdx];
+            const p1 = coords[segIdx + 1];
+            const lon = p0[0] + t * (p1[0] - p0[0]);
+            const lat = p0[1] + t * (p1[1] - p0[1]);
+
+            const j = Math.abs(k - kMid);
+            const tz = j === 0 ? 5 : 31 - Math.clz32(j & -j);
+            const minZoom = tz >= 5 ? 0 : 20 - tz;
+
+            let collides = false;
+            for (const lz of labelZones) {
+                const dx = (lon - lz.lon) * metersPerDegLon;
+                const dy = (lat - lz.lat) * metersPerDegLat;
+                if (Math.hypot(dx, dy) < lz.radiusMeters) {
+                    collides = true;
+                    break;
+                }
+            }
+
+            candidates.push({
+                coordinates: [lon, lat],
+                p0,
+                p1,
+                minZoom,
+                collides,
+            });
+        }
+
+        for (let i = 0; i < candidates.length; i++) {
+            if (!candidates[i].collides) continue;
+            for (let d = 1; d < candidates.length; d++) {
+                let promoted = false;
+                if (i - d >= 0 && !candidates[i - d].collides) {
+                    candidates[i - d].minZoom = Math.min(candidates[i - d].minZoom, candidates[i].minZoom);
+                    promoted = true;
+                }
+                if (i + d < candidates.length && !candidates[i + d].collides) {
+                    candidates[i + d].minZoom = Math.min(candidates[i + d].minZoom, candidates[i].minZoom);
+                    promoted = true;
+                }
+                if (promoted) break;
+            }
+        }
+
+        const filtered = candidates.filter((c) => !c.collides);
+        return filtered.length > 0 ? filtered : candidates;
     }
 
     private addIDsToIconsStore(id: Segment['id'], ...strings: string[]) {
@@ -289,21 +421,28 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    // TODO: this function should cache values  instead of accessing preferences and sdk each time
     private getColorStringFromSpeed(metricspeed: number | null) {
+        const cached = this.speedColorCache.get(metricspeed);
+        if (cached !== undefined) {
+            return cached;
+        }
+        let color: string;
         if (this.mediator.getPreference('showSLSinglecolor')) {
-            return this.mediator.getPreference('SLColor');
+            color = this.mediator.getPreference('SLColor');
+        } else {
+            const speedsPref = this.mediator.getPreference('speeds');
+            if (metricspeed === null) {
+                color = speedsPref['default'];
+            } else {
+                const type = this.isImperial ? 'imperial' : 'metric';
+                const speed = this.isImperial
+                    ? Math.round(metricspeed / 1.609344)
+                    : metricspeed;
+                color = speedsPref[type][speed] ?? speedsPref['default'];
+            }
         }
-        if (metricspeed === null) {
-            return this.mediator.getPreference('speeds')['default'];
-        }
-        const type = this.isImperial ? 'imperial' : 'metric';
-        const speed = this.isImperial
-            ? Math.round(metricspeed / 1.609344)
-            : metricspeed;
-        return (
-            this.mediator.getPreference('speeds')[type][speed] ?? this.mediator.getPreference('speeds')['default']
-        );
+        this.speedColorCache.set(metricspeed, color);
+        return color;
     }
 
     public redrawAll(): void {
@@ -336,11 +475,15 @@ export default class RenderingController extends AbstractController {
     }
 
     public shouldDrawingResumeAfterAbort() {
-        Utils.debugLog(`Segments: ${this.mediator.wmeSDK.DataModel.Segments.getAll().length}, Nodes: ${this.mediator.wmeSDK.DataModel.Nodes.getAll().length}`);
-        Utils.debugLog(`Limits: Segments: ${this.mediator.getPreference('segmentsThreshold')}, Nodes: ${this.mediator.getPreference('nodesThreshold')}`);
+        const segmentsCount = this.mediator.wmeSDK.DataModel.Segments.getAll().length;
+        const nodesCount = this.mediator.wmeSDK.DataModel.Nodes.getAll().length;
+        const segmentsThreshold = this.mediator.getPreference('segmentsThreshold');
+        const nodesThreshold = this.mediator.getPreference('nodesThreshold');
+        Utils.debugLog(`Segments: ${segmentsCount}, Nodes: ${nodesCount}`);
+        Utils.debugLog(`Limits: Segments: ${segmentsThreshold}, Nodes: ${nodesThreshold}`);
         if (
-            this.mediator.wmeSDK.DataModel.Segments.getAll().length < this.mediator.getPreference('segmentsThreshold') &&
-            this.mediator.wmeSDK.DataModel.Nodes.getAll().length < this.mediator.getPreference('nodesThreshold')
+            segmentsCount < segmentsThreshold &&
+            nodesCount < nodesThreshold
         ) {
             this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
         }
@@ -365,9 +508,9 @@ export default class RenderingController extends AbstractController {
         for (let i = 0; i < segments.length; i++) {
             let s = segments[i];
             const res = this.drawSegmentSDK(s);
-            if (res) {
-                if (res.labels)
-                    labels.push(...res.labels);
+            if (res && res.labels && res.labels.length > 0) {
+                this.labelsStore.set(s.id, res.labels);
+                labels.push(...res.labels);
             }
         }
         this.drawAllQueues();
@@ -488,6 +631,8 @@ export default class RenderingController extends AbstractController {
         this.queuedIcons.clear();
         this.iconsStore.clear();
 
+        this.labelsStore.clear();
+
         this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
             layerName: SDK_LAYERS.SEGMENTS
         });
@@ -527,16 +672,22 @@ export default class RenderingController extends AbstractController {
     public removeSegmentsByIds(objectIds: (number)[]): void {
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
         const segmentsFeatureIds: string[] = [];
+        const labelsToDestroy: OpenLayers.Feature.Vector[] = [];
         for (let i = 0; i < objectIds.length; i++) {
-            let set = this.segmentsStore.get(objectIds[i]);
+            const segId = objectIds[i];
+            const set = this.segmentsStore.get(segId);
             if (set) {
                 segmentsFeatureIds.push(...Array.from(set));
-                this.segmentsStore.delete(objectIds[i]);
+                this.segmentsStore.delete(segId);
             }
-            this.labelsVector.destroyFeatures(
-                this.labelsVector.getFeaturesByAttribute('sID', objectIds[i]),
-                { 'silent': true }
-            );
+            const segLabels = this.labelsStore.get(segId);
+            if (segLabels) {
+                labelsToDestroy.push(...segLabels);
+                this.labelsStore.delete(segId);
+            }
+        }
+        if (labelsToDestroy.length > 0) {
+            this.labelsVector.destroyFeatures(labelsToDestroy, { 'silent': true });
         }
 
 
@@ -723,6 +874,13 @@ export default class RenderingController extends AbstractController {
             model.routingRoadType !== null
         ) {
             roadType = model.routingRoadType;
+        }
+
+        // Compute labels first so one-way arrow placement can avoid colliding with them
+        const oldModel = W.model.segments.getObjectById(model.id);
+        let labels: OpenLayers.Feature.Vector[] | undefined;
+        if (oldModel) {
+            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components);
         }
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -1070,8 +1228,10 @@ export default class RenderingController extends AbstractController {
 
             if (toNodeLanesCount > 0) {
                 // console.log("LANE fwd");
-                const res = geometryPointArray.slice(0, 2);
-                res[1] = this.getCentroid(res);
+                const res = [
+                    geometryPointArray[0],
+                    this.getCentroid(geometryPointArray[0], geometryPointArray[1]),
+                ];
 
                 let letToNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
@@ -1091,9 +1251,11 @@ export default class RenderingController extends AbstractController {
             if (fromNodeLanesCount > 0) {
                 // was: revLaneCount
                 // console.log("LANE rev");
-                // Deep copy the last two points to avoid mutating the original array
-                const res = geometryPointArray.slice(-2);
-                res[0] = this.getCentroid(res);
+                const len = geometryPointArray.length;
+                const res = [
+                    this.getCentroid(geometryPointArray[len - 2], geometryPointArray[len - 1]),
+                    geometryPointArray[len - 1],
+                ];
 
                 let fromNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
@@ -1114,59 +1276,54 @@ export default class RenderingController extends AbstractController {
             if (
                 !isTwoWay
             ) {
-                // consoleDebug("The segment is oneway or has unknown direction");
-                let simplifiedPoints = model.geometry.coordinates;
-                // N.B. model.length is the length in meters, not the items in the array (it's an object)
-                if (
-                    !isInRoundabout &&
-                    (length / simplifiedPoints.length) < this.mediator.getPreference('arrowDeclutter')
-                ) {
-                    simplifiedPoints = simplify(geometry, { tolerance: 0.00001, highQuality: false, mutate: false }).coordinates;
-                }
+                const arrowSamples = this.sampleArrowPointsAlongSegment(
+                    model.geometry.coordinates,
+                    isInRoundabout,
+                    labels
+                );
 
-                if ((isAtoB || isBtoA/* || isTwoWay was already checked in the first if*/) === false
-                    && this.mediator.wmeSDK.DataModel.Segments.isRoadTypeDrivable({ roadType: model.roadType })) {
+                if (
+                    (isAtoB || isBtoA) === false &&
+                    this.mediator.wmeSDK.DataModel.Segments.isRoadTypeDrivable({ roadType: model.roadType })
+                ) {
                     // Unknown direction
-                    for (let p = 0; p < simplifiedPoints.length - 1; p += 1) {
-                        // let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
-                        // Unknown direction
-                        let unknownDir: SdkFeature<Point> = {
+                    for (const sample of arrowSamples) {
+                        const unknownDir: SdkFeature<Point> = {
                             type: 'Feature',
                             id: model.id,
                             geometry: {
                                 type: 'Point',
-                                coordinates: (p + 2) < simplifiedPoints.length ? this.getCentroid(simplifiedPoints.slice(p, p + 2)) : this.getCentroid([simplifiedPoints[p], simplifiedPoints[p + 1]])
+                                coordinates: sample.coordinates,
                             },
                             properties: {
                                 'closeZoomOnly': 1,
                                 'isUnknownDirection': 1,
-                                'zIndex': baselevel + 180
+                                'minZoom': sample.minZoom,
+                                'zIndex': baselevel + 180,
                             },
                         };
                         this.queueArrowFeatureForDrawing(model.id, unknownDir);
                     }
                 } else {
                     // It is one way, draw normal arrows
-
-                    const step = isInRoundabout ? 3 : 1;
-                    for (let p = step - 1; p < simplifiedPoints.length - 1; p += step) {
+                    for (const sample of arrowSamples) {
                         const degrees = this.getAngleDegreesSDK(
                             isAtoB,
-                            simplifiedPoints[p],
-                            simplifiedPoints[p + 1]
+                            sample.p0,
+                            sample.p1
                         );
 
-                        let arrow: SdkFeature<Point> = {
+                        const arrow: SdkFeature<Point> = {
                             type: 'Feature',
                             id: model.id,
                             geometry: {
                                 type: 'Point',
-                                coordinates: (p + 2) < simplifiedPoints.length ? this.getCentroid(simplifiedPoints.slice(p, p + 2)) : this.getCentroid([simplifiedPoints[p], simplifiedPoints[p + 1]])
-
+                                coordinates: sample.coordinates,
                             },
                             properties: {
                                 'degrees': degrees,
-                                'zIndex': baselevel + 180
+                                'minZoom': sample.minZoom,
+                                'zIndex': baselevel + 180,
                             },
                         };
                         this.queueArrowFeatureForDrawing(model.id, arrow);
@@ -1228,12 +1385,6 @@ export default class RenderingController extends AbstractController {
             } // 'else': road type is not supported, just add the label
         }
 
-        // Add Label
-        const oldModel = W.model.segments.getObjectById(model.id);
-        let labels;
-        if (oldModel) {
-            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components);
-        }
         return { labels };
     }
 
@@ -1341,9 +1492,10 @@ export default class RenderingController extends AbstractController {
         });
 
         const distances: { index: number, distance: number }[] = [];
-        // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
         for (let p = 0; p < simplified.length - 1; p += 1) {
-            const distance = <number>simplified[p].distanceTo(simplified[p + 1]);
+            const ptA = simplified[p];
+            const ptB = simplified[p + 1];
+            const distance = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
             distances.push({ index: p, distance });
         }
         // sort them by distance, descending
@@ -1368,25 +1520,13 @@ export default class RenderingController extends AbstractController {
             // console.dir(address);
             let dx = 0;
             let dy = 0;
-            // if (distance > streetNameThresholdDistance) {
-            // consoleDebug('Label inserted');
-            // p = maxDistanceIndex;
-            // if (distance < doubleLabelDistance) {
-            // || farzoom
-            // p0 = simplified[p];
-            // p1 = simplified[p + 1];
-            // } else {
             p0 = simplified[p];
-            p1 = new OpenLayers.Geometry.LineString([
-                p0,
-                simplified[p + 1],
-            ]).getCentroid(
-                true
-            ); /* Important: pass true parameter otherwise it will return start point as centroid */ // Clone the label
-        // }
-        /* centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
-          true
-        ); */ labelFeature = sampleLabel.clone();
+            const pNext = simplified[p + 1];
+            p1 = new OpenLayers.Geometry.Point(
+                (p0.x + pNext.x) * 0.5,
+                (p0.y + pNext.y) * 0.5
+            );
+            labelFeature = sampleLabel.clone();
             labelFeature.geometry = p1;
             if (attributes.fwdDirection) {
                 dx = p1.x - p0.x;
@@ -1429,20 +1569,18 @@ export default class RenderingController extends AbstractController {
         return labels;
     }
 
-    // TODO: cache for efficiency
     private getSuperScript(number: number): string {
-        let res = '';
-        if (number) {
-            let numberString: string = number.toString();
-            if (this.isImperial) {
-                // Convert the speed limit to mph
-                numberString = Math.round(number / 1.609344).toString();
-            }
-            numberString = numberString.toString();
-            for (let i = 0; i < numberString.length; i += 1) {
-                res += this.superScript[Number(numberString.charAt(i))];
-            }
+        if (!number) return '';
+        const cached = this.superScriptCache.get(number);
+        if (cached !== undefined) {
+            return cached;
         }
+        const numberString = (this.isImperial ? Math.round(number / 1.609344) : number).toString();
+        let res = '';
+        for (let i = 0; i < numberString.length; i += 1) {
+            res += this.superScript[Number(numberString.charAt(i))];
+        }
+        this.superScriptCache.set(number, res);
         return res;
     }
 
