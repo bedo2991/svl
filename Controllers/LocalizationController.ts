@@ -85,30 +85,34 @@ export default class LocalizationController extends AbstractController {
 
     private async loadTranslations(): Promise<boolean> {
         //console.debug('Loading translations...');
-        const response = await this.request(
-            {
-                method: 'GET',
-                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
-            }
-        );
+        try {
+            const response = await this.request(
+                {
+                    method: 'GET',
+                    url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
+                }
+            );
 
-        if (response.readyState === 4 && response.status === 200) {
-            const data = response.responseText;
-            let temp = data.split('\n');
-            for (const [i, line] of temp.entries()) {
-                if (i > 0) {
-                    const [first, ...rest] = line.split('\t');
-                    this.tr[first] = rest.map((e: string) => e.trim());
-                } else {
-                    const [, ...rest] = line.split('\t');
-                    for (const [j, value] of rest.entries()) {
-                        this.tr_keys[value.trim()] = parseInt(j, 10);
+            if (response.readyState === 4 && response.status === 200) {
+                const data = response.responseText;
+                let temp = data.split('\n');
+                for (const [i, line] of temp.entries()) {
+                    if (i > 0) {
+                        const [first, ...rest] = line.split('\t');
+                        this.tr[first] = rest.map((e: string) => e.trim());
+                    } else {
+                        const [, ...rest] = line.split('\t');
+                        for (const [j, value] of rest.entries()) {
+                            this.tr_keys[value.trim()] = parseInt(j, 10);
+                        }
                     }
                 }
+                this.areOnlineTranslationsLoaded = true;
+                this.setMinimalFallbackTranslations();
+                return true;
             }
-            this.areOnlineTranslationsLoaded = true;
-            this.setMinimalFallbackTranslations();
-            return true;
+        } catch (error) {
+            console.warn('SVL: Failed to load online translations, using built-in fallback.', error);
         }
         return false;
     }

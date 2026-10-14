@@ -38,6 +38,8 @@ export default class RenderingController extends AbstractController {
     private currentTopCountryId: number | null = null;
 
     private isImperial: boolean = false;
+    private nextFeatureId: number = 0;
+    private cachedUserRank: number | undefined = undefined;
 
     private superScript: Array<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
@@ -163,7 +165,7 @@ export default class RenderingController extends AbstractController {
         return {
             type: 'Feature',
             id: id,
-            geometry: { type: 'Point', coordinates: [p0[0] + Utils.efficientSin(perpendicularAngle) * shiftDegrees, p0[1] + Utils.efficientCos(perpendicularAngle) * shiftDegrees] },
+            geometry: { type: 'Point', coordinates: [p0[0] + Math.sin(perpendicularAngle) * shiftDegrees, p0[1] + Math.cos(perpendicularAngle) * shiftDegrees] },
             properties: {
                 'isAverageSpeedCamera': 1,
                 'closeZoomOnly': 1,
@@ -215,8 +217,8 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private async queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
-        feature.id = `${id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
+        feature.id = `${id}_${++this.nextFeatureId}`;
         this.queuedSegments.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
         this.addIDsToSegmentsStore(id, feature.id);
@@ -261,7 +263,7 @@ export default class RenderingController extends AbstractController {
         const latInRadians = startP[1] * Utils.PI_OVER_180;
 
         // Calculate the difference in the direction of travel
-        dx = (endP[0] - startP[0]) * Utils.efficientCos(latInRadians);
+        dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
         dy = endP[1] - startP[1];
 
         // Math.atan2(dx, dy) returns the bearing from the Y-axis (North)
@@ -358,6 +360,7 @@ export default class RenderingController extends AbstractController {
             return;
         }
         //let features: SdkFeature<LineString>[] = [];
+        this.cachedUserRank = this.mediator.wmeSDK.State.getUserInfo()?.rank;
         let labels: any[] = [];
         for (let i = 0; i < segments.length; i++) {
             let s = segments[i];
@@ -374,14 +377,14 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private async queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
+        feature.id = `${id}_a_${++this.nextFeatureId}`;
         this.queuedArrows.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
         this.addIDsToArrowsStore(id, feature.id);
     }
-    private async queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_i_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
+        feature.id = `${id}_i_${++this.nextFeatureId}`;
         this.queuedIcons.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
         this.addIDsToIconsStore(id, feature.id);
@@ -528,6 +531,7 @@ export default class RenderingController extends AbstractController {
             let set = this.segmentsStore.get(objectIds[i]);
             if (set) {
                 segmentsFeatureIds.push(...Array.from(set));
+                this.segmentsStore.delete(objectIds[i]);
             }
             this.labelsVector.destroyFeatures(
                 this.labelsVector.getFeaturesByAttribute('sID', objectIds[i]),
@@ -541,6 +545,7 @@ export default class RenderingController extends AbstractController {
             const set = this.arrowsStore.get(objectIds[i]);
             if (set) {
                 arrowsFeatureIds.push(...Array.from(set));
+                this.arrowsStore.delete(objectIds[i]);
             }
         }
 
@@ -549,22 +554,29 @@ export default class RenderingController extends AbstractController {
             const set = this.iconsStore.get(objectIds[i]);
             if (set) {
                 iconsFeatureIds.push(...Array.from(set));
+                this.iconsStore.delete(objectIds[i]);
             }
         }
 
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: segmentsFeatureIds,
-            layerName: SDK_LAYERS.SEGMENTS
-        });
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: arrowsFeatureIds,
-            layerName: SDK_LAYERS.ARROWS
-        });
+        if (segmentsFeatureIds.length > 0) {
+            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: segmentsFeatureIds,
+                layerName: SDK_LAYERS.SEGMENTS
+            });
+        }
+        if (arrowsFeatureIds.length > 0) {
+            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: arrowsFeatureIds,
+                layerName: SDK_LAYERS.ARROWS
+            });
+        }
 
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: iconsFeatureIds,
-            layerName: SDK_LAYERS.ICONS
-        });
+        if (iconsFeatureIds.length > 0) {
+            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: iconsFeatureIds,
+                layerName: SDK_LAYERS.ICONS
+            });
+        }
     }
 
     public removeNodesByIds(objectIds: (number)[]): void {
@@ -617,7 +629,6 @@ export default class RenderingController extends AbstractController {
         ).components;
         */
         const geometryPointArray = model.geometry.coordinates;
-        const simplified = simplify(geometry, { tolerance: 0.00001, highQuality: false, mutate: false });
         /* Visualize simplified, for testing
         let redSegment: SdkFeature<LineString> = {
           type: 'Feature',
@@ -683,7 +694,7 @@ export default class RenderingController extends AbstractController {
             }
         } else {
             //Use the static value from the preferences
-            segmentWidth = this.streetStyles[roadType].strokeWidth;
+            segmentWidth = this.streetStyles[roadType]?.strokeWidth ?? 0;
         }
 
         const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
@@ -887,7 +898,7 @@ export default class RenderingController extends AbstractController {
             }
 
             const currentLock = lockRank + 1;
-            const userRank = this.mediator.wmeSDK.State.getUserInfo()?.rank;
+            const userRank = this.cachedUserRank ?? this.mediator.wmeSDK.State.getUserInfo()?.rank;
             if (
                 currentLock > this.mediator.getPreference('fakelock') ||
                 (typeof userRank !== "undefined" && currentLock > (userRank + 1))
@@ -1110,7 +1121,7 @@ export default class RenderingController extends AbstractController {
                     !isInRoundabout &&
                     (length / simplifiedPoints.length) < this.mediator.getPreference('arrowDeclutter')
                 ) {
-                    simplifiedPoints = simplified.coordinates;
+                    simplifiedPoints = simplify(geometry, { tolerance: 0.00001, highQuality: false, mutate: false }).coordinates;
                 }
 
                 if ((isAtoB || isBtoA/* || isTwoWay was already checked in the first if*/) === false

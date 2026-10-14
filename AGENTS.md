@@ -123,8 +123,6 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
   - `@turf/simplify` (`simplify`) for simplifying segment geometries at lower zoom levels.
   - `@turf/line-offset` (`lineOffset`) for offsetting one-way / dual-carriageway / ANR lines.
   - Coordinates are always `[lon, lat]` (GeoJSON standard).
-- **Performance Math ([`Utils.ts`](./Utils.ts)):**
-  - Use `Utils.efficientSin(rad)` and `Utils.efficientCos(rad)` (Taylor-series approximations) in tight rendering loops (`RenderingController`).
 - **Compile-Time Debug Flag (`__DEBUG__`):**
   - Rollup replaces `__DEBUG__` with `true` in development builds and `false` in production (`NODE_ENV=production`).
   - Use `this.debugLog(...)`, `Utils.debugLog(...)`, or `this.mediator.alertDebug(...)` for diagnostic output so it is automatically stripped in release builds.

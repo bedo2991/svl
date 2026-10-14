@@ -34,6 +34,7 @@ async function initScript() {
 
   const mediator = await SVLMediator.initialize({ wmeSDK });
   mediator.alertDebug(AlertType2.SUCCESS, "Initialization completed");
+  return;
 
   /** @type {string} */
   const SVL_VERSION: string = GM_info.script.version;
@@ -1025,7 +1026,7 @@ async function initScript() {
     const latInRadians = startP[1] * PI_OVER_180;
 
     // Calculate the difference in the direction of travel
-    dx = (endP[0] - startP[0]) * efficientCos(latInRadians);
+    dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
     dy = endP[1] - startP[1];
 
     // Math.atan2(dx, dy) returns the bearing from the Y-axis (North)
@@ -1248,7 +1249,7 @@ async function initScript() {
     return {
       type: 'Feature',
       id: id,
-      geometry: { type: 'Point', coordinates: [p0[0] + efficientSin(perpendicularAngle) * shiftDegrees, p0[1] + efficientCos(perpendicularAngle) * shiftDegrees] },
+      geometry: { type: 'Point', coordinates: [p0[0] + Math.sin(perpendicularAngle) * shiftDegrees, p0[1] + Math.cos(perpendicularAngle) * shiftDegrees] },
       properties: {
         'isAverageSpeedCamera': 1,
         'closeZoomOnly': 1,
@@ -4236,38 +4237,9 @@ async function initScript() {
     const lat_radians = center_lat_4326 * PI_OVER_180;
 
     // 5. Calculate the Geodesic Pixel Size // res * Math.cos(lat_radians);
-    const geodesic_pixel_size_meters = resolution_3857 * efficientCos(lat_radians);
+    const geodesic_pixel_size_meters = resolution_3857 * Math.cos(lat_radians);
 
     return geodesic_pixel_size_meters;
-  }
-
-  /**
-   * Efficiently calculates the sine of an angle (in radians) using a Taylor series expansion.
-   * @param input Angle in radians
-   * @returns Approximation of the sine of the input angle
-   */
-  function efficientSin(input: number): number {
-    // Calculate powers efficiently
-    const x_squared = input * input;
-    const x_cubed = x_squared * input;
-    const x_to_the_fifth = x_cubed * x_squared;
-
-    // Note: 3! = 6, 5! = 120
-    // sin(x) ≈ x - (x^3 / 6) + (x^5 / 120)
-    return input - (x_cubed / 6.0) + (x_to_the_fifth / 120.0);
-  }
-
-  /**
-   * Efficiently calculates the cosine of an angle (in radians) using a Taylor series expansion.
-   * @param input Angle in radians
-   * @returns Approximation of the cosine of the input angle
-   */
-  function efficientCos(input: number): number {
-    const x_squared = input * input;
-    const x_to_the_fourth = x_squared * x_squared;
-
-    // Note: 2! = 2, 4! = 24
-    return 1.0 - (x_squared / 2.0) + (x_to_the_fourth / 24.0);
   }
 
   /**

@@ -98,12 +98,14 @@ export default class PreferencesController extends AbstractController {
         }
     }
 
-    private loadPreferences(overwrite = false) {
+    private loadPreferences(overwrite = false, customPreferences: PreferenceObject | null = null) {
         let oldUser = true;
         let loadedPreferences = null;
 
         if (overwrite === true) {
             unsafeWindow.localStorage.removeItem('svl');
+        } else if (customPreferences !== null) {
+            loadedPreferences = customPreferences;
         } else {
             const pref = unsafeWindow.localStorage.getItem('svl');
             if (pref) {
@@ -382,7 +384,7 @@ export default class PreferencesController extends AbstractController {
 
         this.preferences['speeds'] = {};
         this.preferences['speeds']['default'] =
-            loadedPreferences?.['speed']?.['default'] ?? '#cc0000';
+            loadedPreferences?.['speeds']?.['default'] ?? '#cc0000';
 
         if (loadedPreferences?.['speeds']?.['metric']) {
             this.preferences['speeds']['metric'] = loadedPreferences['speeds']['metric'];
@@ -521,11 +523,13 @@ export default class PreferencesController extends AbstractController {
             (_: any, input: string) => {
                 try {
                     const importedPreferences = JSON.parse(input);
-                    this.preferences = importedPreferences;
-                    this.storePreferences(this.preferences, true);
+                    if (!importedPreferences || typeof importedPreferences !== 'object' || Array.isArray(importedPreferences)) {
+                        throw new Error('Invalid preferences object');
+                    }
+                    this.loadPreferences(false, importedPreferences);
                     this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
-                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
-                    //this.updateStylesFromPreferences(importedPreferences);
+                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+                    this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
                 } catch (e) {
                     console.error(e);
                     this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_importing_error'));

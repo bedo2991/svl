@@ -864,9 +864,9 @@ export default class UserInterfaceController extends AbstractController {
         tabLabel.innerText = 'SVL 🗺️';
         tabLabel.title = 'Street Vector Layer';
 
-        tabPane.innerHTML = panelDiv.innerHTML;
+        tabPane.replaceChildren(mainDiv);
         // Add event listeners
-        const prefElements = document.querySelectorAll('.prefElement');
+        const prefElements = tabPane.querySelectorAll('.prefElement');
         prefElements.forEach((element) => {
             element.addEventListener('change', this.handleUserUpdatedSVLPreferences.bind(this));
         });

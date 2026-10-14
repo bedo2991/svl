@@ -108,7 +108,7 @@ export default class WMEEventsController extends AbstractController {
                     timeoutId: undefined
                 });
             } else {
-                alert("This event was already set!");
+                console.warn(`SVL: Event ${sdkName} was already registered for type ${eventType}`);
             }
         }
     }
@@ -370,12 +370,12 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    private deferExecution(exec: any): void {
+    private deferExecution(exec: any, ...args: any[]): void {
         if (exec.timeoutId) {
             clearTimeout(exec.timeoutId);
         }
         exec.timeoutId = window.setTimeout(() => {
-            exec.callback();
+            exec.callback(...args);
             exec.timeoutId = undefined;
         }, exec.deferInMs);
     }
@@ -405,8 +405,8 @@ export default class WMEEventsController extends AbstractController {
         } else {
             callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
                 eventName: sdkEvent,
-                eventHandler: () => {
-                    this.deferExecution(callbacks);
+                eventHandler: (e) => {
+                    this.deferExecution(callbacks, e);
                 }
             });
         }
@@ -414,6 +414,10 @@ export default class WMEEventsController extends AbstractController {
 
     private disableDataModelEvents() {
         this.registeredSVLDataModelCallbacks.forEach((value, key) => {
+            if (value.timeoutId) {
+                clearTimeout(value.timeoutId);
+                value.timeoutId = undefined;
+            }
             value.cleanUp?.();
             value.cleanUp = null;
         });
@@ -460,14 +464,27 @@ export default class WMEEventsController extends AbstractController {
             return;
         }
         console.debug(`WMEEventsController: Enabling layer visibility changed event ${sdkEvent}`);
-        callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
-            eventName: sdkEvent,
-            eventHandler: callbacks.callback,
-        });
+        if (!callbacks.deferInMs || callbacks.deferInMs <= 0) {
+            callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
+                eventName: sdkEvent,
+                eventHandler: callbacks.callback,
+            });
+        } else {
+            callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
+                eventName: sdkEvent,
+                eventHandler: (e) => {
+                    this.deferExecution(callbacks, e);
+                },
+            });
+        }
     }
 
     private disableAllLayerVisibilityChangedEvents(): void {
         this.registeredSVLLayerVisibilityCallbacks.forEach((value, key) => {
+            if (value.timeoutId) {
+                clearTimeout(value.timeoutId);
+                value.timeoutId = undefined;
+            }
             value.cleanUp?.();
             value.cleanUp = null;
         });
@@ -502,6 +519,10 @@ export default class WMEEventsController extends AbstractController {
         for (let wmeEvent of wmeEvents) {
             let callback = callbacks.get(wmeEvent);
             if (callback) {
+                if (callback.timeoutId) {
+                    clearTimeout(callback.timeoutId);
+                    callback.timeoutId = undefined;
+                }
                 callback.cleanUp?.();
                 callback.cleanUp = null;
             }

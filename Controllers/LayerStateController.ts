@@ -58,7 +58,7 @@ export default class LayerStateController extends AbstractController {
 
             mediator.wmeSDK.Events.on({
                 eventName: "wme-map-layer-removed",
-                eventHandler: LayerStateController.instance.updateGPSLayerPosition.bind(LayerStateController.instance)
+                eventHandler: () => LayerStateController.instance?.updateGPSLayerPosition()
             });
 
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, LayerStateController.instance.updateAfterPreferencesWereChanged.bind(LayerStateController.instance));
@@ -74,23 +74,6 @@ export default class LayerStateController extends AbstractController {
         const OLMap = W.map.getWazeMap().getOLMap();
         OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
 
-        // Override OpenLayers function
-        OpenLayers.Util.getElement = function () {
-            const elements = [];
-
-            for (let i = 0, len = arguments.length; i < len; i++) {
-                var element = arguments[i];
-                if (typeof element == 'string') {
-                    element = document.getElementById(element);
-                }
-                if (arguments.length === 1) {
-                    return element;
-                }
-                elements.push(element);
-            }
-            return elements;
-        };
-
         const labelStyleMap = new OpenLayers.StyleMap({
             'fontFamily': 'Rubik, Open Sans, Alef, helvetica, sans-serif',
             'fontWeight': '800',
@@ -104,69 +87,56 @@ export default class LayerStateController extends AbstractController {
             'labelAlign': 'cm', // set to center middle
         });
 
-        /**
-         *
-         * @param {number} index
-         * @return {Element}
-         */
-        OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index: number): HTMLElement | null {
-            // const nextIndex = index + 1;
-            // console.log(`Order length: ${this.order.length}` );
-            for (let i = index + 1; i < this.order.length; i++) {
-                let nextElement = document.getElementById(this.order[i]);
-                if (nextElement) {
-                    return nextElement;
-                }
-            }
-            return null;
-        };
-        /**
-         *
-         * @param {HTMLElement} newNode
-         * @return {Element}
-         */
-        OpenLayers.ElementsIndexer.prototype.insert = function (newNode: HTMLElement): HTMLElement | null {
-            // If the node is known to the indexer, remove it so we can
-            // recalculate where it should go.
-            const nodeId = newNode.id;
-            // if newNode exists
-            if (this.indices[nodeId] != null) {
-                this.remove(newNode);
-            }
-
-            this.determineZIndex(newNode);
-
-            var leftIndex: number = -1;
-            var rightIndex: number = this.order.length;
-            var middle;
-
-            while (rightIndex - leftIndex > 1) {
-                middle = Math.trunc((leftIndex + rightIndex) / 2);
-
-                // Changed here, great performance improvement by not using Utils.getElement
-                var placement = this.compare(this, newNode,
-                    document.getElementById(this.order[middle]));
-
-                if (placement > 0) {
-                    leftIndex = middle;
-                } else {
-                    rightIndex = middle;
-                }
-            }
-
-            this.order.splice(rightIndex, 0, nodeId);
-            this.indices[nodeId] = this.getZIndex(newNode);
-
-            // If the new node should be before another in the index
-            // order, return the node before which we have to insert the new one;
-            // else, return null to indicate that the new node can be appended.
-            return this.svlGetNextElement(rightIndex);
-        };
-
         this.labelsVector = new OpenLayers.Layer.Vector(OL_LAYERS.LABELS, {
             'styleMap': labelStyleMap,
             'visibility': false,
         });
+
+        const labelsIndexer = (this.labelsVector.renderer as any)?.indexer;
+        if (labelsIndexer) {
+            labelsIndexer.svlGetNextElement = function (index: number): HTMLElement | null {
+                for (let i = index + 1; i < this.order.length; i++) {
+                    const nextElement = document.getElementById(this.order[i]);
+                    if (nextElement) {
+                        return nextElement;
+                    }
+                }
+                return null;
+            };
+            labelsIndexer.insert = function (newNode: HTMLElement): HTMLElement | null {
+                const nodeId = newNode.id;
+                if (this.indices[nodeId] != null) {
+                    this.remove(newNode);
+                }
+
+                this.determineZIndex(newNode);
+
+                let leftIndex: number = -1;
+                let rightIndex: number = this.order.length;
+                let middle: number;
+
+                while (rightIndex - leftIndex > 1) {
+                    middle = Math.trunc((leftIndex + rightIndex) / 2);
+
+                    const placement = this.compare(
+                        this,
+                        newNode,
+                        document.getElementById(this.order[middle])
+                    );
+
+                    if (placement > 0) {
+                        leftIndex = middle;
+                    } else {
+                        rightIndex = middle;
+                    }
+                }
+
+                this.order.splice(rightIndex, 0, nodeId);
+                this.indices[nodeId] = this.getZIndex(newNode);
+
+                return this.svlGetNextElement(rightIndex);
+            };
+        }
 
         /**
          *
@@ -727,7 +697,6 @@ export default class LayerStateController extends AbstractController {
                 } catch (error) {
                     console.error('Error enabling/disabling layers:', error);
                 }
-                this.currentState = SVLLayerState.VISIBLE;
             } else {
                 this.currentState = SVLLayerState.USER_DISABLED;
             }
@@ -879,7 +848,7 @@ export default class LayerStateController extends AbstractController {
         const lat_radians = center_lat_4326 * Utils.PI_OVER_180;
 
         // 5. Calculate the Geodesic Pixel Size // res * Math.cos(lat_radians);
-        const geodesic_pixel_size_meters = resolution_3857 * Utils.efficientCos(lat_radians);
+        const geodesic_pixel_size_meters = resolution_3857 * Math.cos(lat_radians);
 
         return geodesic_pixel_size_meters;
     }
