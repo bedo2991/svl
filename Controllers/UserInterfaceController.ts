@@ -268,7 +268,7 @@ export default class UserInterfaceController extends AbstractController {
             routingModeDiv.className = 'routingDiv';
             routingModeDiv.innerHTML = `${this.mediator._(
                 'routing_mode_panel_title'
-            )}<br><small>${this.mediator._('routing_mode_panel_body')}<small>`;
+            )}<br><small>${this.mediator._('routing_mode_panel_body')}</small>`;
             routingModeDiv.addEventListener('mouseenter', () => {
                 // Temporary disable routing mode
                 this.mediator.setPreference('routingModeEnabled', false);

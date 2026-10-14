@@ -2073,7 +2073,7 @@ async function initScript() {
       routingModeDiv.className = 'routingDiv';
       routingModeDiv.innerHTML = `${_(
         'routing_mode_panel_title'
-      )}<br><small>${_('routing_mode_panel_body')}<small>`;
+      )}<br><small>${_('routing_mode_panel_body')}</small>`;
       routingModeDiv.addEventListener('mouseenter', () => {
         // Temporary disable routing mode
         preferences['routingModeEnabled'] = false;

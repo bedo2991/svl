@@ -15,12 +15,13 @@ Userscript for the Waze Map Editor (WME) that renders segment and node data mode
 
 ## Critical Rules & Constraints
 
-1. **WME SDK Mode (Synchronous `WmeSDK`):**
-   - Unlike projects that use `AsyncWmeSDK`, SVL uses the **synchronous `WmeSDK`** interface (`import { WmeSDK } from "wme-sdk-typings"`).
-   - Do **not** pass `mode: "async"` to `getWmeSdk`. Almost all SDK calls (`DataModel`, `Map`, `Events`, `Settings`, `Shortcuts`) are synchronous, except `wmeSDK.Sidebar.registerScriptTab()` which returns a `Promise`.
+1. **WME SDK Mode (`AsyncWmeSDK` — Target Architecture):**
+   - SVL is migrating to the **asynchronous `AsyncWmeSDK`** interface (`import { AsyncWmeSDK } from "wme-sdk-typings"`), initialized with `mode: "async"`.
+   - Always pass `mode: "async"` to `getWmeSdk`. Under `AsyncWmeSDK`, SDK calls (`DataModel`, `Map`, `Events.trackDataModelEvents`, `Settings`, `Shortcuts`, `LayerSwitcher`, `Sidebar`) return `Promise`s and must be `await`ed (note: `Events.on` / `Events.off` and layer `styleContext` functions remain synchronous).
+   - *(Migration Note: Existing code in `main.user.ts`, `SVLMediator.ts`, and `Controllers/*` currently types `wmeSDK` as synchronous `WmeSDK` and is being transitioned to `AsyncWmeSDK`.)*
 2. **SDK Documentation & Typings:**
    - Refer to `https://www.waze.com/editor/sdk/` (production) and `https://beta.waze.com/editor/sdk/` (beta).
-   - Import types from `wme-sdk-typings` (e.g., `WmeSDK`, `Segment`, `Node`, `SdkFeature`, `LayerStyleRule`, `AllEvents`).
+   - Import types from `wme-sdk-typings` (e.g., `AsyncWmeSDK`, `Segment`, `Node`, `SdkFeature`, `LayerStyleRule`, `AllEvents`).
    - Local ambient types for `W`, `OpenLayers`, `I18n`, and `WazeWrap` live in [`waze.d.ts`](./waze.d.ts).
 3. **Bounded Exceptions for Legacy Globals (`W`, `OpenLayers`, `I18n`):**
    - **Default Rule:** Do NOT introduce new uses of `W`, `W.model`, `W.map`, `OpenLayers`, `I18n`, or `WazeWrap` where a WME SDK equivalent exists.
@@ -31,26 +32,27 @@ Userscript for the Waze Map Editor (WME) that renders segment and node data mode
 
 ---
 
-## SDK Bootstrap Pattern
+## SDK Bootstrap Pattern (`AsyncWmeSDK`)
 
-From [`main.user.ts`](./main.user.ts):
+Target pattern for [`main.user.ts`](./main.user.ts):
 
 ```typescript
-import { WmeSDK } from "wme-sdk-typings";
-import { SVLMediator } from "./SVLMediator";
+import { AsyncWmeSDK } from "wme-sdk-typings";
+import SVLMediator from "./SVLMediator";
 
 unsafeWindow.SDK_INITIALIZED.then(initScript);
 
-function initScript() {
+async function initScript() {
   if (!unsafeWindow.getWmeSdk) {
     throw new Error("SVL: SDK not available");
   }
-  const wmeSDK: WmeSDK = unsafeWindow.getWmeSdk({
+  const wmeSDK: AsyncWmeSDK = unsafeWindow.getWmeSdk({
     scriptId: "svl-sdk",
     scriptName: "Street Vector Layer",
+    mode: "async",
   });
 
-  SVLMediator.initialize({ wmeSDK });
+  await SVLMediator.initialize({ wmeSDK });
 }
 ```
 
@@ -133,6 +135,6 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
 
 - `npm run compile`: Build development bundle (`rollup -c`) into `.out/main.user.js` (`__DEBUG__ = true`, unminified).
 - `npm run watch`: Rollup watch mode for iterative development.
-- `npm run concat`: Concatenate [`header.js`](./header.js) and `.out/main.user.js` into `.out/WME-Street-Vector-Layer-<version>.user.js`.
+- `npm run concat`: Concatenate [`header.js`](./header.js) and `.out/main.user.js` into `releases/release-<version>.user.js`.
 - `npm run build`: Full development build (`compile` + `concat`).
-- `npm run release`: Update version header (`update-header.js`), build production bundle (`NODE_ENV=production`, `__DEBUG__ = false`, Terser minification with debug methods stripped via `pure_funcs`), and concatenate into final release userscript.
+- `npm run release`: Update version in [`header.js`](./header.js), build production bundle (`NODE_ENV=production`, `__DEBUG__ = false`, Terser minification), and concatenate into `releases/release-<version>.user.js`.
