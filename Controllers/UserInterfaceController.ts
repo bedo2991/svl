@@ -260,9 +260,11 @@ export default class UserInterfaceController extends AbstractController {
             let routingModeDiv = <HTMLDivElement>document.createElement('div');
             routingModeDiv.id = ID;
             routingModeDiv.className = 'routingDiv';
-            routingModeDiv.innerHTML = `${this.mediator._(
-                'routing_mode_panel_title'
-            )}<br><small>${this.mediator._('routing_mode_panel_body')}</small>`;
+            routingModeDiv.textContent = this.mediator._('routing_mode_panel_title');
+            routingModeDiv.appendChild(document.createElement('br'));
+            const smallEl = document.createElement('small');
+            smallEl.textContent = this.mediator._('routing_mode_panel_body');
+            routingModeDiv.appendChild(smallEl);
             routingModeDiv.addEventListener('mouseenter', () => {
                 // Temporary disable routing mode
                 this.mediator.setRoutingModeSuppressed(true);

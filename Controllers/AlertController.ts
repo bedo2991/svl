@@ -2,6 +2,7 @@ import toastr from 'toastr';
 import Swal, { SweetAlertResult } from 'sweetalert2';
 import 'toastr/build/toastr.css';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import Utils from '../Utils';
 
 // Custom styles for WME environment
 const style = document.createElement('style');
@@ -28,7 +29,8 @@ toastr.options = {
     closeDuration: 0,
     showDuration: 0,
     closeButton: true,
-    progressBar: true
+    progressBar: true,
+    escapeHtml: true
 };
 
 /**
@@ -119,9 +121,10 @@ export default class AlertController {
     }
 
     public showScriptUpdate(title: string, version: string, htmlContent: string, supportURL: string = ''): void {
+        const safeSupportURL = supportURL ? Utils.escapeHtml(supportURL) : '';
         Swal.fire({
             title: `${title} ${version}`,
-            html: htmlContent + (supportURL ? `<br/><br/><a href="${supportURL}" target="_blank" style="color: #0078d7; text-decoration: underline;">Support Forum</a>` : ''),
+            html: htmlContent + (safeSupportURL ? `<br/><br/><a href="${safeSupportURL}" target="_blank" rel="noopener noreferrer" style="color: #0078d7; text-decoration: underline;">Support Forum</a>` : ''),
             width: 600,
             allowOutsideClick: true,
             showCloseButton: true,

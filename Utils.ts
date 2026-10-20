@@ -25,4 +25,13 @@ export default class Utils {
     public static feetToMeters(feet: number): number {
         return feet * 0.3048;
     }
+
+    public static escapeHtml(str: string): string {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 }

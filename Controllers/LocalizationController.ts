@@ -95,11 +95,11 @@ export default class LocalizationController extends AbstractController {
 
             if (response.readyState === 4 && response.status === 200) {
                 const data = response.responseText;
-                let temp = data.split('\n');
+                let temp = data.split(/\r?\n/);
                 for (const [i, line] of temp.entries()) {
                     if (i > 0) {
                         const [first, ...rest] = line.split('\t');
-                        this.tr[first] = rest.map((e: string) => e.trim());
+                        this.tr[first] = rest.map((e: string) => e.trim().replace(/[<>]/g, ''));
                     } else {
                         const [, ...rest] = line.split('\t');
                         for (const [j, value] of rest.entries()) {
@@ -126,7 +126,7 @@ export default class LocalizationController extends AbstractController {
 
     private invalidTranslation(key: string): string {
         console.error('[SVL] Invalid translation key: ' + key);
-        return '<invalid translation key>';
+        return '[invalid translation key]';
     }
 
     /**

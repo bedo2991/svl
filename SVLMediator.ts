@@ -305,7 +305,7 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     public alert(type: AlertType, message: string, trial: number = 0): void {
-        const fullMessage = message + (__DEBUG__ && trial > 0 ? `&nbsp;(Trial #${trial})` : '');
+        const fullMessage = message + (__DEBUG__ && trial > 0 ? ` (Trial #${trial})` : '');
         switch (type) {
             case AlertType.INFO:
                 this.alertController.info(GM_info.script.name, fullMessage);
