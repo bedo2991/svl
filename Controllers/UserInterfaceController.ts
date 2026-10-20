@@ -928,7 +928,6 @@ export default class UserInterfaceController extends AbstractController {
         const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
         rollbackButton.classList.add('disabled');
         rollbackButton.disabled = true;
-        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
     }
 
     private handleUserUpdatedSVLPreferences(event: Event) {
@@ -1059,15 +1058,7 @@ export default class UserInterfaceController extends AbstractController {
      *
      */
     private async updatePreferenceValues(): Promise<void> {
-        const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
-        saveNewButton.classList.add('disabled');
-        saveNewButton.disabled = true;
-        saveNewButton.classList.remove('btn-primary');
-
-        const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
-        rollbackButton.classList.add('disabled');
-        rollbackButton.disabled = true;
-        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
+        this.resetButtonState();
         this.updateStreetsPreferenceValues();
 
         const options = this.getOptions();

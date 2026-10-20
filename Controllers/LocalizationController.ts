@@ -47,11 +47,11 @@ export default class LocalizationController extends AbstractController {
         this.fallbackSource = [];
     }
 
-    private setMinimalFallbackTranslations(setAll = false) {
+    private setMinimalFallbackTranslations() {
         for (let i = 0; i < this.fallbackSource.length; i++) {
             let item = this.fallbackSource[i];
             const key_index = this.tr_keys[item.key];
-            if (key_index) {
+            if (key_index !== undefined) {
                 if (this.locale && this.tr[this.locale] && this.tr[this.locale][key_index]) {
                     continue; //skip if local translation exists
                 }
@@ -108,7 +108,6 @@ export default class LocalizationController extends AbstractController {
                     }
                 }
                 this.areOnlineTranslationsLoaded = true;
-                this.setMinimalFallbackTranslations();
                 return true;
             }
         } catch (error) {
