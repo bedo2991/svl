@@ -23,7 +23,7 @@ export default class LayerStateController extends AbstractController {
     private prefNodeRadius: number = 3.0;
     private prefNodeColor: string = '#0015FF';
     private prefNodeDeadEndColor: string = '#C31CFF';
-    private prefVirtualNodeColor: string = '#033a12';
+    private prefVirtualNodeColor: string = '#045419';
     private prefFarZoomLabelSize: number = 14;
     private prefCloseZoomLabelSize: number = 16;
 
@@ -657,6 +657,14 @@ export default class LayerStateController extends AbstractController {
                 },
                 {
                     predicate: (properties, zoomLevel) => {
+                        return properties["isVirtualNode"] == 1
+                    },
+                    style: {
+                        'fillColor': '${getVirtualNodeColor}',
+                    }
+                },
+                {
+                    predicate: (properties, zoomLevel) => {
                         return properties["conSegm"] == 1
                     },
                     style: {
@@ -985,7 +993,7 @@ export default class LayerStateController extends AbstractController {
         this.prefNodeRadius = this.mediator.getPreference('nodeRadius') ?? 3.0;
         this.prefNodeColor = this.mediator.getPreference('nodeColor') || '#0015FF';
         this.prefNodeDeadEndColor = this.mediator.getPreference('nodeDeadEndColor') || '#C31CFF';
-        this.prefVirtualNodeColor = this.mediator.getPreference('virtualNodeColor') || '#033a12';
+        this.prefVirtualNodeColor = this.mediator.getPreference('virtualNodeColor') || '#045419';
         this.prefFarZoomLabelSize = this.mediator.getPreference('farZoomLabelSize') ?? 14;
         this.prefCloseZoomLabelSize = this.mediator.getPreference('closeZoomLabelSize') ?? 16;
 

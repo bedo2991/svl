@@ -201,7 +201,7 @@ export default class PreferencesController extends AbstractController {
         this.preferences['nodeRadius'] = loadedPreferences?.['nodeRadius'] ?? 3.0;
         this.preferences['nodeColor'] = loadedPreferences?.['nodeColor'] ?? '#0015FF';
         this.preferences['nodeDeadEndColor'] = loadedPreferences?.['nodeDeadEndColor'] ?? '#C31CFF';
-        this.preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#033a12';
+        this.preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#045419';
 
         this.preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
         this.preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;

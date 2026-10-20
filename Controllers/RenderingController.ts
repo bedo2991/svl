@@ -661,6 +661,15 @@ export default class RenderingController extends AbstractController {
         for (let i = 0; i < nodesToProcess.length; i++) {
             let n = nodesToProcess[i];
             if (!deletedFlags[i] && !this.nodesStore.has(n.id)) {
+                let isVirtualNode: 0 | 1;
+                try {
+                    isVirtualNode = await this.mediator.wmeSDK.DataModel.Nodes.isVirtual({ nodeId: n.id }) ? 1 : 0;
+                } catch {
+                    // Node is no longer in the data model (DataModelNotFoundError)
+                    continue;
+                }
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                if (this.nodesStore.has(n.id)) continue;
                 //consoleDebug(`Adding node ${n.id}`);
                 this.nodesStore.add(n.id);
                 sdkFeatures.push(
@@ -668,7 +677,8 @@ export default class RenderingController extends AbstractController {
                         id: n.id,
                         geometry: n.geometry,
                         properties: {
-                            "conSegm": n.connectedSegmentIds.length
+                            "conSegm": n.connectedSegmentIds.length,
+                            "isVirtualNode": isVirtualNode
                         },
                         type: "Feature",
                     }
