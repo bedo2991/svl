@@ -9,8 +9,12 @@ import styles from "rollup-plugin-styles";
 // 1. Check the environment variable (NODE_ENV is standard for production)
 const isProduction = process.env.NODE_ENV === 'production';
 
-// 2. Define the minification plugin array
+// 2. Define the plugin array (replace must run before typescript/terser for dead-code elimination)
 const plugins = [
+    replace({
+        preventAssignment: true,
+        __DEBUG__: JSON.stringify(!isProduction)
+    }),
     styles(),
     resolve(),
     commonjs(),
@@ -21,18 +25,9 @@ const plugins = [
 if (isProduction) {
     console.warn("Building for RELEASE");
     plugins.push(terser());
-    plugins.push(replace({
-        preventAssignment: true,
-        __DEBUG__: false
-    }));
 } else {
-    plugins.push(replace({
-        preventAssignment: true,
-        __DEBUG__: true
-    }));
     console.log("Building for development");
 }
-
 
 export default {
     input: 'main.user.ts',

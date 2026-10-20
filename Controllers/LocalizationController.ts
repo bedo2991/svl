@@ -135,23 +135,18 @@ export default class LocalizationController extends AbstractController {
  */
     public translate(key: string, ...args: any[]): string {
         const key_index = this.tr_keys[key];
-        if (typeof key_index === 'undefined' && Object.keys(this.tr).length > 0) {
-            const local_key = this.fallback[key];
-            if (typeof local_key === 'undefined') {
-                return this.invalidTranslation(key);
+        if (key_index !== undefined) {
+            const locale = this.locale || 'en';
+            const localized = this.tr[locale]?.[key_index];
+            if (localized) {
+                return localized;
             }
-            return this.fallback[key];
-        }
-        const locale = this.locale || 'en';
-        if (this.tr[locale]) {
-            if (this.tr[locale][key_index] && this.tr[locale][key_index] !== '') {
-                return this.tr[locale][key_index];
+            const english = this.tr['en']?.[key_index];
+            if (english) {
+                return english;
             }
         }
-        if (this.tr['en'] && this.tr['en'][key_index]) {
-            return this.tr['en'][key_index];
-        }
-        return this.fallback[key];
+        return this.fallback[key] ?? this.invalidTranslation(key);
     }
 
     private fallbackSource = [

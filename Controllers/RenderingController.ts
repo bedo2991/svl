@@ -1,6 +1,6 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
-import { Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
+import { Country, Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
@@ -36,9 +36,7 @@ export default class RenderingController extends AbstractController {
     private labelsStore = new Map<Segment['id'], OpenLayers.Feature.Vector[]>();
     private nodesStore = new Set<Node['id']>();
 
-    private labelsVector = W.map.getLayerByName(OL_LAYERS.LABELS);
-
-    private currentTopCountryId: number | null = null;
+    private labelsVector: OpenLayers.Layer.Vector | undefined;
 
     private isImperial: boolean = false;
     private cachedUserRank: number | undefined = undefined;
@@ -50,6 +48,27 @@ export default class RenderingController extends AbstractController {
     private streetStyles: StreetStyle[] = [];
 
     private clutterConstant: number = 7;
+    private prefRealSize: boolean = true;
+    private prefShowSLColor: boolean = true;
+    private prefShowSLSingleColor: boolean = false;
+    private prefSLColor: string = '#ffffff';
+    private prefShowSLText: boolean = true;
+    private prefShowANs: boolean = true;
+    private prefFakelock: number = 6;
+    private prefLabelOutlineWidth: number = 3;
+    private prefArrowDeclutter: number = 140;
+    private prefSegmentsThreshold: number = 2500;
+    private prefNodesThreshold: number = 2000;
+    private prefUseWMERoadLayerAtZoom: number = 15;
+    private prefRedStyle: { strokeColor: string; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeDashstyle: 'solid' };
+    private prefDirtyStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#8b4513', strokeOpacity: 0.9, strokeDashstyle: 'solid' };
+    private prefClosureStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefTollStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#0000ff', strokeOpacity: 0.7, strokeDashstyle: 'dash' };
+    private prefRestrictionStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffff00', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefHeadlightsStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#00ff00', strokeOpacity: 0.7, strokeDashstyle: 'dot' };
+    private prefNearbyHOVStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#b300ff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefLanesStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffffff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefSpeeds: any = {};
 
     private roundaboutStyle = {
         strokeColor: '#111111',
@@ -108,6 +127,8 @@ export default class RenderingController extends AbstractController {
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<RenderingController> {
         if (!RenderingController.instance) {
             RenderingController.instance = new RenderingController({ mediator });
+            const w = unsafeWindow.W ?? W;
+            RenderingController.instance.labelsVector = w.map.getLayerByName(OL_LAYERS.LABELS);
 
             // Initialization
             await RenderingController.instance.handleWMESettingsUpdated(false);
@@ -153,10 +174,29 @@ export default class RenderingController extends AbstractController {
 
     private handleSVLSettingsUpdated(shouldRedraw: boolean = true) {
         this.speedColorCache.clear();
-        const newClutterConstant = this.mediator.getPreference('clutterConstant');
-        if (this.clutterConstant !== newClutterConstant) {
-            this.clutterConstant = newClutterConstant;
-        }
+        this.clutterConstant = this.mediator.getPreference('clutterConstant');
+        this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
+        this.prefShowSLColor = Boolean(this.mediator.getPreference('showSLcolor'));
+        this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor'));
+        this.prefSLColor = this.mediator.getPreference('SLColor');
+        this.prefShowSLText = Boolean(this.mediator.getPreference('showSLtext'));
+        this.prefShowANs = Boolean(this.mediator.getPreference('showANs'));
+        this.prefFakelock = Number(this.mediator.getPreference('fakelock'));
+        this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth'));
+        this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
+        this.prefSegmentsThreshold = Number(this.mediator.getPreference('segmentsThreshold'));
+        this.prefNodesThreshold = Number(this.mediator.getPreference('nodesThreshold'));
+        this.prefUseWMERoadLayerAtZoom = Number(this.mediator.getPreference('useWMERoadLayerAtZoom'));
+        this.prefRedStyle = this.mediator.getPreference('red');
+        this.prefDirtyStyle = this.mediator.getPreference('dirty');
+        this.prefClosureStyle = this.mediator.getPreference('closure');
+        this.prefTollStyle = this.mediator.getPreference('toll');
+        this.prefRestrictionStyle = this.mediator.getPreference('restriction');
+        this.prefHeadlightsStyle = this.mediator.getPreference('headlights');
+        this.prefNearbyHOVStyle = this.mediator.getPreference('nearbyHOV');
+        this.prefLanesStyle = this.mediator.getPreference('lanes');
+        this.prefSpeeds = this.mediator.getPreference('speeds');
+
         const streetStylesPref = this.mediator.getPreference('streets');
         this.streetStyles = [];
         for (let i = 0; i < streetStylesPref.length; i += 1) {
@@ -174,15 +214,22 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private createAverageSpeedCameraSDK({ id, rev, isForward, p0, p1 }:
-        { id: number, rev: boolean, isForward: boolean, p0: number[], p1: number[] }): SdkFeature<Point> {
-        const degreesInRadians = this.getAngleRadiansSDK(isForward, rev ? p1 : p0, rev ? p0 : p1);
+    private createAverageSpeedCameraSDK({ id, rev, p0, p1 }:
+        { id: number, rev: boolean, p0: number[], p1: number[] }): SdkFeature<Point> {
+        const degreesInRadians = this.getAngleRadiansSDK(true, p0, p1);
         const perpendicularAngle = degreesInRadians + Utils.PI_OVER_2;
         const shiftDegrees = 0.0001;
+        const cosLat = Math.cos(p0[1] * Utils.PI_OVER_180) || 1;
         return {
             type: 'Feature',
             id: `${id}_cam_${rev ? 'r' : 'f'}`,
-            geometry: { type: 'Point', coordinates: [p0[0] + Math.sin(perpendicularAngle) * shiftDegrees, p0[1] + Math.cos(perpendicularAngle) * shiftDegrees] },
+            geometry: {
+                type: 'Point',
+                coordinates: [
+                    p0[0] + (Math.sin(perpendicularAngle) * shiftDegrees) / cosLat,
+                    p0[1] + Math.cos(perpendicularAngle) * shiftDegrees
+                ]
+            },
             properties: {
                 'isAverageSpeedCamera': 1,
                 'closeZoomOnly': 1,
@@ -191,16 +238,9 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private async handleCountryChanged(): Promise<void> {
-        const topCountry = await this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
+    private async handleCountryChanged(data?: { newCountry?: Country }): Promise<void> {
+        const topCountry = data?.newCountry ?? await this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
         if (!topCountry) return;
-
-        if (topCountry.id === this.currentTopCountryId) {
-            // Country hasn't changed, no need to update
-            return;
-        }
-
-        this.currentTopCountryId = topCountry.id;
 
         const defaultLaneWidth = topCountry.defaultLaneWidthPerRoadType;
         if (defaultLaneWidth) {
@@ -216,20 +256,22 @@ export default class RenderingController extends AbstractController {
     }
 
     public async zoomChanged(): Promise<void> {
-        console.debug('zoomChanged running');
-        let currentState = this.mediator.getState();
-        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= +this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+        Utils.debugLog('zoomChanged running');
+        const currentState = this.mediator.getState();
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.prefUseWMERoadLayerAtZoom) {
             // There is nothing to draw, enable road layer
-            console.debug('Road layer automatically enabled because of zoom out');
-            // consoleDebug("Vector visibility: ", streetVector.visibility);
+            Utils.debugLog('Road layer automatically enabled because of zoom out');
             if (currentState === SVLLayerState.VISIBLE) {
                 this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE);
                 return;
             }
-        } else if (currentState == SVLLayerState.AUTOMATICALLY_DISABLED) {
+        } else if (currentState === SVLLayerState.AUTOMATICALLY_DISABLED) {
             // Re-enable the SVL
-            console.debug('Re-enabling SVL after zoom in');
-            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+            Utils.debugLog('Re-enabling SVL after zoom in');
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_ENABLE_LAYER);
+            return;
+        } else if (currentState === SVLLayerState.DRAWING_ABORTED) {
+            await this.shouldDrawingResumeAfterAbort();
             return;
         }
     }
@@ -320,8 +362,7 @@ export default class RenderingController extends AbstractController {
             return [];
         }
 
-        const rawDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
-        const effectiveDeclutter = Math.max(40, rawDeclutter);
+        const effectiveDeclutter = Math.max(40, this.prefArrowDeclutter);
         const minStepMeters = (effectiveDeclutter / 8) * (isInRoundabout ? 1.5 : 1);
 
         const labelZones: { lon: number; lat: number; radiusMeters: number }[] = [];
@@ -438,10 +479,10 @@ export default class RenderingController extends AbstractController {
             return cached;
         }
         let color: string;
-        if (this.mediator.getPreference('showSLSinglecolor')) {
-            color = this.mediator.getPreference('SLColor');
+        if (this.prefShowSLSingleColor) {
+            color = this.prefSLColor;
         } else {
-            const speedsPref = this.mediator.getPreference('speeds');
+            const speedsPref = this.prefSpeeds;
             if (metricspeed === null) {
                 color = speedsPref['default'];
             } else {
@@ -449,7 +490,7 @@ export default class RenderingController extends AbstractController {
                 const speed = this.isImperial
                     ? Math.round(metricspeed / 1.609344)
                     : metricspeed;
-                color = speedsPref[type][speed] ?? speedsPref['default'];
+                color = speedsPref[type]?.[speed] ?? speedsPref['default'];
             }
         }
         this.speedColorCache.set(metricspeed, color);
@@ -466,7 +507,7 @@ export default class RenderingController extends AbstractController {
 
     public redrawAll(): void {
         // Logic to redraw all SVL layers
-        console.log("Redrawing all SVL layers…");
+        Utils.debugLog("Redrawing all SVL layers…");
         this.drawGeneration++;
         // Clear any pending redraw to avoid multiple rapid redraws
         if (this.redrawTimeout !== null) {
@@ -506,23 +547,23 @@ export default class RenderingController extends AbstractController {
         ]);
         const segmentsCount = segments.length;
         const nodesCount = nodes.length;
-        const segmentsThreshold = this.mediator.getPreference('segmentsThreshold');
-        const nodesThreshold = this.mediator.getPreference('nodesThreshold');
+        const segmentsThreshold = this.prefSegmentsThreshold;
+        const nodesThreshold = this.prefNodesThreshold;
         Utils.debugLog(`Segments: ${segmentsCount}, Nodes: ${nodesCount}`);
         Utils.debugLog(`Limits: Segments: ${segmentsThreshold}, Nodes: ${nodesThreshold}`);
         if (
             segmentsCount < segmentsThreshold &&
             nodesCount < nodesThreshold
         ) {
-            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_ENABLE_LAYER);
         }
     }
 
     private async addSegmentsByModel(segments: Segment[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
         if (currentState !== SVLLayerState.VISIBLE || segments.length === 0 || generation !== this.drawGeneration) return;
-        if (segments.length > this.mediator.getPreference('segmentsThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+        if (segments.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
@@ -565,12 +606,12 @@ export default class RenderingController extends AbstractController {
             }
         }
         if (staleLabels.length > 0) {
-            this.labelsVector.destroyFeatures(staleLabels, { 'silent': true });
+            this.labelsVector?.destroyFeatures(staleLabels, { 'silent': true });
         }
         await this.drawAllQueues();
 
         if (labels.length > 0 && generation === this.drawGeneration && this.mediator.getState() === SVLLayerState.VISIBLE) {
-            this.labelsVector.addFeatures(labels, { 'silent': true });
+            this.labelsVector?.addFeatures(labels, { 'silent': true });
         }
     }
 
@@ -624,14 +665,14 @@ export default class RenderingController extends AbstractController {
     private async addNodesByModel(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
         if (currentState !== SVLLayerState.VISIBLE || nodes.length === 0 || generation !== this.drawGeneration) return;
-        if (nodes.length > this.mediator.getPreference('nodesThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.mediator.getPreference('nodesThreshold')}.\nYou can change this in the SVL preferences panel.`);
+        if (nodes.length > this.prefNodesThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.prefNodesThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
         // TODO: this should not happen here. First the events in layerStateController should fire and manage that
-        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.mediator.getPreference('useWMERoadLayerAtZoom')) {
-            console.debug('Not adding nodes them because of the zoom');
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.prefUseWMERoadLayerAtZoom) {
+            Utils.debugLog('Not adding nodes because of the zoom');
             return;
         }
         if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
@@ -649,28 +690,29 @@ export default class RenderingController extends AbstractController {
         const nodesToProcess = nodes.filter(n => !this.nodesStore.has(n.id));
         if (nodesToProcess.length === 0) return;
 
-        const deletedFlags = await Promise.all(
-            nodesToProcess.map(n => this.mediator.wmeSDK.DataModel.isDeleted({
-                dataModelName: "nodes",
-                objectId: n.id
-            }))
+        const nodeStatuses = await Promise.all(
+            nodesToProcess.map(async (n) => {
+                const isDeleted = await this.mediator.wmeSDK.DataModel.isDeleted({
+                    dataModelName: "nodes",
+                    objectId: n.id
+                });
+                if (isDeleted) return null;
+                try {
+                    const isVirtual = await this.mediator.wmeSDK.DataModel.Nodes.isVirtual({ nodeId: n.id });
+                    return isVirtual ? 1 : 0;
+                } catch {
+                    // Node is no longer in the data model (DataModelNotFoundError)
+                    return null;
+                }
+            })
         );
         if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
 
-        let sdkFeatures: SdkFeature<Point>[] = [];
+        const sdkFeatures: SdkFeature<Point>[] = [];
         for (let i = 0; i < nodesToProcess.length; i++) {
-            let n = nodesToProcess[i];
-            if (!deletedFlags[i] && !this.nodesStore.has(n.id)) {
-                let isVirtualNode: 0 | 1;
-                try {
-                    isVirtualNode = await this.mediator.wmeSDK.DataModel.Nodes.isVirtual({ nodeId: n.id }) ? 1 : 0;
-                } catch {
-                    // Node is no longer in the data model (DataModelNotFoundError)
-                    continue;
-                }
-                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
-                if (this.nodesStore.has(n.id)) continue;
-                //consoleDebug(`Adding node ${n.id}`);
+            const n = nodesToProcess[i];
+            const isVirtualNode = nodeStatuses[i];
+            if (isVirtualNode !== null && !this.nodesStore.has(n.id)) {
                 this.nodesStore.add(n.id);
                 sdkFeatures.push(
                     {
@@ -683,8 +725,6 @@ export default class RenderingController extends AbstractController {
                         type: "Feature",
                     }
                 );
-            } else {
-                // Adding a node that was deleted. This can happen if the map gets moved / zoomed while editing
             }
         }
 
@@ -740,8 +780,8 @@ export default class RenderingController extends AbstractController {
         if (idsToAdd.length === 0) return;
 
         Utils.debugLog(`addSegmentsSDK - Adding ${idsToAdd.length} segments`);
-        if (idsToAdd.length > this.mediator.getPreference('segmentsThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${idsToAdd.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+        if (idsToAdd.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${idsToAdd.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
@@ -807,7 +847,7 @@ export default class RenderingController extends AbstractController {
             }
         }
         if (labelsToDestroy.length > 0) {
-            this.labelsVector.destroyFeatures(labelsToDestroy, { 'silent': true });
+            this.labelsVector?.destroyFeatures(labelsToDestroy, { 'silent': true });
         }
 
 
@@ -890,7 +930,7 @@ export default class RenderingController extends AbstractController {
     // TODO: refactor (Strategy pattern?)
     private async drawSegmentSDK(
         model: Segment,
-        streetsMap: Map<number, Street>
+        streetsMap: Map<number, Street>,
     ): Promise<{ labels: OpenLayers.Feature.Vector[] | undefined }> {
         if (!model || await this.mediator.wmeSDK.DataModel.isDeleted({
             dataModelName: "segments",
@@ -900,34 +940,11 @@ export default class RenderingController extends AbstractController {
             return { labels: [] };
         }
 
-        const { id, geometry, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, length, primaryStreetId } = model;
+        const { id, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, primaryStreetId } = model;
         this.mediator.debugLog(`Drawing segment: ${id}`);
         // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
 
-        //const segmentFeatures: SdkFeature<LineString>[] = [];
-
-        /*
-        const geoPoints = model.getGeometry().coordinates; // array of coordinates
-        const olPointArray = geoPoints.map(geoPoint => new OpenLayers.Geometry.Point(geoPoint[0], geoPoint[1]).transform(gmapsProjection, OLMap.projection));
-        const simplified = new OpenLayers.Geometry.LineString(olPointArray).simplify(
-          1.5
-        ).components;
-        */
         const geometryPointArray = model.geometry.coordinates;
-        /* Visualize simplified, for testing
-        let redSegment: SdkFeature<LineString> = {
-          type: 'Feature',
-          id: model.id,
-          geometry: simplified,
-          properties: {
-            "color": preferences['red']['strokeColor'],
-            "width": 10,
-            "dash": preferences['red']['strokeDashstyle'],
-            'zIndex': 100
-          },
-        };
-        queueSegmentFeatureForDrawing(model.id, redSegment);
-        */
         const baselevel = (elevationLevel ?? 0) * 100;
         const isInRoundabout = model.junctionId !== null;
         let isBridge = false;
@@ -936,21 +953,22 @@ export default class RenderingController extends AbstractController {
         let roadType = initialRoadType;
         //Compute the segment width
         let segmentWidth: number = 0;
-        if (this.mediator.getPreference('realsize')) {
+        if (this.prefRealSize) {
+            const defaultLaneWidth = this.defaultLaneWidthMeters[initialRoadType] ?? 3.5;
             let segmentWidthFrom = 0;
             let segmentWidthTo = 0;
             if (fromLanesInfo) {
                 if (fromLanesInfo.laneWidth) {
                     segmentWidthFrom =
                         (fromLanesInfo.numberOfLanes *
-                            (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth))
+                            (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth));
                 } else {
                     segmentWidthFrom =
                         fromLanesInfo.numberOfLanes *
-                        this.defaultLaneWidthMeters[initialRoadType];
+                        defaultLaneWidth;
                 }
             } else {
-                segmentWidthFrom = this.defaultLaneWidthMeters[initialRoadType];
+                segmentWidthFrom = defaultLaneWidth;
             }
 
             if (toLanesInfo) {
@@ -961,10 +979,10 @@ export default class RenderingController extends AbstractController {
                 } else {
                     segmentWidthTo =
                         toLanesInfo.numberOfLanes *
-                        this.defaultLaneWidthMeters[initialRoadType];
+                        defaultLaneWidth;
                 }
             } else {
-                segmentWidthTo = this.defaultLaneWidthMeters[initialRoadType];
+                segmentWidthTo = defaultLaneWidth;
             }
 
             if (!isTwoWay) {
@@ -983,26 +1001,24 @@ export default class RenderingController extends AbstractController {
         }
 
         const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
-        //console.log("TOTAL WIDTH: " + totalSegmentWidth);
         // roadWidth: the width of the "inner" segment, without decorations around it. It will be modified later
         let roadWidth = totalSegmentWidth;
         if (primaryStreetId === null) {
             // consoleDebug("RED segment", model);
-            let redSegment: SdkFeature<LineString> = {
+            const redSegment: SdkFeature<LineString> = {
                 type: 'Feature',
                 id: `${model.id}_red`,
                 geometry: model.geometry,
                 properties: {
-                    "color": this.mediator.getPreference('red.strokeColor'),
+                    "color": this.prefRedStyle.strokeColor,
                     "width": totalSegmentWidth,
-                    "dash": this.mediator.getPreference('red.strokeDashstyle'),
+                    "dash": this.prefRedStyle.strokeDashstyle,
                 },
             };
             this.queueSegmentFeatureForDrawing(model.id, redSegment);
             return { labels: [] };
         }
 
-        // consoleDebug(width);
         if (
             this.mediator.isRoutingModeActive() &&
             model.routingRoadType !== null
@@ -1011,10 +1027,11 @@ export default class RenderingController extends AbstractController {
         }
 
         // Compute labels first so one-way arrow placement can avoid colliding with them
-        const oldModel = W.model.segments.getObjectById(model.id);
+        const w = unsafeWindow.W ?? W;
+        const oldModel = w.model.segments.getObjectById(model.id);
         let labels: OpenLayers.Feature.Vector[] | undefined;
         if (oldModel) {
-            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components, model, streetsMap);
+            labels = this.drawLabels(oldModel, oldModel.getOLGeometry().simplify(7).components, model, streetsMap, roadType);
         }
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -1024,7 +1041,7 @@ export default class RenderingController extends AbstractController {
                 // it is a bridge
                 // consoleDebug("Bridge");
                 isBridge = true;
-                let bridge: SdkFeature<LineString> = {
+                const bridge: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_br`,
                     geometry: model.geometry,
@@ -1037,7 +1054,7 @@ export default class RenderingController extends AbstractController {
                 this.queueSegmentFeatureForDrawing(model.id, bridge);
             }
 
-            hasSpeedLimitDrawn = speed && this.mediator.getPreference('showSLcolor');
+            hasSpeedLimitDrawn = Boolean(speed) && this.prefShowSLColor;
             // roadWidth: the width of the "inner" segment, without decorations around it
             if (hasSpeedLimitDrawn && isBridge) {
                 // A bridge with speed limit
@@ -1052,12 +1069,12 @@ export default class RenderingController extends AbstractController {
                 // consoleDebug("SpeedLimit");
 
                 if (
-                    !this.mediator.getPreference('showSLSinglecolor') &&
+                    !this.prefShowSLSingleColor &&
                     (fwdSpeedLimit || revSpeedLimit) &&
                     fwdSpeedLimit !== revSpeedLimit &&
                     isTwoWay
                 ) {
-                    if (this.mediator.getPreference('realsize')) {
+                    if (this.prefRealSize) {
                         // consoleDebug("The segment has 2 different speed limits");
                         // It has 2 different speeds:
                         const offset = (isBridge
@@ -1071,7 +1088,7 @@ export default class RenderingController extends AbstractController {
                         const revSpeedFeature = lineOffset(model.geometry, -offset, { units: 'meters' });
 
 
-                        let leftSpeedLimit: SdkFeature<LineString> = {
+                        const leftSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
                             id: `${model.id}_sl_l`,
                             geometry: fwdSpeedFeature.geometry,
@@ -1085,7 +1102,7 @@ export default class RenderingController extends AbstractController {
                         };
                         this.queueSegmentFeatureForDrawing(model.id, leftSpeedLimit);
 
-                        let rightSpeedLimit: SdkFeature<LineString> = {
+                        const rightSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
                             id: `${model.id}_sl_r`,
                             geometry: revSpeedFeature.geometry,
@@ -1102,7 +1119,7 @@ export default class RenderingController extends AbstractController {
                         // realsize is disabled, we cannot draw 2 separate lines.
                         let speedValue = fwdSpeedLimit; // If the segment is two way, take any speed, they are equal.
                         if (speedValue) {
-                            let speedLimit: SdkFeature<LineString> = {
+                            const speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
                                 id: `${model.id}_sl_f`,
                                 geometry: model.geometry,
@@ -1118,7 +1135,7 @@ export default class RenderingController extends AbstractController {
                         }
                         speedValue = revSpeedLimit; // If the segment is two way, take any speed, they are equal.
                         if (speedValue) {
-                            let speedLimit: SdkFeature<LineString> = {
+                            const speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
                                 id: `${model.id}_sl_rv`,
                                 geometry: model.geometry,
@@ -1142,7 +1159,7 @@ export default class RenderingController extends AbstractController {
                         speedValue = revSpeedLimit;
                     }
                     if (speedValue) {
-                        let speedLimit: SdkFeature<LineString> = {
+                        const speedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
                             id: `${model.id}_sl`,
                             geometry: model.geometry,
@@ -1160,7 +1177,7 @@ export default class RenderingController extends AbstractController {
             }
 
             // Draw the road
-            let roadFeature: SdkFeature<LineString> = {
+            const roadFeature: SdkFeature<LineString> = {
                 type: 'Feature',
                 id: `${model.id}_rd`,
                 geometry: model.geometry,
@@ -1175,7 +1192,7 @@ export default class RenderingController extends AbstractController {
 
             if (elevationLevel && elevationLevel < 0) {
                 // Tunnel
-                let tunnel: SdkFeature<LineString> = {
+                const tunnel: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_tun`,
                     geometry: model.geometry,
@@ -1192,10 +1209,10 @@ export default class RenderingController extends AbstractController {
             const currentLock = lockRank + 1;
             const userRank = this.cachedUserRank ?? (await this.mediator.wmeSDK.State.getUserInfo())?.rank;
             if (
-                currentLock > this.mediator.getPreference('fakelock') ||
+                currentLock > this.prefFakelock ||
                 (typeof userRank !== "undefined" && currentLock > (userRank + 1))
             ) {
-                let fakelock: SdkFeature<LineString> = {
+                const fakelock: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_lk`,
                     geometry: model.geometry,
@@ -1212,16 +1229,15 @@ export default class RenderingController extends AbstractController {
             const flags = flagAttributes;
 
             if (flags.unpaved) {
-
-                let unpaved: SdkFeature<LineString> = {
+                const unpaved: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_unp`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('dirty.strokeColor'),
+                        'color': this.prefDirtyStyle.strokeColor,
                         'width': roadWidth * 0.7,
-                        'opacity': this.mediator.getPreference('dirty.strokeOpacity'),
-                        'dash': this.mediator.getPreference('dirty.strokeDashstyle'),
+                        'opacity': this.prefDirtyStyle.strokeOpacity,
+                        'dash': this.prefDirtyStyle.strokeDashstyle,
                         'zIndex': baselevel + 135,
                     },
                 };
@@ -1232,15 +1248,15 @@ export default class RenderingController extends AbstractController {
 
             // CLOSE Zoom properties
             if (hasClosures) {
-                let closureLine: SdkFeature<LineString> = {
+                const closureLine: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_cl`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('closure.strokeColor'),
+                        'color': this.prefClosureStyle.strokeColor,
                         'width': roadWidth * 0.6,
-                        'dash': this.mediator.getPreference('closure.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('closure.strokeOpacity'),
+                        'dash': this.prefClosureStyle.strokeDashstyle,
+                        'opacity': this.prefClosureStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 140,
                     },
@@ -1258,15 +1274,15 @@ export default class RenderingController extends AbstractController {
                 ) {
                     // It is a toll road
                     // consoleDebug("Segment is toll");
-                    let tollLine: SdkFeature<LineString> = {
+                    const tollLine: SdkFeature<LineString> = {
                         type: 'Feature',
                         id: `${model.id}_tl`,
                         geometry: model.geometry,
                         properties: {
-                            'color': this.mediator.getPreference('toll.strokeColor'),
+                            'color': this.prefTollStyle.strokeColor,
                             'width': roadWidth * 0.3, // TODO preferences['toll']['strokeWidth'],
-                            'dash': this.mediator.getPreference('toll.strokeDashstyle'),
-                            'opacity': this.mediator.getPreference('toll.strokeOpacity'),
+                            'dash': this.prefTollStyle.strokeDashstyle,
+                            'opacity': this.prefTollStyle.strokeOpacity,
                             'zIndex': baselevel + 145,
                         },
                     };
@@ -1277,7 +1293,7 @@ export default class RenderingController extends AbstractController {
             if (isInRoundabout) {
                 // It is a roundabout
                 // consoleDebug("Segment is a roundabout");
-                let roundaboutLine: SdkFeature<LineString> = {
+                const roundaboutLine: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_ra`,
                     geometry: model.geometry,
@@ -1296,51 +1312,32 @@ export default class RenderingController extends AbstractController {
             if (hasRestrictions) {
                 // It has restrictions
                 // consoleDebug("Segment has restrictions");
-                let restrictionLine: SdkFeature<LineString> = {
+                const restrictionLine: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_res`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('restriction.strokeColor'),
+                        'color': this.prefRestrictionStyle.strokeColor,
                         'width': roadWidth * 0.4, // this.mediator.getPreference('restriction.strokeWidth'),
-                        'dash': this.mediator.getPreference('restriction.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('restriction.strokeOpacity'),
+                        'dash': this.prefRestrictionStyle.strokeDashstyle,
+                        'opacity': this.prefRestrictionStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 155,
                     },
-                }
+                };
                 this.queueSegmentFeatureForDrawing(model.id, restrictionLine);
             }
 
-            /*
-            // TODO: not supported by SDK
-            if (model.validated === false) {
-              // Segments that needs validation
-              lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(olPointArray),
-                {
-                  'sID': attributes.id,
-                  'color': validatedStyle.strokeColor,
-                  'width': roadWidth * 0.5, // validatedStyle.strokeWidth,
-                  'dash': validatedStyle.strokeDashstyle,
-                  closeZoomOnly: true,
-                  'zIndex': baselevel + 160,
-                }
-              );
-              segmentFeatures.push(lineFeature);
-            }
-            */
-
             if (flags.headlights) {
-                let headlights: SdkFeature<LineString> = {
+                const headlights: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_hl`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('headlights.strokeColor'),
+                        'color': this.prefHeadlightsStyle.strokeColor,
                         'width': roadWidth * 0.2, // this.mediator.getPreference('headlights.strokeWidth'),
-                        'dash': this.mediator.getPreference('headlights.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('headlights.strokeOpacity'),
+                        'dash': this.prefHeadlightsStyle.strokeDashstyle,
+                        'opacity': this.prefHeadlightsStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 165,
                     },
@@ -1348,15 +1345,15 @@ export default class RenderingController extends AbstractController {
                 this.queueSegmentFeatureForDrawing(model.id, headlights);
             }
             if (flags.nearbyHOV) {
-                let nearbyHOVLine: SdkFeature<LineString> = {
+                const nearbyHOVLine: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_hov`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('nearbyHOV.strokeColor'),
+                        'color': this.prefNearbyHOVStyle.strokeColor,
                         'width': roadWidth * 0.25,
-                        'dash': this.mediator.getPreference('nearbyHOV.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('nearbyHOV.strokeOpacity'),
+                        'dash': this.prefNearbyHOVStyle.strokeDashstyle,
+                        'opacity': this.prefNearbyHOVStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 166,
                     },
@@ -1371,15 +1368,15 @@ export default class RenderingController extends AbstractController {
                     this.getCentroid(geometryPointArray[0], geometryPointArray[1]),
                 ];
 
-                let letToNodeLanes: SdkFeature<LineString> = {
+                const letToNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_ln_to`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
-                        'color': this.mediator.getPreference('lanes.strokeColor'),
+                        'color': this.prefLanesStyle.strokeColor,
                         'width': roadWidth * 0.3,
-                        'dash': this.mediator.getPreference('lanes.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('lanes.strokeOpacity'),
+                        'dash': this.prefLanesStyle.strokeDashstyle,
+                        'opacity': this.prefLanesStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 170,
                     },
@@ -1395,15 +1392,15 @@ export default class RenderingController extends AbstractController {
                     geometryPointArray[len - 1],
                 ];
 
-                let fromNodeLanes: SdkFeature<LineString> = {
+                const fromNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_ln_fr`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
-                        'color': this.mediator.getPreference('lanes.strokeColor'),
+                        'color': this.prefLanesStyle.strokeColor,
                         'width': roadWidth * 0.3,
-                        'dash': this.mediator.getPreference('lanes.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('lanes.strokeOpacity'),
+                        'dash': this.prefLanesStyle.strokeDashstyle,
+                        'opacity': this.prefLanesStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 175,
                     },
@@ -1475,7 +1472,6 @@ export default class RenderingController extends AbstractController {
                 const avg = this.createAverageSpeedCameraSDK({
                     id: model.id,
                     rev: false,
-                    isForward: isAtoB || isTwoWay,
                     p0: model.geometry.coordinates[0],
                     p1: model.geometry.coordinates[1],
                 });
@@ -1486,7 +1482,6 @@ export default class RenderingController extends AbstractController {
                 const avg = this.createAverageSpeedCameraSDK({
                     id: model.id,
                     rev: true,
-                    isForward: isAtoB,
                     p0: model.geometry.coordinates[model.geometry.coordinates.length - 1],
                     p1: model.geometry.coordinates[model.geometry.coordinates.length - 2],
                 });
@@ -1496,7 +1491,7 @@ export default class RenderingController extends AbstractController {
 
             // In any 'Zoom':
             if (flags.tunnel) {
-                let tunnelFlag: SdkFeature<LineString> = {
+                const tunnelFlag: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_tf1`,
                     geometry: model.geometry,
@@ -1510,7 +1505,7 @@ export default class RenderingController extends AbstractController {
                 };
                 this.queueSegmentFeatureForDrawing(model.id, tunnelFlag);
 
-                let tunnelFlag2: SdkFeature<LineString> = {
+                const tunnelFlag2: SdkFeature<LineString> = {
                     type: 'Feature',
                     id: `${model.id}_tf2`,
                     geometry: model.geometry,
@@ -1530,29 +1525,26 @@ export default class RenderingController extends AbstractController {
 
     /**
   *
-  * @param {Waze.Feature.Vector.Segment} segmentModel
+  * @param {Waze.Feature.Vector.Segment} _segmentModel
   * @param {Array<OpenLayers.Geometry.Point>} simplified
   */
     private drawLabels(
-        segmentModel: Waze.Feature.Vector.Segment,
+        _segmentModel: Waze.Feature.Vector.Segment,
         simplified: Array<OpenLayers.Geometry.Point>,
         sdkSegment: Segment,
-        streetsMap: Map<number, Street>
+        streetsMap: Map<number, Street>,
+        roadType: number = sdkSegment.roadType
     ): OpenLayers.Feature.Vector[] {
-        // consoleDebug('drawLabels');
+        const ol = unsafeWindow.OpenLayers ?? OpenLayers;
         let labelFeature;
         let labelText: string;
 
-        // let centroid;
         /** @type {string} */
         let directionArrow: string;
-        // let streetNameThresholdDistance;
         let p0: OpenLayers.Geometry.Point;
         let p1: OpenLayers.Geometry.Point;
-        // let doubleLabelDistance;
         const labels = [];
         labelFeature = null;
-        const attributes = segmentModel.getAttributes();
         const primaryStreet = sdkSegment.primaryStreetId !== null ? streetsMap.get(sdkSegment.primaryStreetId) : undefined;
         const hasStreetName = Boolean(
             primaryStreet &&
@@ -1563,14 +1555,13 @@ export default class RenderingController extends AbstractController {
         let streetPart = '';
         if (hasStreetName) {
             streetPart = primaryStreet!.name as string;
-        } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
+        } else if (roadType < 10 && sdkSegment.junctionId === null) {
             streetPart = '⚑';
         }
-        // consoleDebug(`Streetpart: ${streetPart}`);
 
         // add alt street names
         let altStreetPart = '';
-        if (this.mediator.getPreference('showANs') && sdkSegment.alternateStreetIds?.length > 0) {
+        if (this.prefShowANs && sdkSegment.alternateStreetIds?.length > 0) {
             let ANsShown = 0;
             for (let i = 0; i < sdkSegment.alternateStreetIds.length; i += 1) {
                 const altStreet = streetsMap.get(sdkSegment.alternateStreetIds[i]);
@@ -1592,32 +1583,32 @@ export default class RenderingController extends AbstractController {
             }
         }
 
-        if (!this.streetStyles[attributes.roadType]) {
+        if (!this.streetStyles[roadType]) {
             streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
         }
 
         let speedPart = '';
-        const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
-        if (speed && this.mediator.getPreference('showSLtext')) {
-            if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
-                speedPart = this.getSuperScript(attributes.fwdMaxSpeed);
-            } else if (attributes.fwdMaxSpeed) {
-                speedPart = this.getSuperScript(attributes.fwdMaxSpeed);
-                if (attributes.revMaxSpeed) {
-                    speedPart += `'${this.getSuperScript(attributes.revMaxSpeed)}`;
+        const fwdMaxSpeed = sdkSegment.fwdSpeedLimit;
+        const revMaxSpeed = sdkSegment.revSpeedLimit;
+        const speed = fwdMaxSpeed ?? revMaxSpeed;
+        if (speed && this.prefShowSLText) {
+            if (fwdMaxSpeed === revMaxSpeed) {
+                speedPart = this.getSuperScript(fwdMaxSpeed!);
+            } else if (fwdMaxSpeed) {
+                speedPart = this.getSuperScript(fwdMaxSpeed);
+                if (revMaxSpeed) {
+                    speedPart += `'${this.getSuperScript(revMaxSpeed)}`;
                 }
-            } else {
-                speedPart = this.getSuperScript(attributes.revMaxSpeed);
-                if (attributes.fwdMaxSpeed) {
-                    speedPart += `'${this.getSuperScript(attributes.fwdMaxSpeed)}`;
+            } else if (revMaxSpeed) {
+                speedPart = this.getSuperScript(revMaxSpeed);
+                if (fwdMaxSpeed) {
+                    speedPart += `'${this.getSuperScript(fwdMaxSpeed)}`;
                 }
             }
-            /* jslint bitwise: true */
             if (
-                attributes.fwdMaxSpeedUnverified ||
-                attributes.revMaxSpeedUnverified
+                !sdkSegment.isFwdSpeedLimitVerified ||
+                !sdkSegment.isRevSpeedLimitVerified
             ) {
-                /* jslint bitwise: false */
                 speedPart += '?';
             }
         }
@@ -1625,20 +1616,17 @@ export default class RenderingController extends AbstractController {
         if (labelText === ' ') {
             return [];
         }
-        /* streetNameThresholdDistance =
-          labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
-        doubleLabelDistance = 4 * streetNameThresholdDistance; */
 
-        const roadTypeID = attributes.roadType;
-        const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
-            'sID': attributes.id,
+        const roadTypeID = roadType;
+        const sampleLabel = new ol.Feature.Vector(simplified[0], {
+            'sID': sdkSegment.id,
             'color': this.streetStyles[roadTypeID]
                 ? this.streetStyles[roadTypeID]['strokeColor']
                 : '#f00',
             'outlinecolor': this.streetStyles[roadTypeID]
                 ? this.streetStyles[roadTypeID]['outlineColor']
                 : '#fff',
-            'outlinewidth': this.mediator.getPreference('labelOutlineWidth'),
+            'outlinewidth': this.prefLabelOutlineWidth,
         });
 
         const distances: { index: number, distance: number }[] = [];
@@ -1654,31 +1642,26 @@ export default class RenderingController extends AbstractController {
         );
         let labelsToInsert = streetPart === '' ? 1 : distances.length;
         const requiredSpace = this.clutterConstant * Math.max(labelText.length, altStreetPart.length);
-        // console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
 
-        // console.debug(segmentModel.getID(), distances);
+        const isOneWay = !sdkSegment.isTwoWay && (sdkSegment.isAtoB || sdkSegment.isBtoA);
         for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
-            // console.log(`LabelsToInsert: ${labelsToInsert}`);
             if (
                 distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
             ) {
-                // console.log(`Breaking at index ${i}`);
                 break;
             }
             const p = distances[i].index;
-            // consoleDebug('Label can be inserted:');
-            // console.dir(address);
             let dx = 0;
             let dy = 0;
             p0 = simplified[p];
             const pNext = simplified[p + 1];
-            p1 = new OpenLayers.Geometry.Point(
+            p1 = new ol.Geometry.Point(
                 (p0.x + pNext.x) * 0.5,
                 (p0.y + pNext.y) * 0.5
             );
             labelFeature = sampleLabel.clone();
             labelFeature.geometry = p1;
-            if (attributes.fwdDirection) {
+            if (sdkSegment.isAtoB) {
                 dx = p1.x - p0.x;
                 dy = p1.y - p0.y;
             } else {
@@ -1698,12 +1681,11 @@ export default class RenderingController extends AbstractController {
             } else {
                 directionArrow = '';
             }
-            if (!segmentModel.isOneWay()) {
+            if (!isOneWay) {
                 directionArrow = ''; // The degree has to be computed anyway
             }
             labelFeature.attributes.label =
-                directionArrow + labelText + directionArrow + altStreetPart; // +
-            // labelsToInsert; //TODO remove
+                directionArrow + labelText + directionArrow + altStreetPart;
 
             labelFeature.attributes['angle'] = degrees;
             labelFeature.attributes.closeZoomOnly = p % 2 === 1;
@@ -1711,10 +1693,6 @@ export default class RenderingController extends AbstractController {
             labelsToInsert -= 1;
             labels.push(labelFeature);
         }
-        // console.dir(distances);
-        /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
-     
-        } */
 
         return labels;
     }

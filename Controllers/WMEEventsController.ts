@@ -1,8 +1,7 @@
 import { DataModelName } from "wme-sdk-typings";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
-import { AlertType, SVLEvents } from "./AbstractMediator";
-import { AcceptedControllerEvents } from "../svlGlobals";
+import { SVLEvents } from "./AbstractMediator";
 
 export enum SVLCallbackEventTypes {
     DATA_MODEL, // Called when data model events occur (nodes, segments, etc.)
@@ -141,57 +140,6 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    private unregisterDataModelCallback(sdkName: SdkDataModelEvents, callback: RegisteredDataModelExecution["callback"]): void {
-        const callbacks = this.registeredSVLDataModelCallbacks.get(sdkName);
-        if (callbacks && callbacks.callback === callback) {
-            if (callbacks.timeoutId) {
-                clearTimeout(callbacks.timeoutId);
-                callbacks.timeoutId = undefined;
-            }
-            callbacks.pendingObjectIdsByModel.clear();
-            callbacks.cleanUp?.();
-            this.registeredSVLDataModelCallbacks.delete(sdkName);
-        }
-    }
-
-    private unregisterLayerVisibilityCallback(sdkName: SdkEventWithStringParameter, callback: RegisteredLayerVisibilityExecution["callback"]): void {
-        const callbacks = this.registeredSVLLayerVisibilityCallbacks.get(sdkName);
-        if (callbacks && callbacks.callback === callback) {
-            if (callbacks.timeoutId) {
-                clearTimeout(callbacks.timeoutId);
-                callbacks.timeoutId = undefined;
-            }
-            callbacks.cleanUp?.();
-            this.registeredSVLLayerVisibilityCallbacks.delete(sdkName);
-        }
-    }
-
-
-    public unregisterCallback(eventType: SVLCallbackEventTypes, sdkName: SdkEventName, callback: RegisteredEventExecution["callback"] | RegisteredDataModelExecution["callback"] | RegisteredLayerVisibilityExecution["callback"]): void {
-        if (eventType === SVLCallbackEventTypes.DATA_MODEL) {
-            this.unregisterDataModelCallback(sdkName as SdkDataModelEvents, callback as RegisteredDataModelExecution["callback"]);
-            return;
-        }
-
-        if (eventType === SVLCallbackEventTypes.LAYER_VISIBILITY_CHANGED) {
-            this.unregisterLayerVisibilityCallback(sdkName as SdkEventWithStringParameter, callback as RegisteredLayerVisibilityExecution["callback"]);
-            return;
-        }
-
-        const callbacks = this.registeredSVLCallbacks.get(eventType);
-        if (callbacks) {
-            const registeredCallback = callbacks.get(sdkName as SdkEventsWithoutCallbacks);
-            if (registeredCallback && registeredCallback.callback === callback) {
-                if (registeredCallback.timeoutId) {
-                    clearTimeout(registeredCallback.timeoutId);
-                    registeredCallback.timeoutId = undefined;
-                }
-                registeredCallback.cleanUp?.();
-                callbacks.delete(sdkName as SdkEventsWithoutCallbacks);
-            }
-        }
-    }
-
     public static getInstance(): WMEEventsController {
         if (!WMEEventsController.instance) {
             throw new Error("WMEEventsController not initialized. Call initialize() first.");
@@ -285,12 +233,6 @@ export default class WMEEventsController extends AbstractController {
         });
     }
 
-    public handleWmeSettingsChanged() {
-        console.debug('WMEEventsController: Handling WME settings changed event');
-        this.mediator.notify(this, AcceptedControllerEvents.WME_SETTINGS_UPDATED);
-        // This is not a state change, so we don't update lastState
-    }
-
     public async handleSvlAutomaticallyDisabled(): Promise<void> {
         this.lastState = SVLEvents.AUTOMATICALLY_DISABLED;
         await this.manageState({
@@ -334,13 +276,6 @@ export default class WMEEventsController extends AbstractController {
             drawingAbortedEvents: true,
             layerVisibilityChangedEvents: false,
         });
-    }
-
-    public async refreshState(): Promise<void> {
-        const handler = this.lastState && this.stateHandlers[this.lastState];
-        if (handler) {
-            await handler();
-        }
     }
 
     private enableSDKEvents({ type, sdkEvent }:
@@ -524,15 +459,6 @@ export default class WMEEventsController extends AbstractController {
             value.cleanUp?.();
             value.cleanUp = null;
         });
-    }
-
-    private removeCallbacks(callbacks: Array<() => void>): void {
-        while (callbacks.length > 0) {
-            let callback = callbacks.pop();
-            if (callback) {
-                callback();
-            }
-        }
     }
 
     private disableAllCallbacksOfType(eventType: SVLCallbackEventTypes): void {

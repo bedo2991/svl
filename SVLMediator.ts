@@ -243,6 +243,9 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE:
                 this.emit(SVLEvents.AUTOMATICALLY_DISABLED);
                 break;
+            case AcceptedControllerEvents.SVL_SHOULD_ENABLE_LAYER:
+                void this.layerStateController.tryEnablingSVLRoadLayer();
+                break;
             case AcceptedControllerEvents.REDRAW_ALL_REQUEST:
                 this.renderingController.redrawAll();
                 break;

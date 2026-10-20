@@ -452,74 +452,24 @@ export default class UserInterfaceController extends AbstractController {
 
         const options = this.getOptions();
         options['streets'].forEach((o) => {
-            if (o !== 'red') {
-                streets.appendChild(
-                    this.createStreetOptionLine({
-                        i: o,
-                        showWidth: true,
-                        showOpacity: false,
-                    })
-                );
-            } else {
-                streets.appendChild(
-                    this.createStreetOptionLine({
-                        i: o,
-                        showWidth: false,
-                        showOpacity: false,
-                    })
-                );
-            }
+            streets.appendChild(
+                this.createStreetOptionLine({
+                    i: o,
+                    showWidth: false,
+                    showOpacity: false,
+                })
+            );
         });
 
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'lanes',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'toll',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'restriction',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'closure',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'headlights',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'dirty',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
-        decorations.appendChild(
-            this.createStreetOptionLine({
-                i: 'nearbyHOV',
-                showWidth: false,
-                showOpacity: true,
-            })
-        );
+        options['decorations'].forEach((o) => {
+            decorations.appendChild(
+                this.createStreetOptionLine({
+                    i: o,
+                    showWidth: false,
+                    showOpacity: true,
+                })
+            );
+        });
 
         streets.appendChild(decorations);
 
@@ -869,22 +819,12 @@ export default class UserInterfaceController extends AbstractController {
             element.addEventListener('change', this.handleUserUpdatedSVLPreferences.bind(this));
         });
 
-        (<HTMLButtonElement>document
-            .getElementById('svl_saveNewPref')
-        ).addEventListener('click', this.handleSaveNewPrefClick.bind(this));
-        (<HTMLButtonElement>document
-            .getElementById('svl_rollbackButton'))
-            .addEventListener('click', this.handleRollbackPreferencesClick.bind(this));
-        (<HTMLButtonElement>document
-            .getElementById('svl_resetButton'))
-            .addEventListener('click', this.handleResetPreferencesClick.bind(this));
-        (<HTMLButtonElement>document
-            .getElementById('svl_importButton'))
-            .addEventListener('click', this.handleImportPreferencesClick.bind(this));
-        (<HTMLButtonElement>document
-            .getElementById('svl_exportButton'))
-            .addEventListener('click', this.handleExportPreferencesClick.bind(this));
-        this.updatePreferencesUI();
+        document.getElementById('svl_saveNewPref')?.addEventListener('click', this.handleSaveNewPrefClick.bind(this));
+        document.getElementById('svl_rollbackButton')?.addEventListener('click', this.handleRollbackPreferencesClick.bind(this));
+        document.getElementById('svl_resetButton')?.addEventListener('click', this.handleResetPreferencesClick.bind(this));
+        document.getElementById('svl_importButton')?.addEventListener('click', this.handleImportPreferencesClick.bind(this));
+        document.getElementById('svl_exportButton')?.addEventListener('click', this.handleExportPreferencesClick.bind(this));
+        void this.updatePreferencesUI();
     }
     private handleResetPreferencesClick() {
         this.mediator.alertController.confirm(
@@ -920,38 +860,55 @@ export default class UserInterfaceController extends AbstractController {
     }
 
     private resetButtonState() {
-        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.remove('svl_unsaved');
-        const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
-        saveNewButton.classList.add('disabled');
-        saveNewButton.disabled = true;
-        saveNewButton.classList.remove('btn-primary');
-        const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
-        rollbackButton.classList.add('disabled');
-        rollbackButton.disabled = true;
+        document.getElementById('svl_buttons')?.classList.remove('svl_unsaved');
+        const saveNewButton = document.getElementById('svl_saveNewPref') as HTMLButtonElement | null;
+        if (saveNewButton) {
+            saveNewButton.classList.add('disabled');
+            saveNewButton.disabled = true;
+            saveNewButton.classList.remove('btn-primary');
+        }
+        const rollbackButton = document.getElementById('svl_rollbackButton') as HTMLButtonElement | null;
+        if (rollbackButton) {
+            rollbackButton.classList.add('disabled');
+            rollbackButton.disabled = true;
+        }
+    }
+
+    private markDirtyButtonState() {
+        document.getElementById('svl_buttons')?.classList.add('svl_unsaved');
+        const saveNewButton = document.getElementById('svl_saveNewPref') as HTMLButtonElement | null;
+        if (saveNewButton) {
+            saveNewButton.classList.remove('disabled');
+            saveNewButton.disabled = false;
+            saveNewButton.classList.add('btn-primary');
+        }
+
+        const rollbackButton = document.getElementById('svl_rollbackButton') as HTMLButtonElement | null;
+        if (rollbackButton) {
+            rollbackButton.classList.remove('disabled');
+            rollbackButton.disabled = false;
+        }
     }
 
     private handleUserUpdatedSVLPreferences(event: Event) {
         console.debug(event);
-        (<HTMLDivElement>document.getElementById('svl_buttons')).classList.add('svl_unsaved');
-        const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
-        saveNewButton.classList.remove('disabled');
-        saveNewButton.disabled = false;
-        saveNewButton.classList.add('btn-primary');
+        if (!event.target) return;
 
-        const rollbackButton = <HTMLButtonElement>document.getElementById('svl_rollbackButton');
-        rollbackButton.classList.remove('disabled');
-        rollbackButton.disabled = false;
+        const t = <HTMLInputElement>event.target;
+        const uniqueID = t.dataset.uniqueId;
+        if (uniqueID === 'presets' && !t.value) {
+            return;
+        }
 
-        // Check event target
-        if (event.target) {
-            const t = <HTMLInputElement>event.target;
-            const uniqueID = t.dataset.uniqueId;
-            if (uniqueID) {
-                console.debug(`Preference changed: ${uniqueID}`);
-                if (uniqueID === 'presets') {
-                    this.preferencesController.loadPreset(t.value);
-                    this.updateStreetsPreferenceValues();
-                } else if (uniqueID.startsWith('streets.')) {
+        this.markDirtyButtonState();
+
+        if (uniqueID) {
+            console.debug(`Preference changed: ${uniqueID}`);
+            if (uniqueID === 'presets') {
+                this.preferencesController.loadPreset(t.value);
+                this.updateStreetsPreferenceValues();
+                this.mediator.alert(AlertType.INFO, this.mediator._('preset_applied'));
+            } else if (uniqueID.startsWith('streets.')) {
                     const parts = uniqueID.split('.');
                     const streetIndex = parseInt(parts[1], 10);
                     const property = parts[2];
@@ -1029,8 +986,21 @@ export default class UserInterfaceController extends AbstractController {
                 if (uniqueID === 'routingModeEnabled' || uniqueID === 'hideRoutingModeBlock') {
                     this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
                 }
-            }
-            this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+        }
+        this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+    }
+
+    private setInputValue(id: string, value: string | number): void {
+        const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+        if (el) {
+            el.value = String(value);
+        }
+    }
+
+    private setCheckboxChecked(id: string, checked: boolean): void {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        if (el) {
+            el.checked = Boolean(checked);
         }
     }
 
@@ -1038,12 +1008,9 @@ export default class UserInterfaceController extends AbstractController {
         const streetsPreferences = this.mediator.getPreference('streets');
         for (let i = 0; i < streetsPreferences.length; i += 1) {
             if (streetsPreferences[i]) {
-                (<HTMLInputElement>document.getElementById(`svl_streetWidth_${i}`)).value =
-                    streetsPreferences[i]['strokeWidth'];
-                (<HTMLInputElement>document.getElementById(`svl_streetColor_${i}`)).value =
-                    streetsPreferences[i]['strokeColor'];
-                (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${i}`)).value =
-                    streetsPreferences[i]['strokeDashstyle'];
+                this.setInputValue(`svl_streetWidth_${i}`, streetsPreferences[i]['strokeWidth']);
+                this.setInputValue(`svl_streetColor_${i}`, streetsPreferences[i]['strokeColor']);
+                this.setInputValue(`svl_strokeDashstyle_${i}`, streetsPreferences[i]['strokeDashstyle']);
             }
         }
     }
@@ -1064,103 +1031,54 @@ export default class UserInterfaceController extends AbstractController {
         const options = this.getOptions();
         options['streets'].forEach((o) => {
             const streetPreference = this.mediator.getPreference(o);
-            if (o !== 'red') {
-                (<HTMLInputElement>document.getElementById(`svl_streetWidth_${o}`)).value =
-                    streetPreference['strokeWidth'];
-            }
-            (<HTMLInputElement>document.getElementById(`svl_streetColor_${o}`)).value =
-                streetPreference['strokeColor'];
-            (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${o}`)).value =
-                streetPreference['strokeDashstyle'];
+            if (!streetPreference) return;
+            this.setInputValue(`svl_streetColor_${o}`, streetPreference['strokeColor']);
+            this.setInputValue(`svl_strokeDashstyle_${o}`, streetPreference['strokeDashstyle']);
         });
 
         options['decorations'].forEach((o) => {
             const decorationPreference = this.mediator.getPreference(o);
-            if (
-                [
-                    'dirty',
-                    'lanes',
-                    'toll',
-                    'restriction',
-                    'closure',
-                    'headlights',
-                    'nearbyHOV',
-                ].includes(o)
-            ) {
-                (<HTMLInputElement>document.getElementById(`svl_streetOpacity_${o}`)).value =
-                    (decorationPreference['strokeOpacity'] * 100.0).toString();
-            } else {
-                (<HTMLInputElement>document.getElementById(`svl_streetWidth_${o}`)).value =
-                    decorationPreference['strokeWidth'];
-            }
-            (<HTMLInputElement>document.getElementById(`svl_streetColor_${o}`)).value =
-                decorationPreference['strokeColor'];
-            (<HTMLInputElement>document.getElementById(`svl_strokeDashstyle_${o}`)).value =
-                decorationPreference['strokeDashstyle'];
+            if (!decorationPreference) return;
+            this.setInputValue(`svl_streetOpacity_${o}`, decorationPreference['strokeOpacity'] * 100.0);
+            this.setInputValue(`svl_streetColor_${o}`, decorationPreference['strokeColor']);
+            this.setInputValue(`svl_strokeDashstyle_${o}`, decorationPreference['strokeDashstyle']);
         });
 
-        (<HTMLInputElement>document.getElementById('svl_fakelock')).value = this.mediator.getPreference('fakelock') ?? 6;
-        (<HTMLInputElement>document.getElementById('svl_autoReload_enabled')).checked =
-            this.mediator.getPreference('autoReload.enabled');
-        (<HTMLInputElement>document.getElementById('svl_labelOutlineWidth')).value =
-            this.mediator.getPreference('labelOutlineWidth');
-        (<HTMLInputElement>document.getElementById('svl_autoReload_interval')).value =
-            (this.mediator.getPreference('autoReload.interval') / 1000).toString();
+        this.setInputValue('svl_fakelock', this.mediator.getPreference('fakelock') ?? 6);
+        this.setCheckboxChecked('svl_autoReload_enabled', this.mediator.getPreference('autoReload.enabled'));
+        this.setInputValue('svl_labelOutlineWidth', this.mediator.getPreference('labelOutlineWidth'));
+        this.setInputValue('svl_autoReload_interval', this.mediator.getPreference('autoReload.interval') / 1000);
 
-        (<HTMLInputElement>document.getElementById('svl_clutterConstant')).value =
-            this.mediator.getPreference('clutterConstant');
-        (<HTMLInputElement>document.getElementById('svl_closeZoomLabelSize')).value =
-            this.mediator.getPreference('closeZoomLabelSize');
-        (<HTMLInputElement>document.getElementById('svl_farZoomLabelSize')).value =
-            this.mediator.getPreference('farZoomLabelSize');
-        (<HTMLInputElement>document.getElementById('svl_arrowDeclutter')).value =
-            this.mediator.getPreference('arrowDeclutter');
-        (<HTMLInputElement>document.getElementById('svl_useWMERoadLayerAtZoom')).value =
-            this.mediator.getPreference('useWMERoadLayerAtZoom');
-        (<HTMLInputElement>document.getElementById('svl_switchZoom')).value =
-            this.mediator.getPreference('switchZoom');
-        (<HTMLInputElement>document.getElementById('svl_nodesThreshold')).value =
-            this.mediator.getPreference('nodesThreshold');
+        this.setInputValue('svl_clutterConstant', this.mediator.getPreference('clutterConstant'));
+        this.setInputValue('svl_closeZoomLabelSize', this.mediator.getPreference('closeZoomLabelSize'));
+        this.setInputValue('svl_farZoomLabelSize', this.mediator.getPreference('farZoomLabelSize'));
+        this.setInputValue('svl_arrowDeclutter', this.mediator.getPreference('arrowDeclutter'));
+        this.setInputValue('svl_useWMERoadLayerAtZoom', this.mediator.getPreference('useWMERoadLayerAtZoom'));
+        this.setInputValue('svl_switchZoom', this.mediator.getPreference('switchZoom'));
+        this.setInputValue('svl_nodesThreshold', this.mediator.getPreference('nodesThreshold'));
 
-        (<HTMLInputElement>document.getElementById('svl_nodeRadius')).value =
-            this.mediator.getPreference('nodeRadius');
-        (<HTMLInputElement>document.getElementById('svl_nodeColor')).value =
-            this.mediator.getPreference('nodeColor');
-        (<HTMLInputElement>document.getElementById('svl_nodeDeadEndColor')).value =
-            this.mediator.getPreference('nodeDeadEndColor');
-        (<HTMLInputElement>document.getElementById('svl_virtualNodeColor')).value =
-            this.mediator.getPreference('virtualNodeColor');
+        this.setInputValue('svl_nodeRadius', this.mediator.getPreference('nodeRadius'));
+        this.setInputValue('svl_nodeColor', this.mediator.getPreference('nodeColor'));
+        this.setInputValue('svl_nodeDeadEndColor', this.mediator.getPreference('nodeDeadEndColor'));
+        this.setInputValue('svl_virtualNodeColor', this.mediator.getPreference('virtualNodeColor'));
 
-        (<HTMLInputElement>document.getElementById('svl_segmentsThreshold')).value =
-            this.mediator.getPreference('segmentsThreshold');
+        this.setInputValue('svl_segmentsThreshold', this.mediator.getPreference('segmentsThreshold'));
 
-        (<HTMLInputElement>document.getElementById('svl_disableRoadLayers')).checked =
-            this.mediator.getPreference('disableRoadLayers');
-        (<HTMLInputElement>document.getElementById('svl_startDisabled')).checked =
-            this.mediator.getPreference('startDisabled');
-        (<HTMLInputElement>document.getElementById('svl_showUnderGPSPoints')).checked =
-            this.mediator.getPreference('showUnderGPSPoints');
-        (<HTMLInputElement>document.getElementById('svl_routingModeEnabled')).checked =
-            this.mediator.getPreference('routingModeEnabled');
-        (<HTMLInputElement>document.getElementById('svl_hideRoutingModeBlock')).checked =
-            this.mediator.getPreference('hideRoutingModeBlock');
-        (<HTMLInputElement>document.getElementById('svl_showANs')).checked =
-            this.mediator.getPreference('showANs');
+        this.setCheckboxChecked('svl_disableRoadLayers', this.mediator.getPreference('disableRoadLayers'));
+        this.setCheckboxChecked('svl_startDisabled', this.mediator.getPreference('startDisabled'));
+        this.setCheckboxChecked('svl_showUnderGPSPoints', this.mediator.getPreference('showUnderGPSPoints'));
+        this.setCheckboxChecked('svl_routingModeEnabled', this.mediator.getPreference('routingModeEnabled'));
+        this.setCheckboxChecked('svl_hideRoutingModeBlock', this.mediator.getPreference('hideRoutingModeBlock'));
+        this.setCheckboxChecked('svl_showANs', this.mediator.getPreference('showANs'));
 
-        (<HTMLInputElement>document.getElementById('svl_layerOpacity')).value =
-            String(this.mediator.getPreference('layerOpacity') * 100);
+        this.setInputValue('svl_layerOpacity', this.mediator.getPreference('layerOpacity') * 100);
 
         // Speed limits
-        (<HTMLInputElement>document.getElementById('svl_showSLtext')).checked =
-            this.mediator.getPreference('showSLtext');
-        (<HTMLInputElement>document.getElementById('svl_showSLcolor')).checked =
-            this.mediator.getPreference('showSLcolor');
-        (<HTMLInputElement>document.getElementById('svl_showSLSinglecolor')).checked =
-            this.mediator.getPreference('showSLSinglecolor');
-        (<HTMLInputElement>document.getElementById('svl_SLColor')).value =
-            this.mediator.getPreference('SLColor');
-        (<HTMLInputElement>document.getElementById('svl_realsize')).checked =
-            this.mediator.getPreference('realsize');
+        this.setCheckboxChecked('svl_showSLtext', this.mediator.getPreference('showSLtext'));
+        this.setCheckboxChecked('svl_showSLcolor', this.mediator.getPreference('showSLcolor'));
+        this.setCheckboxChecked('svl_showSLSinglecolor', this.mediator.getPreference('showSLSinglecolor'));
+        this.setInputValue('svl_SLColor', this.mediator.getPreference('SLColor'));
+        this.setCheckboxChecked('svl_realsize', this.mediator.getPreference('realsize'));
 
         const segmentWidths = <NodeListOf<HTMLInputElement>>(document.querySelectorAll('input.segmentsWidth'));
         segmentWidths.forEach((el) => {
@@ -1316,7 +1234,8 @@ export default class UserInterfaceController extends AbstractController {
 
     // This rather belongs in the localitation controller!
     private getLocalisedString(i: (string | number)) {
-        const locale = I18n.translations[I18n.currentLocale()];
+        const i18n = unsafeWindow.I18n ?? (typeof I18n !== 'undefined' ? I18n : undefined);
+        const locale = i18n?.translations?.[i18n.currentLocale()];
         switch (i) {
             case 'red':
                 return locale?.['segment']?.['address']?.['none'] ?? i;

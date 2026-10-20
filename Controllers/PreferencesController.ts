@@ -103,8 +103,6 @@ export default class PreferencesController extends AbstractController {
                     this.preferences[keys[i]] = preset[keys[i]];
                 }
             }
-            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
         }
     }
 
@@ -343,14 +341,6 @@ export default class PreferencesController extends AbstractController {
             'strokeDashstyle':
                 loadedPreferences?.['red']?.['strokeDashstyle'] ?? 'solid',
         };
-
-        this.preferences['roundabout'] = {
-            'strokeColor':
-                loadedPreferences?.['roundabout']?.['strokeColor'] ?? '#111',
-            'strokeWidth': loadedPreferences?.['roundabout']?.['strokeWidth'] ?? 1,
-            'strokeDashstyle':
-                loadedPreferences?.['roundabout']?.['strokeDashstyle'] ?? 'dash',
-        };
         this.preferences['lanes'] = {
             'strokeColor': loadedPreferences?.['lanes']?.['strokeColor'] ?? '#454443',
             'strokeDashstyle':
@@ -521,7 +511,7 @@ export default class PreferencesController extends AbstractController {
     public rollbackPreferences() {
         this.loadPreferences(false);
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+        this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
     }
 
     public resetPreferences() {

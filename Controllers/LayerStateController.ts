@@ -69,10 +69,6 @@ export default class LayerStateController extends AbstractController {
             mediator.subscribe(SVLEvents.DRAWING_ABORTED,
                 LayerStateController.instance.disableSVLRoadLayerDueToDrawingAbort.bind(LayerStateController.instance));
 
-            mediator.subscribe(SVLEvents.LAYER_ENABLED,
-                LayerStateController.instance.tryEnablingSVLRoadLayer.bind(LayerStateController.instance)
-            );
-
             mediator.wmeSDK.Events.on({
                 eventName: "wme-map-layer-removed",
                 eventHandler: () => LayerStateController.instance?.updateGPSLayerPosition()
@@ -90,9 +86,9 @@ export default class LayerStateController extends AbstractController {
     private async waitForLegacyMap(maxWaitMs: number = 10000): Promise<void> {
         const start = Date.now();
         while (
-            typeof W === 'undefined' ||
-            typeof OpenLayers === 'undefined' ||
-            !W.map?.getWazeMap?.()?.getOLMap?.()
+            (!unsafeWindow.W && typeof W === 'undefined') ||
+            (!unsafeWindow.OpenLayers && typeof OpenLayers === 'undefined') ||
+            !(unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()
         ) {
             if (Date.now() - start > maxWaitMs) {
                 throw new Error("SVL: Timed out waiting for legacy W.map / OpenLayers to initialize.");
@@ -102,10 +98,12 @@ export default class LayerStateController extends AbstractController {
     }
 
     private async initializeLayers(): Promise<void> {
-        const OLMap = W.map.getWazeMap().getOLMap();
-        OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
+        const waze = unsafeWindow.W ?? W;
+        const OL = unsafeWindow.OpenLayers ?? OpenLayers;
+        const OLMap = waze.map.getWazeMap().getOLMap();
+        OL.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
 
-        const labelStyleMap = new OpenLayers.StyleMap({
+        const labelStyleMap = new OL.StyleMap({
             'fontFamily': 'Rubik, Open Sans, Alef, helvetica, sans-serif',
             'fontWeight': '800',
             'fontColor': '${color}',
@@ -118,7 +116,7 @@ export default class LayerStateController extends AbstractController {
             'labelAlign': 'cm', // set to center middle
         });
 
-        this.labelsVector = new OpenLayers.Layer.Vector(OL_LAYERS.LABELS, {
+        this.labelsVector = new OL.Layer.Vector(OL_LAYERS.LABELS, {
             'styleMap': labelStyleMap,
             'visibility': false,
         });
@@ -226,7 +224,7 @@ export default class LayerStateController extends AbstractController {
                 return;
             }
             if (typeof style != "object") {
-                if (!style && feature.state === OpenLayers.State.DELETE) {
+                if (!style && feature.state === OL.State.DELETE) {
                     style = "delete";
                 }
                 var renderIntent = style || feature.renderIntent;
@@ -247,7 +245,7 @@ export default class LayerStateController extends AbstractController {
 
 
         this.labelsVector.moveTo = function (bounds: OpenLayers.Bounds, zoomChanged: boolean, dragging: boolean) {
-            OpenLayers.Layer.prototype.moveTo.call(this, bounds, zoomChanged, dragging);
+            OL.Layer.prototype.moveTo.call(this, bounds, zoomChanged, dragging);
 
             var coordSysUnchanged = true;
             const farZoom = LayerStateController.instance.mediator.isFarZoom();
@@ -275,7 +273,7 @@ export default class LayerStateController extends AbstractController {
                 // Force a reflow on gecko based browsers to prevent jump/flicker.
                 // This seems to happen on only certain configurations; it was originally
                 // noticed in FF 2.0 and Linux.
-                if (OpenLayers.IS_GECKO === true) {
+                if (OL.IS_GECKO === true) {
                     this.div.scrollLeft = this.div.scrollLeft;
                 }
 
@@ -368,7 +366,7 @@ export default class LayerStateController extends AbstractController {
                     resolvedStyle['label'] &&
                     rendered !== false
                 ) {
-                    const location = feature.geometry instanceof OpenLayers.Geometry.Point
+                    const location = feature.geometry instanceof OL.Geometry.Point
                         ? feature.geometry
                         : feature.geometry.getCentroid();
                     lsc.labelsVector.renderer.drawText(feature.id, resolvedStyle, location);
@@ -447,16 +445,16 @@ export default class LayerStateController extends AbstractController {
             label.setAttribute('pointer-events', 'none');
 
             const align =
-                style['labelAlign'] ?? OpenLayers.Renderer.defaultSymbolizer.labelAlign;
+                style['labelAlign'] ?? OL.Renderer.defaultSymbolizer.labelAlign;
             label.setAttribute(
                 'text-anchor',
-                OpenLayers.Renderer.SVG.LABEL_ALIGN[align[0]] ?? 'middle'
+                OL.Renderer.SVG.LABEL_ALIGN[align[0]] ?? 'middle'
             );
 
-            if (OpenLayers.IS_GECKO === true) {
+            if (OL.IS_GECKO === true) {
                 label.setAttribute(
                     'dominant-baseline',
-                    OpenLayers.Renderer.SVG.LABEL_ALIGN[align[1]] ?? 'central'
+                    OL.Renderer.SVG.LABEL_ALIGN[align[1]] ?? 'central'
                 );
             }
 
@@ -479,15 +477,15 @@ export default class LayerStateController extends AbstractController {
                     tspan._geometryClass = location.CLASS_NAME;
                     /* eslint-enable no-underscore-dangle */
                 }
-                if (OpenLayers.IS_GECKO === false) {
+                if (OL.IS_GECKO === false) {
                     tspan.setAttribute(
                         'baseline-shift',
-                        OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
+                        OL.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
                     );
                 }
                 tspan.setAttribute('x', String(x));
                 if (i === 0) {
-                    let vfactor = OpenLayers.Renderer.SVG.LABEL_VFACTOR[align[1]];
+                    let vfactor = OL.Renderer.SVG.LABEL_VFACTOR[align[1]];
                     if (vfactor == null) {
                         vfactor = -0.5;
                     }
@@ -742,6 +740,7 @@ export default class LayerStateController extends AbstractController {
     }
 
     public async enableAllSVLLayers(): Promise<void> {
+        this.currentState = SVLLayerState.VISIBLE;
         // Enable all SDK Layers
         await Promise.all(
             this.svlSDKLayerNames.map((layerName) =>
@@ -749,8 +748,9 @@ export default class LayerStateController extends AbstractController {
             )
         );
         // Enable all OL Layers
+        const waze = unsafeWindow.W ?? W;
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
-            const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
+            const olLayer = waze.map.getLayerByName(this.svlOLLayerNames[i]);
             if (olLayer) {
                 olLayer.setVisibility(true);
             }
@@ -760,7 +760,6 @@ export default class LayerStateController extends AbstractController {
             await this.disableWMERoadLayer();
         }
         await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
-        this.currentState = SVLLayerState.VISIBLE;
         this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
         this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
     }
@@ -773,8 +772,9 @@ export default class LayerStateController extends AbstractController {
             )
         );
         // Disable all OL Layers
+        const waze = unsafeWindow.W ?? W;
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
-            const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
+            const olLayer = waze.map.getLayerByName(this.svlOLLayerNames[i]);
             if (olLayer) {
                 olLayer.setVisibility(false);
             }
@@ -824,7 +824,6 @@ export default class LayerStateController extends AbstractController {
         if ([SVLLayerState.VISIBLE, SVLLayerState.USER_DISABLED, SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
             this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
             await this.disableAllSVLLayers(true);
-            await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
             return true;
         }
         return false;
@@ -863,7 +862,7 @@ export default class LayerStateController extends AbstractController {
         this.lastZoomLevel = zoomLevel;
         this.lastResolution = resolution;
         this.lastCenterLat = center.lat;
-        const olZoom = W.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        const olZoom = (unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
         if (typeof olZoom === 'number') {
             this.olZoomOffset = zoomLevel - olZoom;
         }
@@ -878,7 +877,7 @@ export default class LayerStateController extends AbstractController {
     }
 
     public getCurrentZoomLevel(): ZoomLevel {
-        const olZoom = W.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        const olZoom = (unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
         if (typeof olZoom === 'number') {
             return (olZoom + this.olZoomOffset) as ZoomLevel;
         }

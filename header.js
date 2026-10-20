@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Street Vector Layer
 // @namespace  wme-champs-it
-// @version    7.0.2
+// @version    8.0.0
 // @description  Adds a vector layer for drawing streets on the Waze Map editor
 // @match      https://www.waze.com/editor*
 // @match      https://beta.waze.com/editor*
@@ -18,6 +18,7 @@
 // @connect    docs.google.com
 // @connect    googleusercontent.com
 // @author     bedo2991
+// @grant      GM_info
 // @grant      GM_setClipboard
 // @grant      GM_xmlhttpRequest
 // @grant      unsafeWindow
