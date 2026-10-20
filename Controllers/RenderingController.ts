@@ -1,6 +1,6 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
-import { Node, SdkFeature, Segment } from "wme-sdk-typings";
+import { Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
@@ -23,6 +23,8 @@ export default class RenderingController extends AbstractController {
     private static instance: RenderingController | null = null;
     // Add throttling to prevent excessive redraws
     private redrawTimeout: number | null = null;
+    private drawGeneration: number = 0;
+    private dataModelQueue: Promise<void> = Promise.resolve();
 
     private queuedSegments: Set<SdkFeature<LineString>> = new Set();
     private queuedArrows: Set<SdkFeature<Point>> = new Set();
@@ -32,6 +34,7 @@ export default class RenderingController extends AbstractController {
     private arrowsStore = new Map<Segment['id'], Set<string>>();
     private iconsStore = new Map<Segment['id'], Set<string>>();
     private labelsStore = new Map<Segment['id'], OpenLayers.Feature.Vector[]>();
+    private nodesStore = new Set<Node['id']>();
 
     private labelsVector = W.map.getLayerByName(OL_LAYERS.LABELS);
 
@@ -108,7 +111,7 @@ export default class RenderingController extends AbstractController {
             RenderingController.instance = new RenderingController({ mediator });
 
             // Initialization
-            RenderingController.instance.handleWMESettingsUpdated.call(RenderingController.instance);
+            await RenderingController.instance.handleWMESettingsUpdated();
             RenderingController.instance.handleSVLSettingsUpdated.call(RenderingController.instance);
 
             // Event subscriptions
@@ -123,12 +126,13 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private handleUserDisabledLayer() {
-        this.removeAllSegmentsFromLayer();
+    private async handleUserDisabledLayer(): Promise<void> {
+        this.drawGeneration++;
+        await this.removeAllSegmentsFromLayer();
     }
 
-    private handleWMESettingsUpdated() {
-        const newIsImperial = this.mediator.wmeSDK.Settings.getUserSettings().isImperial === true;
+    private async handleWMESettingsUpdated(): Promise<void> {
+        const newIsImperial = (await this.mediator.wmeSDK.Settings.getUserSettings()).isImperial === true;
         if (this.isImperial !== newIsImperial) {
             this.isImperial = newIsImperial;
             this.speedColorCache.clear();
@@ -179,8 +183,8 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private handleCountryChanged(): void {
-        const topCountry = this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
+    private async handleCountryChanged(): Promise<void> {
+        const topCountry = await this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
         if (!topCountry) return;
 
         if (topCountry.id === this.currentTopCountryId) {
@@ -203,10 +207,10 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    public zoomChanged(): void {
+    public async zoomChanged(): Promise<void> {
         console.debug('zoomChanged running');
         let currentState = this.mediator.getState();
-        if (this.mediator.wmeSDK.Map.getZoomLevel() <= +this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= +this.mediator.getPreference('useWMERoadLayerAtZoom')) {
             // There is nothing to draw, enable road layer
             console.debug('Road layer automatically enabled because of zoom out');
             // consoleDebug("Vector visibility: ", streetVector.visibility);
@@ -445,9 +449,18 @@ export default class RenderingController extends AbstractController {
         return color;
     }
 
+    private enqueueDataModelOp(op: () => Promise<void>): Promise<void> {
+        const next = this.dataModelQueue.then(op, op);
+        this.dataModelQueue = next.catch((err) => {
+            console.error("SVL: Error in data model operation:", err);
+        });
+        return next;
+    }
+
     public redrawAll(): void {
         // Logic to redraw all SVL layers
         console.log("Redrawing all SVL layers…");
+        this.drawGeneration++;
         // Clear any pending redraw to avoid multiple rapid redraws
         if (this.redrawTimeout !== null) {
             clearTimeout(this.redrawTimeout);
@@ -455,28 +468,38 @@ export default class RenderingController extends AbstractController {
 
         // Throttle redraw operations to improve performance
         this.redrawTimeout = window.setTimeout(() => {
-            if (this.mediator.getState() === SVLLayerState.VISIBLE) {
-                this.destroyAllFeatures();
-                this.addAllSegmentsSDK();
-                this.addAllNodesSDK();
-            }
             this.redrawTimeout = null;
+            const generation = ++this.drawGeneration;
+            void this.enqueueDataModelOp(async () => {
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.destroyAllFeatures();
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.addAllSegmentsSDK(generation);
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.addAllNodesSDK(generation);
+            });
         }, 100); // 100ms throttle
     }
 
-    private destroyAllFeatures(): void {
-        this.removeAllSegmentsFromLayer();
+    private async destroyAllFeatures(): Promise<void> {
+        await this.removeAllSegmentsFromLayer();
         this.labelsVector.destroyFeatures(this.labelsVector.features, { 'silent': true });
-        this.removeAllNodesFromLayer();
+        await this.removeAllNodesFromLayer();
     }
 
-    private addAllSegmentsSDK(): void {
-        this.addSegmentsByModel(this.mediator.wmeSDK.DataModel.Segments.getAll());
+    private async addAllSegmentsSDK(generation: number = this.drawGeneration): Promise<void> {
+        const segments = await this.mediator.wmeSDK.DataModel.Segments.getAll();
+        if (generation !== this.drawGeneration) return;
+        await this.addSegmentsByModel(segments, generation);
     }
 
-    public shouldDrawingResumeAfterAbort() {
-        const segmentsCount = this.mediator.wmeSDK.DataModel.Segments.getAll().length;
-        const nodesCount = this.mediator.wmeSDK.DataModel.Nodes.getAll().length;
+    public async shouldDrawingResumeAfterAbort(): Promise<void> {
+        const [segments, nodes] = await Promise.all([
+            this.mediator.wmeSDK.DataModel.Segments.getAll(),
+            this.mediator.wmeSDK.DataModel.Nodes.getAll()
+        ]);
+        const segmentsCount = segments.length;
+        const nodesCount = nodes.length;
         const segmentsThreshold = this.mediator.getPreference('segmentsThreshold');
         const nodesThreshold = this.mediator.getPreference('nodesThreshold');
         Utils.debugLog(`Segments: ${segmentsCount}, Nodes: ${nodesCount}`);
@@ -489,33 +512,63 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private addSegmentsByModel(segments: Segment[]): void {
+    private async addSegmentsByModel(segments: Segment[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
         if (__DEBUG__) {
             if (currentState === SVLLayerState.DRAWING_ABORTED) {
                 alert("Drawing aborted state detected in addSegmentsByModel");
             }
         }
-        if (segments.length === 0) return;
+        if (segments.length === 0 || generation !== this.drawGeneration) return;
         if (!(currentState === SVLLayerState.DRAWING_ABORTED) && segments.length > this.mediator.getPreference('segmentsThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
-        //let features: SdkFeature<LineString>[] = [];
-        this.cachedUserRank = this.mediator.wmeSDK.State.getUserInfo()?.rank;
-        let labels: any[] = [];
+
+        const [userInfo, streets] = await Promise.all([
+            this.mediator.wmeSDK.State.getUserInfo(),
+            this.mediator.wmeSDK.DataModel.Streets.getAll(),
+        ]);
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+
+        this.cachedUserRank = userInfo?.rank;
+        const streetsMap = new Map<number, Street>();
+        for (let i = 0; i < streets.length; i++) {
+            streetsMap.set(streets[i].id, streets[i]);
+        }
+
+        const results = await Promise.all(
+            segments.map(s => this.drawSegmentSDK(s, streetsMap))
+        );
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+            this.queuedSegments.clear();
+            this.queuedArrows.clear();
+            this.queuedIcons.clear();
+            return;
+        }
+
+        const labels: OpenLayers.Feature.Vector[] = [];
+        const staleLabels: OpenLayers.Feature.Vector[] = [];
         for (let i = 0; i < segments.length; i++) {
-            let s = segments[i];
-            const res = this.drawSegmentSDK(s);
+            const s = segments[i];
+            const existing = this.labelsStore.get(s.id);
+            if (existing) {
+                staleLabels.push(...existing);
+                this.labelsStore.delete(s.id);
+            }
+            const res = results[i];
             if (res && res.labels && res.labels.length > 0) {
                 this.labelsStore.set(s.id, res.labels);
                 labels.push(...res.labels);
             }
         }
-        this.drawAllQueues();
+        if (staleLabels.length > 0) {
+            this.labelsVector.destroyFeatures(staleLabels, { 'silent': true });
+        }
+        await this.drawAllQueues();
 
-        if (labels.length > 0) {
+        if (labels.length > 0 && generation === this.drawGeneration && this.mediator.getState() === SVLLayerState.VISIBLE) {
             this.labelsVector.addFeatures(labels, { 'silent': true });
         }
     }
@@ -533,72 +586,89 @@ export default class RenderingController extends AbstractController {
         this.addIDsToIconsStore(id, feature.id);
     }
 
-    private drawAllQueues() {
-        this.drawQueuedSegments();
-        this.drawQueuedArrows();
-        this.drawQueuedIcons();
+    private async drawAllQueues(): Promise<void> {
+        await Promise.all([
+            this.drawQueuedSegments(),
+            this.drawQueuedArrows(),
+            this.drawQueuedIcons()
+        ]);
     }
 
-    private drawQueuedSegments() {
+    private async drawQueuedSegments(): Promise<void> {
         if (this.queuedSegments.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedSegments.size} queued segments`);
             // Convert to array once instead of calling Array.from repeatedly
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.SEGMENTS, features: Array.from(this.queuedSegments) });
+            const features = Array.from(this.queuedSegments);
             this.queuedSegments.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.SEGMENTS, features });
         }
     }
 
-    private drawQueuedArrows() {
+    private async drawQueuedArrows(): Promise<void> {
         if (this.queuedArrows.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedArrows.size} queued arrows`);
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ARROWS, features: Array.from(this.queuedArrows) });
+            const features = Array.from(this.queuedArrows);
             this.queuedArrows.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ARROWS, features });
         }
     }
 
-    private drawQueuedIcons() {
+    private async drawQueuedIcons(): Promise<void> {
         if (this.queuedIcons.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedIcons.size} queued icons`);
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ICONS, features: Array.from(this.queuedIcons) });
+            const features = Array.from(this.queuedIcons);
             this.queuedIcons.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ICONS, features });
         }
     }
 
-    private addNodesByModel(nodes: Node[]): void {
+    private async addNodesByModel(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
         if (__DEBUG__) {
             if (currentState === SVLLayerState.DRAWING_ABORTED) {
                 alert("Drawing aborted state detected in addAllNodesSDK");
             }
         }
-        if (nodes.length === 0) return;
+        if (nodes.length === 0 || generation !== this.drawGeneration) return;
         if (!(currentState === SVLLayerState.DRAWING_ABORTED) && nodes.length > this.mediator.getPreference('nodesThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.mediator.getPreference('nodesThreshold')}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
         // TODO: this should not happen here. First the events in layerStateController should fire and manage that
-        if (this.mediator.wmeSDK.Map.getZoomLevel() <= this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.mediator.getPreference('useWMERoadLayerAtZoom')) {
             console.debug('Not adding nodes them because of the zoom');
             return;
         }
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
 
-        this.addNodesSDK(nodes);
+        await this.addNodesSDK(nodes, generation);
     }
 
-    private addAllNodesSDK(): void {
-        this.addNodesByModel(this.mediator.wmeSDK.DataModel.Nodes.getAll());
+    private async addAllNodesSDK(generation: number = this.drawGeneration): Promise<void> {
+        const nodes = await this.mediator.wmeSDK.DataModel.Nodes.getAll();
+        if (generation !== this.drawGeneration) return;
+        await this.addNodesByModel(nodes, generation);
     }
 
-    private addNodesSDK(nodes: Node[]) {
-        let sdkFeatures: SdkFeature<Point>[] = [];
-        for (let i = 0; i < nodes.length; i++) {
-            let n = nodes[i];
-            if (!this.mediator.wmeSDK.DataModel.isDeleted({
+    private async addNodesSDK(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
+        const nodesToProcess = nodes.filter(n => !this.nodesStore.has(n.id));
+        if (nodesToProcess.length === 0) return;
+
+        const deletedFlags = await Promise.all(
+            nodesToProcess.map(n => this.mediator.wmeSDK.DataModel.isDeleted({
                 dataModelName: "nodes",
                 objectId: n.id
-            })) {
+            }))
+        );
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+
+        let sdkFeatures: SdkFeature<Point>[] = [];
+        for (let i = 0; i < nodesToProcess.length; i++) {
+            let n = nodesToProcess[i];
+            if (!deletedFlags[i] && !this.nodesStore.has(n.id)) {
                 //consoleDebug(`Adding node ${n.id}`);
+                this.nodesStore.add(n.id);
                 sdkFeatures.push(
                     {
                         id: n.id,
@@ -614,14 +684,16 @@ export default class RenderingController extends AbstractController {
             }
         }
 
-        this.mediator.wmeSDK.Map.addFeaturesToLayer({
-            features: sdkFeatures,
-            layerName: SDK_LAYERS.NODES
-        })
+        if (sdkFeatures.length > 0) {
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({
+                features: sdkFeatures,
+                layerName: SDK_LAYERS.NODES
+            });
+        }
     }
 
 
-    private removeAllSegmentsFromLayer() {
+    private async removeAllSegmentsFromLayer(): Promise<void> {
         this.queuedSegments.clear();
         this.segmentsStore.clear();
 
@@ -633,43 +705,86 @@ export default class RenderingController extends AbstractController {
 
         this.labelsStore.clear();
 
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.SEGMENTS
-        });
-
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.ARROWS
-        });
-
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.ICONS
-        });
+        await Promise.all([
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.SEGMENTS
+            }),
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.ARROWS
+            }),
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.ICONS
+            })
+        ]);
     }
 
-    private removeAllNodesFromLayer() {
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+    private async removeAllNodesFromLayer(): Promise<void> {
+        this.nodesStore.clear();
+        await this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
             layerName: SDK_LAYERS.NODES
         });
     }
 
-    public addSegmentsByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`addSegmentsSDK - Adding ${objectIds.length} segments`);
-        if (objectIds.length > this.mediator.getPreference('segmentsThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${objectIds.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+    public async addSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.addSegmentsByIdsInternal(objectIds));
+    }
+
+    private async addSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
+        if (this.redrawTimeout !== null || objectIds.length === 0) return;
+        const idsToAdd = objectIds.filter(id => !this.segmentsStore.has(id));
+        if (idsToAdd.length === 0) return;
+
+        Utils.debugLog(`addSegmentsSDK - Adding ${idsToAdd.length} segments`);
+        if (idsToAdd.length > this.mediator.getPreference('segmentsThreshold')) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${idsToAdd.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
-        const segments = objectIds.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id })).filter(s => s !== null) as Segment[];
-        this.addSegmentsByModel(segments);
+        const generation = this.drawGeneration;
+        let segments: Segment[];
+        if (idsToAdd.length > 50) {
+            const idSet = new Set(idsToAdd);
+            const allSegments = await this.mediator.wmeSDK.DataModel.Segments.getAll();
+            segments = allSegments.filter((s: Segment) => idSet.has(s.id));
+        } else {
+            segments = (await Promise.all(
+                idsToAdd.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id }))
+            )).filter((s: Segment | null): s is Segment => s !== null);
+        }
+        if (generation !== this.drawGeneration) return;
+        await this.addSegmentsByModel(segments, generation);
     }
 
-    public addNodesByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`addNodesSDK - Adding ${objectIds.length} nodes`);
-        const nodes = objectIds.map(id => this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: id })).filter(n => n !== null) as Node[];
-        this.addNodesByModel(nodes);
+    public async addNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.addNodesByIdsInternal(objectIds));
     }
 
-    public removeSegmentsByIds(objectIds: (number)[]): void {
+    private async addNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
+        if (this.redrawTimeout !== null || objectIds.length === 0) return;
+        const idsToAdd = objectIds.filter(id => !this.nodesStore.has(id));
+        if (idsToAdd.length === 0) return;
+
+        Utils.debugLog(`addNodesSDK - Adding ${idsToAdd.length} nodes`);
+        const generation = this.drawGeneration;
+        let nodes: Node[];
+        if (idsToAdd.length > 50) {
+            const idSet = new Set(idsToAdd);
+            const allNodes = await this.mediator.wmeSDK.DataModel.Nodes.getAll();
+            nodes = allNodes.filter((n: Node) => idSet.has(n.id));
+        } else {
+            nodes = (await Promise.all(
+                idsToAdd.map(id => this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: id }))
+            )).filter((n: Node | null): n is Node => n !== null);
+        }
+        if (generation !== this.drawGeneration) return;
+        await this.addNodesByModel(nodes, generation);
+    }
+
+    public async removeSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.removeSegmentsByIdsInternal(objectIds));
+    }
+
+    private async removeSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
         const segmentsFeatureIds: string[] = [];
         const labelsToDestroy: OpenLayers.Feature.Vector[] = [];
@@ -709,56 +824,70 @@ export default class RenderingController extends AbstractController {
             }
         }
 
+        const promises: Promise<void>[] = [];
         if (segmentsFeatureIds.length > 0) {
-            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
                 featureIds: segmentsFeatureIds,
                 layerName: SDK_LAYERS.SEGMENTS
-            });
+            }));
         }
         if (arrowsFeatureIds.length > 0) {
-            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
                 featureIds: arrowsFeatureIds,
                 layerName: SDK_LAYERS.ARROWS
-            });
+            }));
         }
 
         if (iconsFeatureIds.length > 0) {
-            this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
                 featureIds: iconsFeatureIds,
                 layerName: SDK_LAYERS.ICONS
+            }));
+        }
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
+    }
+
+    public async removeNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.removeNodesByIdsInternal(objectIds));
+    }
+
+    private async removeNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
+        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
+        for (let i = 0; i < objectIds.length; i++) {
+            this.nodesStore.delete(objectIds[i]);
+        }
+        if (objectIds.length > 0) {
+            await this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: objectIds,
+                layerName: SDK_LAYERS.NODES
             });
         }
     }
 
-    public removeNodesByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: objectIds,
-            layerName: SDK_LAYERS.NODES
-        })
+    public async updateSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null || objectIds.length === 0) return;
+            await this.removeSegmentsByIdsInternal(objectIds);
+            await this.addSegmentsByIdsInternal(objectIds);
+        });
     }
 
-    public updateSegmentsByIds(objectIds: (number)[]): void {
-        this.removeSegmentsByIds(objectIds);
-        this.addSegmentsByIds(objectIds);
-    }
-
-    public updateNodesByIds(objectIds: (number)[]): void {
-        if (objectIds.length === 0) return;
-        let nodes = objectIds.map((nodeId) => {
-            return this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: nodeId as number });
-        }).filter((n) => n !== null) as Node[];
-        if (nodes.length == 0) {
-            Utils.debugLog("No nodes found to update");
-            return;
-        }
-        this.removeNodesByIds(objectIds);
-        this.addNodesSDK(nodes);
+    public async updateNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null || objectIds.length === 0) return;
+            await this.removeNodesByIdsInternal(objectIds);
+            await this.addNodesByIdsInternal(objectIds);
+        });
     }
 
     // TODO: refactor (Strategy pattern?)
-    private drawSegmentSDK(model: Segment): { labels: any } {
-        if (!model || this.mediator.wmeSDK.DataModel.isDeleted({
+    private async drawSegmentSDK(
+        model: Segment,
+        streetsMap: Map<number, Street>
+    ): Promise<{ labels: OpenLayers.Feature.Vector[] | undefined }> {
+        if (!model || await this.mediator.wmeSDK.DataModel.isDeleted({
             dataModelName: "segments",
             objectId: model.id
         })) {
@@ -880,7 +1009,7 @@ export default class RenderingController extends AbstractController {
         const oldModel = W.model.segments.getObjectById(model.id);
         let labels: OpenLayers.Feature.Vector[] | undefined;
         if (oldModel) {
-            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components);
+            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components, model, streetsMap);
         }
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -1056,7 +1185,7 @@ export default class RenderingController extends AbstractController {
             }
 
             const currentLock = lockRank + 1;
-            const userRank = this.cachedUserRank ?? this.mediator.wmeSDK.State.getUserInfo()?.rank;
+            const userRank = this.cachedUserRank ?? (await this.mediator.wmeSDK.State.getUserInfo())?.rank;
             if (
                 currentLock > this.mediator.getPreference('fakelock') ||
                 (typeof userRank !== "undefined" && currentLock > (userRank + 1))
@@ -1115,8 +1244,12 @@ export default class RenderingController extends AbstractController {
             }
 
             try {
+                const mightBeToll = !oldModel
+                    || Boolean(oldModel.attributes.fwdToll || oldModel.attributes.revToll)
+                    || (hasRestrictions && model.restrictions.some((r: any) => r.defaultType === 'TOLL'));
                 if (
-                    this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })
+                    mightBeToll &&
+                    await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })
                 ) {
                     // It is a toll road
                     // consoleDebug("Segment is toll");
@@ -1284,7 +1417,7 @@ export default class RenderingController extends AbstractController {
 
                 if (
                     (isAtoB || isBtoA) === false &&
-                    this.mediator.wmeSDK.DataModel.Segments.isRoadTypeDrivable({ roadType: model.roadType })
+                    model.isDrivable
                 ) {
                     // Unknown direction
                     for (const sample of arrowSamples) {
@@ -1393,7 +1526,12 @@ export default class RenderingController extends AbstractController {
   * @param {Waze.Feature.Vector.Segment} segmentModel
   * @param {Array<OpenLayers.Geometry.Point>} simplified
   */
-    private drawLabels(segmentModel: Waze.Feature.Vector.Segment, simplified: Array<OpenLayers.Geometry.Point>) {
+    private drawLabels(
+        segmentModel: Waze.Feature.Vector.Segment,
+        simplified: Array<OpenLayers.Geometry.Point>,
+        sdkSegment: Segment,
+        streetsMap: Map<number, Street>
+    ): OpenLayers.Feature.Vector[] {
         // consoleDebug('drawLabels');
         let labelFeature;
         let labelText: string;
@@ -1408,11 +1546,16 @@ export default class RenderingController extends AbstractController {
         const labels = [];
         labelFeature = null;
         const attributes = segmentModel.getAttributes();
-        const address = this.mediator.wmeSDK.DataModel.Segments.getAddress({ segmentId: attributes.id })
-        const hasStreetName = !address.isEmpty && typeof (address.street?.name) == 'string';
+        const primaryStreet = sdkSegment.primaryStreetId !== null ? streetsMap.get(sdkSegment.primaryStreetId) : undefined;
+        const hasStreetName = Boolean(
+            primaryStreet &&
+            !primaryStreet.isEmpty &&
+            typeof primaryStreet.name === 'string' &&
+            primaryStreet.name.length > 0
+        );
         let streetPart = '';
         if (hasStreetName) {
-            streetPart = address.street?.name as string;
+            streetPart = primaryStreet!.name as string;
         } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
             streetPart = '⚑';
         }
@@ -1420,16 +1563,16 @@ export default class RenderingController extends AbstractController {
 
         // add alt street names
         let altStreetPart = '';
-        if (this.mediator.getPreference('showANs')) {
+        if (this.mediator.getPreference('showANs') && sdkSegment.alternateStreetIds?.length > 0) {
             let ANsShown = 0;
-            for (let i = 0; i < address.altStreets.length; i += 1) {
-                const altStreet = address.altStreets[i];
+            for (let i = 0; i < sdkSegment.alternateStreetIds.length; i += 1) {
+                const altStreet = streetsMap.get(sdkSegment.alternateStreetIds[i]);
                 if (ANsShown === 2) {
                     // Show maximum 2 alternative names
                     altStreetPart += ' …';
                     break;
                 }
-                const altStreetName = altStreet.street?.name;
+                const altStreetName = !altStreet?.isEmpty ? altStreet?.name : undefined;
                 if (altStreetName && altStreetName !== streetPart) {
                     ANsShown += 1;
                     altStreetPart += `(${altStreetName})`;

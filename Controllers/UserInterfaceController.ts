@@ -36,7 +36,7 @@ export default class UserInterfaceController extends AbstractController {
         if (!UserInterfaceController.instance) {
             UserInterfaceController.instance = new UserInterfaceController({ mediator, preferencesController });
 
-            UserInterfaceController.instance.initShortcut();
+            await UserInterfaceController.instance.initShortcut();
             UserInterfaceController.instance.checkVersionAndUpdate();
             UserInterfaceController.instance.createBadge();
             UserInterfaceController.instance.registerBadgeCallbacks();
@@ -67,7 +67,7 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private initShortcut() {
+    private async initShortcut(): Promise<void> {
         const defaultShortcut = "S+s";
 
         const toggleShortcut: KeyboardShortcut = {
@@ -78,11 +78,11 @@ export default class UserInterfaceController extends AbstractController {
         };
 
 
-        if (!this.mediator.wmeSDK.Shortcuts.areShortcutKeysInUse({
+        if (!(await this.mediator.wmeSDK.Shortcuts.areShortcutKeysInUse({
             shortcutKeys: defaultShortcut
-        })) {
+        }))) {
             try {
-                this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
                 console.log('SVL: Keyboard shortcut successfully added.');
             } catch (e) {
                 this.mediator.alert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
@@ -95,7 +95,7 @@ export default class UserInterfaceController extends AbstractController {
             }, 3000);
             try {
                 toggleShortcut.shortcutKeys = null;
-                this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
                 console.log('SVL: Empty Keyboard shortcut successfully added.');
             } catch (e) {
                 console.error('SVL: Error while adding the empty keyboard shortcut:');
@@ -1038,8 +1038,8 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    public updatePreferencesUI() {
-        this.updatePreferenceValues();
+    public async updatePreferencesUI(): Promise<void> {
+        await this.updatePreferenceValues();
         this.updateRoutingModePanel();
     }
 
@@ -1047,7 +1047,7 @@ export default class UserInterfaceController extends AbstractController {
      * This function updates the values shown on the preference panel with the one saved in the preferences object.
      *
      */
-    private updatePreferenceValues() {
+    private async updatePreferenceValues(): Promise<void> {
         const saveNewButton = <HTMLButtonElement>document.getElementById('svl_saveNewPref');
         saveNewButton.classList.add('disabled');
         saveNewButton.disabled = true;
@@ -1166,7 +1166,7 @@ export default class UserInterfaceController extends AbstractController {
         });
 
         // Toggle metric/decimal
-        const WMEUsesImperial = this.mediator.wmeSDK.Settings.getUserSettings().isImperial;
+        const WMEUsesImperial = (await this.mediator.wmeSDK.Settings.getUserSettings()).isImperial;
         const type = WMEUsesImperial ? 'imperial' : 'metric';
         const otherType = WMEUsesImperial ? 'metric' : 'imperial';
         const speeds = Object.keys(this.mediator.getPreference(`speeds.${type}`));

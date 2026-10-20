@@ -27,21 +27,21 @@ type EventExecution = {
 
 type RegisteredEventExecution = {
     cleanUp: (() => void) | null,
-    callback: () => void,
+    callback: () => void | Promise<void>,
     timeoutId: number | undefined,
     deferInMs?: number,
 }
 
 type RegisteredDataModelExecution = {
     cleanUp: (() => void) | null,
-    callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void,
+    callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void | Promise<void>,
     timeoutId: number | undefined,
     deferInMs?: number,
 }
 
 type RegisteredLayerVisibilityExecution = {
     cleanUp: (() => void) | null,
-    callback: ({ layerName }: { layerName: string }) => void,
+    callback: ({ layerName }: { layerName: string }) => void | Promise<void>,
     timeoutId: number | undefined,
     deferInMs?: number,
 }
@@ -55,7 +55,7 @@ export default class WMEEventsController extends AbstractController {
     // Singleton pattern
     private static instance: WMEEventsController | null = null;
     private lastState: SVLEvents | null = null;
-    private stateHandlers: Partial<{ [key in SVLEvents]: () => void }> = {
+    private stateHandlers: Partial<{ [key in SVLEvents]: () => void | Promise<void> }> = {
         [SVLEvents.LAYER_ENABLED]: this.handleLayerEnabled.bind(this),
         [SVLEvents.USER_DISABLED]: this.handleUserDisabled.bind(this),
         [SVLEvents.AUTOMATICALLY_DISABLED]: this.handleSvlAutomaticallyDisabled.bind(this),
@@ -202,7 +202,7 @@ export default class WMEEventsController extends AbstractController {
 
     }
 
-    private manageState({ zoomEvents, countryChangeEvents, dataModelEvents, wmeSettingsChangedEvents, nodeTrackingEvents, segmentTrackingEvents, drawingAbortedEvents, layerVisibilityChangedEvents }: {
+    private async manageState({ zoomEvents, countryChangeEvents, dataModelEvents, wmeSettingsChangedEvents, nodeTrackingEvents, segmentTrackingEvents, drawingAbortedEvents, layerVisibilityChangedEvents }: {
         zoomEvents: boolean,
         countryChangeEvents: boolean,
         dataModelEvents: boolean,
@@ -211,7 +211,7 @@ export default class WMEEventsController extends AbstractController {
         segmentTrackingEvents: boolean,
         drawingAbortedEvents: boolean,
         layerVisibilityChangedEvents: boolean,
-    }): void {
+    }): Promise<void> {
         if (zoomEvents) {
             this.enableZoomEvents();
         } else {
@@ -237,15 +237,15 @@ export default class WMEEventsController extends AbstractController {
         }
 
         if (nodeTrackingEvents) {
-            this.startTrackingNodesEvents();
+            await this.startTrackingNodesEvents();
         } else {
-            this.stopTrackingNodesEvents();
+            await this.stopTrackingNodesEvents();
         }
 
         if (segmentTrackingEvents) {
-            this.startTrackingSegmentsEvents();
+            await this.startTrackingSegmentsEvents();
         } else {
-            this.stopTrackingSegmentsEvents();
+            await this.stopTrackingSegmentsEvents();
         }
 
         if (drawingAbortedEvents) {
@@ -255,17 +255,18 @@ export default class WMEEventsController extends AbstractController {
         }
 
         if (layerVisibilityChangedEvents) {
-            this.startTrackingRoadLayerEvents();
+            await this.startTrackingRoadLayerEvents();
             this.enableLayerVisibilityChangedEvents();
         } else {
-            this.stopTrackingRoadLayerEvents();
+            await this.stopTrackingRoadLayerEvents();
             this.disableLayerVisibilityChangedEvents();
         }
     }
 
-    public handleLayerEnabled() {
+    public async handleLayerEnabled(): Promise<void> {
         console.debug('WMEEventsController: Handling layer enabled event');
-        this.manageState({
+        this.lastState = SVLEvents.LAYER_ENABLED;
+        await this.manageState({
             zoomEvents: true,
             countryChangeEvents: true,
             dataModelEvents: true,
@@ -275,7 +276,6 @@ export default class WMEEventsController extends AbstractController {
             drawingAbortedEvents: false,
             layerVisibilityChangedEvents: true,
         });
-        this.lastState = SVLEvents.LAYER_ENABLED;
     }
 
     public handleWmeSettingsChanged() {
@@ -284,8 +284,9 @@ export default class WMEEventsController extends AbstractController {
         // This is not a state change, so we don't update lastState
     }
 
-    public handleSvlAutomaticallyDisabled() {
-        this.manageState({
+    public async handleSvlAutomaticallyDisabled(): Promise<void> {
+        this.lastState = SVLEvents.AUTOMATICALLY_DISABLED;
+        await this.manageState({
             zoomEvents: true,
             countryChangeEvents: false,
             dataModelEvents: false,
@@ -295,12 +296,12 @@ export default class WMEEventsController extends AbstractController {
             drawingAbortedEvents: false,
             layerVisibilityChangedEvents: false,
         });
-        this.lastState = SVLEvents.AUTOMATICALLY_DISABLED;
     }
 
-    public handleUserDisabled() {
+    public async handleUserDisabled(): Promise<void> {
         console.debug('WMEEventsController: Handling user disabled event');
-        this.manageState({
+        this.lastState = SVLEvents.USER_DISABLED;
+        await this.manageState({
             zoomEvents: false,
             countryChangeEvents: false,
             dataModelEvents: false,
@@ -310,13 +311,13 @@ export default class WMEEventsController extends AbstractController {
             drawingAbortedEvents: false,
             layerVisibilityChangedEvents: false,
         });
-        this.lastState = SVLEvents.USER_DISABLED;
     }
 
-    public handleSvlDrawingAborted() {
+    public async handleSvlDrawingAborted(): Promise<void> {
         console.debug('WMEEventsController: Handling drawing aborted event');
 
-        this.manageState({
+        this.lastState = SVLEvents.DRAWING_ABORTED;
+        await this.manageState({
             zoomEvents: true,
             countryChangeEvents: true,
             dataModelEvents: true,
@@ -326,13 +327,12 @@ export default class WMEEventsController extends AbstractController {
             drawingAbortedEvents: true,
             layerVisibilityChangedEvents: false,
         });
-        this.lastState = SVLEvents.DRAWING_ABORTED;
     }
 
-    public refreshState() {
+    public async refreshState(): Promise<void> {
         const handler = this.lastState && this.stateHandlers[this.lastState];
         if (handler) {
-            handler();
+            await handler();
         }
     }
 
@@ -529,36 +529,36 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    private startTrackingRoadLayerEvents(): void {
-        this.mediator.wmeSDK.Events.trackLayerEvents({
+    private async startTrackingRoadLayerEvents(): Promise<void> {
+        await this.mediator.wmeSDK.Events.trackLayerEvents({
             layerName: "roads"
         });
     }
 
-    private stopTrackingRoadLayerEvents(): void {
-        this.mediator.wmeSDK.Events.stopLayerEventsTracking({
+    private async stopTrackingRoadLayerEvents(): Promise<void> {
+        await this.mediator.wmeSDK.Events.stopLayerEventsTracking({
             layerName: "roads"
         });
     }
 
-    private startTrackingSegmentsEvents(): void {
+    private async startTrackingSegmentsEvents(): Promise<void> {
         console.debug('Registering segment events');
-        this.mediator.wmeSDK.Events.trackDataModelEvents({ dataModelName: "segments" });
+        await this.mediator.wmeSDK.Events.trackDataModelEvents({ dataModelName: "segments" });
     }
 
-    private stopTrackingSegmentsEvents(): void {
+    private async stopTrackingSegmentsEvents(): Promise<void> {
         console.debug('Removing segments events');
-        this.mediator.wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "segments" });
+        await this.mediator.wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "segments" });
     }
 
-    private startTrackingNodesEvents(): void {
+    private async startTrackingNodesEvents(): Promise<void> {
         console.debug('Registering node events');
-        this.mediator.wmeSDK.Events.trackDataModelEvents({ dataModelName: "nodes" });
+        await this.mediator.wmeSDK.Events.trackDataModelEvents({ dataModelName: "nodes" });
     }
 
-    private stopTrackingNodesEvents(): void {
+    private async stopTrackingNodesEvents(): Promise<void> {
         console.debug('Removing node events');
-        this.mediator.wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "nodes" });
+        await this.mediator.wmeSDK.Events.stopDataModelEventsTracking({ dataModelName: "nodes" });
     }
 
     private enableAllEventsOfType(eventType: SVLCallbackEventTypes): void {

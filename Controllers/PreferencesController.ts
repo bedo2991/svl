@@ -11,6 +11,7 @@ export default class PreferencesController extends AbstractController {
     private static instance: PreferencesController | null = null;
     private preferences: PreferenceObject;
     private previousVersion: string | null = null;
+    private userRank: number | undefined;
     private constructor({ mediator }: { mediator: SVLMediator }) {
         // Private constructor to prevent direct instantiation
         super(mediator);
@@ -30,6 +31,7 @@ export default class PreferencesController extends AbstractController {
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<PreferencesController> {
         if (!PreferencesController.instance) {
             PreferencesController.instance = new PreferencesController({ mediator });
+            PreferencesController.instance.userRank = (await mediator.wmeSDK.State.getUserInfo())?.rank;
             let oldUser = PreferencesController.instance.loadPreferences();
             if (!oldUser) {
                 PreferencesController.instance.mediator.notify(PreferencesController.instance, AcceptedControllerEvents.FIRST_RUN);
@@ -153,7 +155,7 @@ export default class PreferencesController extends AbstractController {
             loadedPreferences?.['showSLSinglecolor'] ?? false;
         this.preferences['SLColor'] = loadedPreferences?.['SLColor'] ?? '#ffdf00';
 
-        let userLevel = this.mediator.wmeSDK.State.getUserInfo()?.rank;
+        let userLevel = this.userRank;
         if (typeof userLevel !== 'undefined') {
             userLevel += 1;
         }

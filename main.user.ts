@@ -1,12 +1,19 @@
 // import { LineString, Point } from "geojson";
-import { WmeSDK } from "wme-sdk-typings";
+import { AsyncWmeSDK } from "wme-sdk-typings";
 // import { simplify } from '@turf/simplify';
 // import { lineOffset } from "@turf/line-offset";
 // import proj4 from "proj4";
 import SVLMediator from "./SVLMediator";
 import { AlertType as AlertType2 } from "./Controllers/AbstractMediator";
 
-declare const unsafeWindow: Window & typeof globalThis;
+declare const unsafeWindow: Omit<Window, "getWmeSdk"> & typeof globalThis & {
+  getWmeSdk?: (options: {
+    scriptId: string;
+    scriptName: string;
+    version?: string;
+    mode?: "async" | "sync";
+  }) => AsyncWmeSDK;
+};
 
 //import averageSpeedCameraImg from './resources/averagespeed.png';
 
@@ -25,14 +32,15 @@ async function initScript() {
     // This block is required for type checking, but it is guaranteed that the function exists.
     throw new Error("SDK not available");
   }
-  const wmeSDK: WmeSDK = unsafeWindow.getWmeSdk(
+  const wmeSDK: AsyncWmeSDK = unsafeWindow.getWmeSdk(
     {
       scriptId: "svl-sdk",
-      scriptName: "Street Vector Layer"
+      scriptName: "Street Vector Layer",
+      mode: "async",
     }
   )
 
-  console.debug(`SDK v. ${wmeSDK.getSDKVersion()} on ${wmeSDK.getWMEVersion()} initialized`)
+  console.debug(`SDK v. ${await wmeSDK.getSDKVersion()} on ${await wmeSDK.getWMEVersion()} initialized`)
 
   const mediator = await SVLMediator.initialize({ wmeSDK });
   mediator.alertDebug(AlertType2.SUCCESS, "Initialization completed");

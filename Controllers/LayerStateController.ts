@@ -14,6 +14,10 @@ export default class LayerStateController extends AbstractController {
 
     private SVL_PIXEL_SIZE_CACHE = new Map<ZoomLevel, number>();
     private SVL_RESOLUTION_CACHE = new Map<ZoomLevel, number>();
+    private lastZoomLevel: ZoomLevel = 16 as ZoomLevel;
+    private lastResolution: number = 1.0;
+    private lastCenterLat: number = 0.0;
+    private olZoomOffset: number = 12;
 
     private prefRealSize: boolean = false;
     private prefNodeRadius: number = 3.0;
@@ -44,7 +48,8 @@ export default class LayerStateController extends AbstractController {
                 mediator
             });
             await LayerStateController.instance.waitForLegacyMap();
-            LayerStateController.instance.initializeLayers();
+            await LayerStateController.instance.refreshMapMetrics();
+            await LayerStateController.instance.initializeLayers();
             LayerStateController.instance.currentState = SVLLayerState.INITIALIZED;
 
             LayerStateController.instance.svlSDKLayerNames = Object.values(SDK_LAYERS);
@@ -52,6 +57,11 @@ export default class LayerStateController extends AbstractController {
 
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, () => {
                 LayerStateController.instance.SVL_PIXEL_SIZE_CACHE.clear();
+                void LayerStateController.instance.refreshMapMetrics();
+            });
+
+            mediator.subscribe(SVLEvents.ZOOM_CHANGED, () => {
+                void LayerStateController.instance.refreshMapMetrics();
             });
 
             mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED,
@@ -92,7 +102,7 @@ export default class LayerStateController extends AbstractController {
         }
     }
 
-    private initializeLayers(): void {
+    private async initializeLayers(): Promise<void> {
         const OLMap = W.map.getWazeMap().getOLMap();
         OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
 
@@ -500,7 +510,7 @@ export default class LayerStateController extends AbstractController {
         // Add layers to the map
 
         // Add segment layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.SEGMENTS,
             styleContext: {
                 'color': (context): string => {
@@ -555,7 +565,7 @@ export default class LayerStateController extends AbstractController {
         });
 
         // Add arrow layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.ARROWS,
             styleContext: {
                 'degrees': (context): number => {
@@ -612,7 +622,7 @@ export default class LayerStateController extends AbstractController {
         });
 
         // Add node layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.NODES,
             styleContext: {
                 'getPointRadius': (context) => {
@@ -662,7 +672,7 @@ export default class LayerStateController extends AbstractController {
         OLMap.addLayer(this.labelsVector);
 
         // Add icons layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer(
+        await this.mediator.wmeSDK.Map.addLayer(
             {
                 layerName: SDK_LAYERS.ICONS,
                 styleContext: {
@@ -697,7 +707,7 @@ export default class LayerStateController extends AbstractController {
         );
 
         // Add the layer checkbox
-        this.mediator.wmeSDK.LayerSwitcher.addLayerCheckbox({
+        await this.mediator.wmeSDK.LayerSwitcher.addLayerCheckbox({
             name: SDK_LAYERS.SEGMENTS,
             isChecked: this.currentState === SVLLayerState.VISIBLE,
         });
@@ -707,14 +717,14 @@ export default class LayerStateController extends AbstractController {
         });
 
 
-        this.updateAfterPreferencesWereChanged();
+        await this.updateAfterPreferencesWereChanged();
     }
 
-    public enableLayerForTheFirstTime(): void {
+    public async enableLayerForTheFirstTime(): Promise<void> {
         if (this.currentState === SVLLayerState.INITIALIZED) {
             if (!this.mediator.getPreference('startDisabled')) {
                 try {
-                    this.tryEnablingSVLRoadLayer();
+                    await this.tryEnablingSVLRoadLayer();
                 } catch (error) {
                     console.error('Error enabling/disabling layers:', error);
                 }
@@ -724,11 +734,13 @@ export default class LayerStateController extends AbstractController {
         }
     }
 
-    public enableAllSVLLayers() {
+    public async enableAllSVLLayers(): Promise<void> {
         // Enable all SDK Layers
-        for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
-            this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.svlSDKLayerNames[i], visibility: true });
-        }
+        await Promise.all(
+            this.svlSDKLayerNames.map((layerName) =>
+                this.mediator.wmeSDK.Map.setLayerVisibility({ layerName, visibility: true })
+            )
+        );
         // Enable all OL Layers
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
             const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
@@ -738,19 +750,21 @@ export default class LayerStateController extends AbstractController {
         }
 
         if (this.mediator.getPreference('disableRoadLayers') ?? true) {
-            this.disableWMERoadLayer();
+            await this.disableWMERoadLayer();
         }
-        this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
+        await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
         this.currentState = SVLLayerState.VISIBLE;
         this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
         this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
     }
 
-    public disableAllSVLLayers(shouldEnableWMERoadLayer: boolean = false) {
+    public async disableAllSVLLayers(shouldEnableWMERoadLayer: boolean = false): Promise<void> {
         // Disable all SDK Layers
-        for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
-            this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.svlSDKLayerNames[i], visibility: false });
-        }
+        await Promise.all(
+            this.svlSDKLayerNames.map((layerName) =>
+                this.mediator.wmeSDK.Map.setLayerVisibility({ layerName, visibility: false })
+            )
+        );
         // Disable all OL Layers
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
             const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
@@ -759,15 +773,15 @@ export default class LayerStateController extends AbstractController {
             }
         }
         if (shouldEnableWMERoadLayer) {
-            this.enableWMERoadLayer();
+            await this.enableWMERoadLayer();
         }
     }
 
-    public tryEnablingSVLRoadLayer(): boolean {
+    public async tryEnablingSVLRoadLayer(): Promise<boolean> {
         if ([SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED, SVLLayerState.AUTOMATICALLY_DISABLED, SVLLayerState.USER_DISABLED].includes(this.currentState)) {
             const zoomThreshold = Number(this.mediator.getPreference('useWMERoadLayerAtZoom')) || 16;
-            if (this.mediator.wmeSDK.Map.getZoomLevel() > zoomThreshold) {
-                this.enableAllSVLLayers();
+            if ((await this.mediator.wmeSDK.Map.getZoomLevel()) > zoomThreshold) {
+                await this.enableAllSVLLayers();
                 return true;
             } else if (this.currentState !== SVLLayerState.AUTOMATICALLY_DISABLED) {
                 this.mediator.alert(AlertType.INFO, this.mediator._('zoom_in_for_svl'));
@@ -778,32 +792,32 @@ export default class LayerStateController extends AbstractController {
         return false;
     }
 
-    public toggleSVLLayerEnabledState(): void {
+    public async toggleSVLLayerEnabledState(): Promise<void> {
         if ([SVLLayerState.VISIBLE,
         SVLLayerState.AUTOMATICALLY_DISABLED,
         SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
-            this.userDisabledSvl();
+            await this.userDisabledSvl();
         } else {
-            this.tryEnablingSVLRoadLayer();
+            await this.tryEnablingSVLRoadLayer();
         }
     }
 
-    public disableSVLRoadLayerDueToDrawingAbort(): boolean {
+    public async disableSVLRoadLayerDueToDrawingAbort(): Promise<boolean> {
         if (this.currentState === SVLLayerState.DRAWING_ABORTED) return true;
         if (this.currentState === SVLLayerState.VISIBLE) {
             this.currentState = SVLLayerState.DRAWING_ABORTED;
-            this.disableAllSVLLayers(true);
+            await this.disableAllSVLLayers(true);
             return true;
         }
         return false;
     }
 
-    public disableSVLRoadLayerAutomatically(): boolean {
+    public async disableSVLRoadLayerAutomatically(): Promise<boolean> {
         if (this.currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return true;
         if ([SVLLayerState.VISIBLE, SVLLayerState.USER_DISABLED, SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
             this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
-            this.disableAllSVLLayers(true);
-            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
+            await this.disableAllSVLLayers(true);
+            await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
             return true;
         }
         return false;
@@ -822,16 +836,40 @@ export default class LayerStateController extends AbstractController {
         return destination;
     }
 
-    private disableWMERoadLayer(): void {
-        this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: false });
+    private async disableWMERoadLayer(): Promise<void> {
+        await this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: false });
         // or this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.roadLayerUniqueName, visibility: false });?
     }
 
-    private enableWMERoadLayer(): void {
-        this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: true });
+    private async enableWMERoadLayer(): Promise<void> {
+        await this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: true });
         // or this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.roadLayerUniqueName, visibility: true });?
     }
 
+    public async refreshMapMetrics(): Promise<void> {
+        const [zoomLevel, resolution, center] = await Promise.all([
+            this.mediator.wmeSDK.Map.getZoomLevel(),
+            this.mediator.wmeSDK.Map.getMapResolution(),
+            this.mediator.wmeSDK.Map.getMapCenter(),
+        ]);
+        this.lastZoomLevel = zoomLevel;
+        this.lastResolution = resolution;
+        this.lastCenterLat = center.lat;
+        const olZoom = W.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        if (typeof olZoom === 'number') {
+            this.olZoomOffset = zoomLevel - olZoom;
+        }
+        this.SVL_RESOLUTION_CACHE.set(zoomLevel, 1.0 / resolution);
+        this.SVL_PIXEL_SIZE_CACHE.set(zoomLevel, resolution * Math.cos(center.lat * Utils.PI_OVER_180));
+    }
+
+    public getCurrentZoomLevel(): ZoomLevel {
+        const olZoom = W.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        if (typeof olZoom === 'number') {
+            return (olZoom + this.olZoomOffset) as ZoomLevel;
+        }
+        return this.lastZoomLevel;
+    }
 
     /**
      * Careful! The returned value is 1.0 / resolution!
@@ -841,9 +879,11 @@ export default class LayerStateController extends AbstractController {
         if (cachedValue !== undefined) {
             return cachedValue;
         }
+        const resAtZoom = this.lastResolution * Math.pow(2, this.lastZoomLevel - zoomLevel);
         // we do this division here, so that later we can multiply instead of divide, for performance.
-        const resolution_factor = (1.0 / this.mediator.wmeSDK.Map.getMapResolution());
+        const resolution_factor = 1.0 / resAtZoom;
         this.SVL_RESOLUTION_CACHE.set(zoomLevel, resolution_factor);
+        void this.refreshMapMetrics();
         return resolution_factor;
     }
 
@@ -852,17 +892,18 @@ export default class LayerStateController extends AbstractController {
         if (cachedValue !== undefined) {
             return cachedValue as number;
         }
-        const size = this.getGeodesicPixelSize();
+        const size = this.getGeodesicPixelSize(zoomLevel);
         this.SVL_PIXEL_SIZE_CACHE.set(zoomLevel, size);
+        void this.refreshMapMetrics();
         return size;
     }
 
-    private getGeodesicPixelSize(): number {
-        // 1. Get the center latitude directly from the SDK, which is in WGS84 degrees.
-        const center_lat_4326 = this.mediator.wmeSDK.Map.getMapCenter().lat;
+    private getGeodesicPixelSize(zoomLevel: ZoomLevel): number {
+        // 1. Use the cached center latitude in WGS84 degrees.
+        const center_lat_4326 = this.lastCenterLat;
 
-        // 2. Get the resolution in EPSG:3857 (meters/pixel at equator)
-        let resolution_3857 = this.mediator.wmeSDK.Map.getMapResolution();
+        // 2. Scale the resolution in EPSG:3857 (meters/pixel at equator) for the requested zoom level
+        const resolution_3857 = this.lastResolution * Math.pow(2, this.lastZoomLevel - zoomLevel);
 
         // 3. Convert Latitude from degrees to radians.
         // Assuming PI_OVER_180 is Math.PI / 180.
@@ -876,7 +917,7 @@ export default class LayerStateController extends AbstractController {
 
 
 
-    private updateGPSLayerPosition(trial = 0) {
+    private async updateGPSLayerPosition(trial = 0): Promise<void> {
         if (trial > 20) {
             console.log('SVL: giving up on getting GPS Layer index');
             return;
@@ -884,13 +925,12 @@ export default class LayerStateController extends AbstractController {
 
         let gpsLayerIndex = 0;
         let currentSVLIndex = 0;
-        let farTurnLayerIndex = 0;
         try {
-            gpsLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
-            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
+            gpsLayerIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
+            currentSVLIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
         } catch (e) {
             setTimeout(() => {
-                this.updateGPSLayerPosition(trial + 1);
+                void this.updateGPSLayerPosition(trial + 1);
             }, 500);
             return;
         }
@@ -900,7 +940,7 @@ export default class LayerStateController extends AbstractController {
         try {
             if (showSVLUnderGPS && (currentSVLIndex > gpsLayerIndex)) {
                 // alert("SHOWUNDER " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'gps_points', zIndex: currentSVLIndex + 1 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'gps_points', zIndex: currentSVLIndex + 1 });
 
                 // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex - 20 });
                 // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex - 19 });
@@ -910,11 +950,11 @@ export default class LayerStateController extends AbstractController {
                 // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
             } else if (!showSVLUnderGPS && (currentSVLIndex < gpsLayerIndex)) {
                 // alert("SHOW_ABOVE " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
                 this.labelsVector.setZIndex(gpsLayerIndex + 21);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
                 // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
             }
 
@@ -923,18 +963,18 @@ export default class LayerStateController extends AbstractController {
         }
 
         try {
-            const farTurnLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'farTurnPathLayer' });
-            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
+            const farTurnLayerIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'farTurnPathLayer' });
+            currentSVLIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
             if (farTurnLayerIndex < currentSVLIndex) {
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'farTurnPathLayer', zIndex: currentSVLIndex + 2 });
-            };
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'farTurnPathLayer', zIndex: currentSVLIndex + 2 });
+            }
         } catch (e) {
             console.error(e);
             console.error('SVL: Error setting farTurnPathLayer z-indexes', e);
         }
     }
 
-    private updateAfterPreferencesWereChanged() {
+    private async updateAfterPreferencesWereChanged(): Promise<void> {
         this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
         this.prefNodeRadius = this.mediator.getPreference('nodeRadius') ?? 3.0;
         this.prefNodeColor = this.mediator.getPreference('nodeColor') || '#0015FF';
@@ -943,26 +983,26 @@ export default class LayerStateController extends AbstractController {
         this.prefFarZoomLabelSize = this.mediator.getPreference('farZoomLabelSize') ?? 14;
         this.prefCloseZoomLabelSize = this.mediator.getPreference('closeZoomLabelSize') ?? 16;
 
-        this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
-        this.updateGPSLayerPosition();
+        await this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
+        await this.updateGPSLayerPosition();
 
         if (this.currentState === SVLLayerState.VISIBLE) {
             if (this.mediator.getPreference('disableRoadLayers') ?? true) {
-                this.disableWMERoadLayer();
+                await this.disableWMERoadLayer();
             } else {
-                this.enableWMERoadLayer();
+                await this.enableWMERoadLayer();
             }
         }
     }
 
-    private manageSVLCheckboxUpdated({ checked, name }:
-        { checked: boolean, name: string }) {
+    private async manageSVLCheckboxUpdated({ checked, name }:
+        { checked: boolean, name: string }): Promise<void> {
         if (name !== SDK_LAYERS.SEGMENTS) return;
 
         if (checked) {
-            this.tryEnablingSVLRoadLayer();
+            await this.tryEnablingSVLRoadLayer();
         } else {
-            this.userDisabledSvl();
+            await this.userDisabledSvl();
         }
     }
 
@@ -970,14 +1010,14 @@ export default class LayerStateController extends AbstractController {
         return this.currentState;
     }
 
-    private userDisabledSvl(): void {
+    private async userDisabledSvl(): Promise<void> {
         if (this.currentState === SVLLayerState.USER_DISABLED) return;
         if ([SVLLayerState.VISIBLE,
         SVLLayerState.DRAWING_ABORTED,
         SVLLayerState.AUTOMATICALLY_DISABLED].includes(this.currentState)) {
             this.currentState = SVLLayerState.USER_DISABLED;
-            this.disableAllSVLLayers(false);
-            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
+            await this.disableAllSVLLayers(false);
+            await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
             this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_DISABLED_BY_USER);
         }
     }

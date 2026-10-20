@@ -6,19 +6,19 @@ export default class LocalizationController extends AbstractController {
     private static instance: LocalizationController | null = null;
     readonly tr: { [s: string]: Array<string>; } = {};
     readonly tr_keys: { [s: string]: number; } = {};
-    private locale: string;
+    private locale: string = 'en';
     private readonly fallback: Record<string, string> = {};
     private areOnlineTranslationsLoaded: boolean = false;
 
     private constructor({ mediator }: { mediator: SVLMediator }) {
         super(mediator);
         // Private constructor to prevent direct instantiation
-        this.locale = this.mediator.wmeSDK.Settings.getLocale()?.localeCode || 'en';
     }
 
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<LocalizationController> {
         if (!LocalizationController.instance) {
             LocalizationController.instance = new LocalizationController({ mediator });
+            LocalizationController.instance.locale = (await mediator.wmeSDK.Settings.getLocale())?.localeCode || 'en';
             let success = await LocalizationController.instance.loadTranslations();
             if (!success) {
                 console.warn("LocalizationController: Could not load online translations, using fallback translations.");
