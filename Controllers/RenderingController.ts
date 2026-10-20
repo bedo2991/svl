@@ -522,13 +522,8 @@ export default class RenderingController extends AbstractController {
 
     private async addSegmentsByModel(segments: Segment[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
-        if (__DEBUG__) {
-            if (currentState === SVLLayerState.DRAWING_ABORTED) {
-                alert("Drawing aborted state detected in addSegmentsByModel");
-            }
-        }
-        if (segments.length === 0 || generation !== this.drawGeneration) return;
-        if (!(currentState === SVLLayerState.DRAWING_ABORTED) && segments.length > this.mediator.getPreference('segmentsThreshold')) {
+        if (currentState !== SVLLayerState.VISIBLE || segments.length === 0 || generation !== this.drawGeneration) return;
+        if (segments.length > this.mediator.getPreference('segmentsThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
@@ -632,13 +627,8 @@ export default class RenderingController extends AbstractController {
 
     private async addNodesByModel(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
-        if (__DEBUG__) {
-            if (currentState === SVLLayerState.DRAWING_ABORTED) {
-                alert("Drawing aborted state detected in addAllNodesSDK");
-            }
-        }
-        if (nodes.length === 0 || generation !== this.drawGeneration) return;
-        if (!(currentState === SVLLayerState.DRAWING_ABORTED) && nodes.length > this.mediator.getPreference('nodesThreshold')) {
+        if (currentState !== SVLLayerState.VISIBLE || nodes.length === 0 || generation !== this.drawGeneration) return;
+        if (nodes.length > this.mediator.getPreference('nodesThreshold')) {
             this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.mediator.getPreference('nodesThreshold')}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
@@ -739,7 +729,7 @@ export default class RenderingController extends AbstractController {
     }
 
     private async addSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
-        if (this.redrawTimeout !== null || objectIds.length === 0) return;
+        if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
         const idsToAdd = objectIds.filter(id => !this.segmentsStore.has(id));
         if (idsToAdd.length === 0) return;
 
@@ -769,7 +759,7 @@ export default class RenderingController extends AbstractController {
     }
 
     private async addNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
-        if (this.redrawTimeout !== null || objectIds.length === 0) return;
+        if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
         const idsToAdd = objectIds.filter(id => !this.nodesStore.has(id));
         if (idsToAdd.length === 0) return;
 

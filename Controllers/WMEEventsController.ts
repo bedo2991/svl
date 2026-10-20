@@ -320,10 +320,10 @@ export default class WMEEventsController extends AbstractController {
         await this.manageState({
             zoomEvents: true,
             countryChangeEvents: true,
-            dataModelEvents: true,
+            dataModelEvents: false,
             wmeSettingsChangedEvents: true,
-            nodeTrackingEvents: true,
-            segmentTrackingEvents: true,
+            nodeTrackingEvents: false,
+            segmentTrackingEvents: false,
             drawingAbortedEvents: true,
             layerVisibilityChangedEvents: false,
         });
