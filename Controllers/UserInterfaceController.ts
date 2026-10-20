@@ -865,7 +865,7 @@ export default class UserInterfaceController extends AbstractController {
         tabPane.replaceChildren(mainDiv);
         // Add event listeners
         const prefElements = tabPane.querySelectorAll('.prefElement');
-        prefElements.forEach((element) => {
+        prefElements.forEach((element: Element) => {
             element.addEventListener('change', this.handleUserUpdatedSVLPreferences.bind(this));
         });
 
@@ -951,7 +951,7 @@ export default class UserInterfaceController extends AbstractController {
                 console.debug(`Preference changed: ${uniqueID}`);
                 if (uniqueID === 'presets') {
                     this.preferencesController.loadPreset(t.value);
-                    this.updatePreferencesUI();
+                    this.updateStreetsPreferenceValues();
                 } else if (uniqueID.startsWith('streets.')) {
                     const parts = uniqueID.split('.');
                     const streetIndex = parseInt(parts[1], 10);
@@ -1018,12 +1018,19 @@ export default class UserInterfaceController extends AbstractController {
                     if (uniqueID === 'autoReload.interval') {
                         val = val * 1000;
                     }
+                    if (uniqueID === 'realsize') {
+                        document.querySelectorAll<HTMLInputElement>('input.segmentsWidth').forEach((el) => {
+                            el.disabled = Boolean(val);
+                        });
+                    }
 
                     this.mediator.setPreference(uniqueID, val);
                 }
+
+                if (uniqueID === 'routingModeEnabled' || uniqueID === 'hideRoutingModeBlock') {
+                    this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
+                }
             }
-            // TODO: only do this if the changed element is related to streets preferences
-            this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
             this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
         }
     }
