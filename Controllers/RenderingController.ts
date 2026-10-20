@@ -41,7 +41,6 @@ export default class RenderingController extends AbstractController {
     private currentTopCountryId: number | null = null;
 
     private isImperial: boolean = false;
-    private nextFeatureId: number = 0;
     private cachedUserRank: number | undefined = undefined;
     private speedColorCache = new Map<number | null, string>();
     private superScriptCache = new Map<number, string>();
@@ -182,7 +181,7 @@ export default class RenderingController extends AbstractController {
         const shiftDegrees = 0.0001;
         return {
             type: 'Feature',
-            id: id,
+            id: `${id}_cam_${rev ? 'r' : 'f'}`,
             geometry: { type: 'Point', coordinates: [p0[0] + Math.sin(perpendicularAngle) * shiftDegrees, p0[1] + Math.cos(perpendicularAngle) * shiftDegrees] },
             properties: {
                 'isAverageSpeedCamera': 1,
@@ -236,10 +235,9 @@ export default class RenderingController extends AbstractController {
     }
 
     private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
-        feature.id = `${id}_${++this.nextFeatureId}`;
         this.queuedSegments.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToSegmentsStore(id, feature.id);
+        this.addIDsToSegmentsStore(id, String(feature.id));
     }
 
     private addIDsToSegmentsStore(id: Segment['id'], ...strings: string[]) {
@@ -577,16 +575,14 @@ export default class RenderingController extends AbstractController {
     }
 
     private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_a_${++this.nextFeatureId}`;
         this.queuedArrows.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToArrowsStore(id, feature.id);
+        this.addIDsToArrowsStore(id, String(feature.id));
     }
     private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_i_${++this.nextFeatureId}`;
         this.queuedIcons.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToIconsStore(id, feature.id);
+        this.addIDsToIconsStore(id, String(feature.id));
     }
 
     private async drawAllQueues(): Promise<void> {
@@ -984,7 +980,7 @@ export default class RenderingController extends AbstractController {
             // consoleDebug("RED segment", model);
             let redSegment: SdkFeature<LineString> = {
                 type: 'Feature',
-                id: model.id,
+                id: `${model.id}_red`,
                 geometry: model.geometry,
                 properties: {
                     "color": this.mediator.getPreference('red.strokeColor'),
@@ -1020,7 +1016,7 @@ export default class RenderingController extends AbstractController {
                 isBridge = true;
                 let bridge: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_br`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
@@ -1067,7 +1063,7 @@ export default class RenderingController extends AbstractController {
 
                         let leftSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl_l`,
                             geometry: fwdSpeedFeature.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(fwdSpeedLimit),
@@ -1081,7 +1077,7 @@ export default class RenderingController extends AbstractController {
 
                         let rightSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl_r`,
                             geometry: revSpeedFeature.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(revSpeedLimit),
@@ -1098,7 +1094,7 @@ export default class RenderingController extends AbstractController {
                         if (speedValue) {
                             let speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
-                                id: model.id,
+                                id: `${model.id}_sl_f`,
                                 geometry: model.geometry,
                                 properties: {
                                     'color': this.getColorStringFromSpeed(speedValue),
@@ -1114,7 +1110,7 @@ export default class RenderingController extends AbstractController {
                         if (speedValue) {
                             let speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
-                                id: model.id,
+                                id: `${model.id}_sl_rv`,
                                 geometry: model.geometry,
                                 properties: {
                                     'color': this.getColorStringFromSpeed(speedValue),
@@ -1138,7 +1134,7 @@ export default class RenderingController extends AbstractController {
                     if (speedValue) {
                         let speedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl`,
                             geometry: model.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(speedValue),
@@ -1156,7 +1152,7 @@ export default class RenderingController extends AbstractController {
             // Draw the road
             let roadFeature: SdkFeature<LineString> = {
                 type: 'Feature',
-                id: model.id,
+                id: `${model.id}_rd`,
                 geometry: model.geometry,
                 properties: {
                     'color': this.streetStyles[roadType]['strokeColor'],
@@ -1171,7 +1167,7 @@ export default class RenderingController extends AbstractController {
                 // Tunnel
                 let tunnel: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tun`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
@@ -1191,7 +1187,7 @@ export default class RenderingController extends AbstractController {
             ) {
                 let fakelock: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_lk`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.nonEditableStyle.strokeColor,
@@ -1209,7 +1205,7 @@ export default class RenderingController extends AbstractController {
 
                 let unpaved: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_unp`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.mediator.getPreference('dirty.strokeColor'),
@@ -1228,7 +1224,7 @@ export default class RenderingController extends AbstractController {
             if (hasClosures) {
                 let closureLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_cl`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.mediator.getPreference('closure.strokeColor'),
@@ -1254,7 +1250,7 @@ export default class RenderingController extends AbstractController {
                     // consoleDebug("Segment is toll");
                     let tollLine: SdkFeature<LineString> = {
                         type: 'Feature',
-                        id: model.id,
+                        id: `${model.id}_tl`,
                         geometry: model.geometry,
                         properties: {
                             'color': this.mediator.getPreference('toll.strokeColor'),
@@ -1273,7 +1269,7 @@ export default class RenderingController extends AbstractController {
                 // consoleDebug("Segment is a roundabout");
                 let roundaboutLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ra`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.roundaboutStyle.strokeColor,
@@ -1292,7 +1288,7 @@ export default class RenderingController extends AbstractController {
                 // consoleDebug("Segment has restrictions");
                 let restrictionLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_res`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.mediator.getPreference('restriction.strokeColor'),
@@ -1328,7 +1324,7 @@ export default class RenderingController extends AbstractController {
             if (flags.headlights) {
                 let headlights: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_hl`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.mediator.getPreference('headlights.strokeColor'),
@@ -1344,7 +1340,7 @@ export default class RenderingController extends AbstractController {
             if (flags.nearbyHOV) {
                 let nearbyHOVLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_hov`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.mediator.getPreference('nearbyHOV.strokeColor'),
@@ -1367,7 +1363,7 @@ export default class RenderingController extends AbstractController {
 
                 let letToNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ln_to`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
                         'color': this.mediator.getPreference('lanes.strokeColor'),
@@ -1391,7 +1387,7 @@ export default class RenderingController extends AbstractController {
 
                 let fromNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ln_fr`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
                         'color': this.mediator.getPreference('lanes.strokeColor'),
@@ -1419,10 +1415,11 @@ export default class RenderingController extends AbstractController {
                     model.isDrivable
                 ) {
                     // Unknown direction
-                    for (const sample of arrowSamples) {
+                    for (let i = 0; i < arrowSamples.length; i++) {
+                        const sample = arrowSamples[i];
                         const unknownDir: SdkFeature<Point> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_a_${i}`,
                             geometry: {
                                 type: 'Point',
                                 coordinates: sample.coordinates,
@@ -1438,7 +1435,8 @@ export default class RenderingController extends AbstractController {
                     }
                 } else {
                     // It is one way, draw normal arrows
-                    for (const sample of arrowSamples) {
+                    for (let i = 0; i < arrowSamples.length; i++) {
+                        const sample = arrowSamples[i];
                         const degrees = this.getAngleDegreesSDK(
                             isAtoB,
                             sample.p0,
@@ -1447,7 +1445,7 @@ export default class RenderingController extends AbstractController {
 
                         const arrow: SdkFeature<Point> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_a_${i}`,
                             geometry: {
                                 type: 'Point',
                                 coordinates: sample.coordinates,
@@ -1490,7 +1488,7 @@ export default class RenderingController extends AbstractController {
             if (flags.tunnel) {
                 let tunnelFlag: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tf1`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle1.strokeColor,
@@ -1504,7 +1502,7 @@ export default class RenderingController extends AbstractController {
 
                 let tunnelFlag2: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tf2`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle2.strokeColor,
