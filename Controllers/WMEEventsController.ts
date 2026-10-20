@@ -37,6 +37,7 @@ type RegisteredDataModelExecution = {
     callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => void | Promise<void>,
     timeoutId: number | undefined,
     deferInMs?: number,
+    pendingObjectIdsByModel: Map<DataModelName, Set<string | number>>,
 }
 
 type RegisteredLayerVisibilityExecution = {
@@ -119,8 +120,11 @@ export default class WMEEventsController extends AbstractController {
                 callback: callback,
                 cleanUp: null,
                 deferInMs: deferInMs,
-                timeoutId: undefined
+                timeoutId: undefined,
+                pendingObjectIdsByModel: new Map(),
             });
+        } else {
+            console.warn(`SVL: Data model event ${sdkName} was already registered`);
         }
     }
 
@@ -132,6 +136,8 @@ export default class WMEEventsController extends AbstractController {
                 deferInMs: deferInMs,
                 timeoutId: undefined
             });
+        } else {
+            console.warn(`SVL: Layer visibility event ${sdkName} was already registered`);
         }
     }
 
@@ -142,6 +148,7 @@ export default class WMEEventsController extends AbstractController {
                 clearTimeout(callbacks.timeoutId);
                 callbacks.timeoutId = undefined;
             }
+            callbacks.pendingObjectIdsByModel.clear();
             callbacks.cleanUp?.();
             this.registeredSVLDataModelCallbacks.delete(sdkName);
         }
@@ -370,13 +377,41 @@ export default class WMEEventsController extends AbstractController {
         }
     }
 
-    private deferExecution(exec: any, ...args: any[]): void {
+    private deferExecution<TArgs extends unknown[]>(
+        exec: { timeoutId: number | undefined; deferInMs?: number; callback: (...args: TArgs) => void | Promise<void> },
+        ...args: TArgs
+    ): void {
         if (exec.timeoutId) {
             clearTimeout(exec.timeoutId);
         }
         exec.timeoutId = window.setTimeout(() => {
-            exec.callback(...args);
             exec.timeoutId = undefined;
+            exec.callback(...args);
+        }, exec.deferInMs);
+    }
+
+    private deferDataModelExecution(
+        exec: RegisteredDataModelExecution,
+        event: { dataModelName: DataModelName; objectIds: Array<string | number> }
+    ): void {
+        let ids = exec.pendingObjectIdsByModel.get(event.dataModelName);
+        if (!ids) {
+            ids = new Set();
+            exec.pendingObjectIdsByModel.set(event.dataModelName, ids);
+        }
+        for (const id of event.objectIds) {
+            ids.add(id);
+        }
+        if (exec.timeoutId) {
+            clearTimeout(exec.timeoutId);
+        }
+        exec.timeoutId = window.setTimeout(() => {
+            exec.timeoutId = undefined;
+            const pendingEntries = Array.from(exec.pendingObjectIdsByModel.entries());
+            exec.pendingObjectIdsByModel.clear();
+            for (const [dataModelName, objectIds] of pendingEntries) {
+                exec.callback({ dataModelName, objectIds: Array.from(objectIds) });
+            }
         }, exec.deferInMs);
     }
 
@@ -405,8 +440,8 @@ export default class WMEEventsController extends AbstractController {
         } else {
             callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
                 eventName: sdkEvent,
-                eventHandler: (e) => {
-                    this.deferExecution(callbacks, e);
+                eventHandler: (e: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
+                    this.deferDataModelExecution(callbacks, e);
                 }
             });
         }
@@ -418,6 +453,7 @@ export default class WMEEventsController extends AbstractController {
                 clearTimeout(value.timeoutId);
                 value.timeoutId = undefined;
             }
+            value.pendingObjectIdsByModel.clear();
             value.cleanUp?.();
             value.cleanUp = null;
         });
@@ -472,7 +508,7 @@ export default class WMEEventsController extends AbstractController {
         } else {
             callbacks.cleanUp = this.mediator.wmeSDK.Events.on({
                 eventName: sdkEvent,
-                eventHandler: (e) => {
+                eventHandler: (e: { layerName: string }) => {
                     this.deferExecution(callbacks, e);
                 },
             });
