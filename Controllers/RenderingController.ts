@@ -111,8 +111,8 @@ export default class RenderingController extends AbstractController {
             RenderingController.instance = new RenderingController({ mediator });
 
             // Initialization
-            await RenderingController.instance.handleWMESettingsUpdated();
-            RenderingController.instance.handleSVLSettingsUpdated.call(RenderingController.instance);
+            await RenderingController.instance.handleWMESettingsUpdated(false);
+            RenderingController.instance.handleSVLSettingsUpdated(false);
 
             // Event subscriptions
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, RenderingController.instance.handleCountryChanged.bind(RenderingController.instance));
@@ -140,23 +140,23 @@ export default class RenderingController extends AbstractController {
         });
     }
 
-    private async handleWMESettingsUpdated(): Promise<void> {
+    private async handleWMESettingsUpdated(shouldRedraw: boolean = true): Promise<void> {
         const newIsImperial = (await this.mediator.wmeSDK.Settings.getUserSettings()).isImperial === true;
         if (this.isImperial !== newIsImperial) {
             this.isImperial = newIsImperial;
             this.speedColorCache.clear();
             this.superScriptCache.clear();
-            this.redrawAll();
+            if (shouldRedraw) {
+                this.redrawAll();
+            }
         }
     }
 
-    private handleSVLSettingsUpdated() {
-        let shouldRedraw = true; // TODO: this can be made more efficient
+    private handleSVLSettingsUpdated(shouldRedraw: boolean = true) {
         this.speedColorCache.clear();
         const newClutterConstant = this.mediator.getPreference('clutterConstant');
         if (this.clutterConstant !== newClutterConstant) {
             this.clutterConstant = newClutterConstant;
-            shouldRedraw = true;
         }
         const streetStylesPref = this.mediator.getPreference('streets');
         this.streetStyles = [];
