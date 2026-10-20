@@ -118,7 +118,9 @@ export default class RenderingController extends AbstractController {
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, RenderingController.instance.handleCountryChanged.bind(RenderingController.instance));
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, RenderingController.instance.handleSVLSettingsUpdated.bind(RenderingController.instance));
             mediator.subscribe(SVLEvents.WME_SETTINGS_CHANGED, RenderingController.instance.handleWMESettingsUpdated.bind(RenderingController.instance));
-            mediator.subscribe(SVLEvents.USER_DISABLED, RenderingController.instance.handleUserDisabledLayer.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.USER_DISABLED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.DRAWING_ABORTED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
 
             return RenderingController.instance;
         } else {
@@ -126,9 +128,16 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private async handleUserDisabledLayer(): Promise<void> {
-        this.drawGeneration++;
-        await this.removeAllSegmentsFromLayer();
+    private async handleLayerDisabledOrAborted(): Promise<void> {
+        if (this.redrawTimeout !== null) {
+            clearTimeout(this.redrawTimeout);
+            this.redrawTimeout = null;
+        }
+        const generation = ++this.drawGeneration;
+        await this.enqueueDataModelOp(async () => {
+            if (generation !== this.drawGeneration) return;
+            await this.destroyAllFeatures();
+        });
     }
 
     private async handleWMESettingsUpdated(): Promise<void> {
@@ -483,7 +492,6 @@ export default class RenderingController extends AbstractController {
 
     private async destroyAllFeatures(): Promise<void> {
         await this.removeAllSegmentsFromLayer();
-        this.labelsVector.destroyFeatures(this.labelsVector.features, { 'silent': true });
         await this.removeAllNodesFromLayer();
     }
 
@@ -704,6 +712,7 @@ export default class RenderingController extends AbstractController {
         this.iconsStore.clear();
 
         this.labelsStore.clear();
+        this.labelsVector?.destroyFeatures(this.labelsVector.features, { 'silent': true });
 
         await Promise.all([
             this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
