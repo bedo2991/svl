@@ -56,8 +56,7 @@ export default class LayerStateController extends AbstractController {
             LayerStateController.instance.svlOLLayerNames = Object.values(OL_LAYERS);
 
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, () => {
-                LayerStateController.instance.SVL_PIXEL_SIZE_CACHE.clear();
-                void LayerStateController.instance.refreshMapMetrics();
+                void LayerStateController.instance.refreshMapMetrics(true);
             });
 
             mediator.subscribe(SVLEvents.ZOOM_CHANGED, () => {
@@ -846,18 +845,25 @@ export default class LayerStateController extends AbstractController {
         // or this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.roadLayerUniqueName, visibility: true });?
     }
 
-    public async refreshMapMetrics(): Promise<void> {
+    public async refreshMapMetrics(clearCaches: boolean = false): Promise<void> {
         const [zoomLevel, resolution, center] = await Promise.all([
             this.mediator.wmeSDK.Map.getZoomLevel(),
             this.mediator.wmeSDK.Map.getMapResolution(),
             this.mediator.wmeSDK.Map.getMapCenter(),
         ]);
+        const latChanged = Math.abs(center.lat - this.lastCenterLat) > 0.01;
         this.lastZoomLevel = zoomLevel;
         this.lastResolution = resolution;
         this.lastCenterLat = center.lat;
         const olZoom = W.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
         if (typeof olZoom === 'number') {
             this.olZoomOffset = zoomLevel - olZoom;
+        }
+        if (clearCaches) {
+            this.SVL_RESOLUTION_CACHE.clear();
+        }
+        if (clearCaches || latChanged) {
+            this.SVL_PIXEL_SIZE_CACHE.clear();
         }
         this.SVL_RESOLUTION_CACHE.set(zoomLevel, 1.0 / resolution);
         this.SVL_PIXEL_SIZE_CACHE.set(zoomLevel, resolution * Math.cos(center.lat * Utils.PI_OVER_180));
