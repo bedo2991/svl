@@ -265,17 +265,18 @@ export default class UserInterfaceController extends AbstractController {
             )}<br><small>${this.mediator._('routing_mode_panel_body')}</small>`;
             routingModeDiv.addEventListener('mouseenter', () => {
                 // Temporary disable routing mode
-                this.mediator.setPreference('routingModeEnabled', false);
+                this.mediator.setRoutingModeSuppressed(true);
                 this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             });
             routingModeDiv.addEventListener('mouseleave', () => {
                 // Enable routing mode again
-                this.mediator.setPreference('routingModeEnabled', true);
+                this.mediator.setRoutingModeSuppressed(false);
                 this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
             });
             document.getElementById('map')?.appendChild(routingModeDiv);
         } else {
             // Remove the routing panel
+            this.mediator.setRoutingModeSuppressed(false);
             div?.remove();
         }
     }

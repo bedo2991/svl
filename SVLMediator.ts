@@ -26,6 +26,7 @@ export default class SVLMediator extends AbstractMediator {
     public readonly SVL_VERSION: string = GM_info.script.version;
 
     private autoReloadInterval: number | null = null;
+    private routingModeSuppressed: boolean = false;
 
     private constructor({ wmeSDK }: { wmeSDK: AsyncWmeSDK }) {
         super();
@@ -398,6 +399,14 @@ export default class SVLMediator extends AbstractMediator {
 
     public areOnlineTranslationsLoaded(): boolean {
         return this.localizationController.getOnlineTranslationsLoaded();
+    }
+
+    public setRoutingModeSuppressed(suppressed: boolean): void {
+        this.routingModeSuppressed = suppressed;
+    }
+
+    public isRoutingModeActive(): boolean {
+        return Boolean(this.getPreference('routingModeEnabled')) && !this.routingModeSuppressed;
     }
 
 

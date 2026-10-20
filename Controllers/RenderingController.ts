@@ -1008,7 +1008,7 @@ export default class RenderingController extends AbstractController {
 
         // consoleDebug(width);
         if (
-            this.mediator.getPreference('routingModeEnabled') &&
+            this.mediator.isRoutingModeActive() &&
             model.routingRoadType !== null
         ) {
             roadType = model.routingRoadType;
