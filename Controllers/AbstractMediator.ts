@@ -21,7 +21,6 @@ export enum SVLEvents {
 }
 
 export default abstract class AbstractMediator {
-    private isInitializationCompleted: boolean = false;
     private subscribers: Map<string, ((data?: any) => void)[]> = new Map();
 
     public abstract notify(sender: any, event: any): void;
@@ -52,22 +51,5 @@ export default abstract class AbstractMediator {
         if (eventSubscribers) {
             eventSubscribers.forEach(callback => callback(data));
         }
-    }
-
-    protected setInitializationCompleted(): void {
-        this.isInitializationCompleted = true;
-    }
-
-    public initializationCompleted(): Promise<void> {
-        return new Promise((resolve) => {
-            const checkInitialization = () => {
-                if (this.isInitializationCompleted) {
-                    resolve();
-                } else {
-                    setTimeout(checkInitialization, 300);
-                }
-            };
-            checkInitialization();
-        });
     }
 }
