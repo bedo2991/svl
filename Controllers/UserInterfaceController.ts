@@ -347,7 +347,8 @@ export default class UserInterfaceController extends AbstractController {
 
         const translationMessage = document.createElement('div');
         translationMessage.className = 'svl_translationblock';
-        if (this.mediator._('language_code') === I18n.currentLocale()) {
+        const currentLocale = (await this.mediator.wmeSDK.Settings.getLocale())?.localeCode;
+        if (this.mediator._('language_code') === currentLocale) {
             //Translations are available for this language
             const translationPercentage = this.mediator._('completition_percentage');
             if (translationPercentage === '100%') {
