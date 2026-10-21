@@ -55,7 +55,7 @@ export default class UserInterfaceController extends AbstractController {
                 'Street Vector Layer',
                 this.mediator.SVL_VERSION,
                 `<b>${this.mediator._('whats_new')}</b>
-                <br>- 8.0.0 - Various bug fixes and performance improvements.
+                <br>- 8.0.0 - Improved arrows placement, virtual nodes, and overall visual quality. Various bug fixes and performance improvements.
                 <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
                 <br>- 7.0.0 - Fixed: SVL covers the WME's paths. The option "Show GPS layer above roads" now also works consistently. Flickering is possible at every deselection (current SDK limitation).
                 <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
@@ -909,83 +909,83 @@ export default class UserInterfaceController extends AbstractController {
                 this.updateStreetsPreferenceValues();
                 this.mediator.alert(AlertType.INFO, this.mediator._('preset_applied'));
             } else if (uniqueID.startsWith('streets.')) {
-                    const parts = uniqueID.split('.');
-                    const streetIndex = parseInt(parts[1], 10);
-                    const property = parts[2];
-                    if (isNaN(streetIndex)) {
-                        // This is probably a decorator
-                        const decorator = parts[1];
-                        const decPreference = this.mediator.getPreference(decorator);
-                        if (!decPreference) {
-                            console.error(`Decorator preference not found for ${decorator}`);
-                            return;
-                        }
+                const parts = uniqueID.split('.');
+                const streetIndex = parseInt(parts[1], 10);
+                const property = parts[2];
+                if (isNaN(streetIndex)) {
+                    // This is probably a decorator
+                    const decorator = parts[1];
+                    const decPreference = this.mediator.getPreference(decorator);
+                    if (!decPreference) {
+                        console.error(`Decorator preference not found for ${decorator}`);
+                        return;
+                    }
+                    switch (property) {
+                        case 'strokeOpacity':
+                            decPreference[property] = parseFloat(t.value) / 100.0;
+                            break;
+                        case 'strokeWidth':
+                            decPreference[property] = parseFloat(t.value);
+                            break;
+                        default:
+                            decPreference[property] = t.value;
+                            break;
+                    }
+                    this.mediator.setPreference(decorator, decPreference);
+                } else {
+                    // this is a street preference
+                    const streetsPreferences = this.mediator.getPreference('streets');
+
+
+                    if (streetsPreferences[streetIndex]) {
                         switch (property) {
                             case 'strokeOpacity':
-                                decPreference[property] = parseFloat(t.value) / 100.0;
+                                streetsPreferences[streetIndex][property] = parseFloat(t.value) / 100.0;
                                 break;
                             case 'strokeWidth':
-                                decPreference[property] = parseFloat(t.value);
+                                streetsPreferences[streetIndex][property] = parseFloat(t.value);
                                 break;
                             default:
-                                decPreference[property] = t.value;
+                                streetsPreferences[streetIndex][property] = t.value;
                                 break;
                         }
-                        this.mediator.setPreference(decorator, decPreference);
-                    } else {
-                        // this is a street preference
-                        const streetsPreferences = this.mediator.getPreference('streets');
-
-
-                        if (streetsPreferences[streetIndex]) {
-                            switch (property) {
-                                case 'strokeOpacity':
-                                    streetsPreferences[streetIndex][property] = parseFloat(t.value) / 100.0;
-                                    break;
-                                case 'strokeWidth':
-                                    streetsPreferences[streetIndex][property] = parseFloat(t.value);
-                                    break;
-                                default:
-                                    streetsPreferences[streetIndex][property] = t.value;
-                                    break;
-                            }
-                            this.mediator.setPreference('streets', streetsPreferences);
-                        }
+                        this.mediator.setPreference('streets', streetsPreferences);
                     }
-                } else {
-                    let val: any = t.value;
-                    if (t.type === 'checkbox') {
-                        val = (<HTMLInputElement>t).checked;
-                    } else if (t.type === 'number' || t.type === 'range') {
-                        val = parseFloat(t.value);
-                        if (t.min && val < parseFloat(t.min)) {
-                            val = parseFloat(t.min);
-                            t.value = val.toString();
-                        }
-                        if (t.max && val > parseFloat(t.max)) {
-                            val = parseFloat(t.max);
-                            t.value = val.toString();
-                        }
+                }
+            } else {
+                let val: any = t.value;
+                if (t.type === 'checkbox') {
+                    val = (<HTMLInputElement>t).checked;
+                } else if (t.type === 'number' || t.type === 'range') {
+                    val = parseFloat(t.value);
+                    if (t.min && val < parseFloat(t.min)) {
+                        val = parseFloat(t.min);
+                        t.value = val.toString();
                     }
-
-                    if (uniqueID === 'layerOpacity') {
-                        val = val / 100.0;
+                    if (t.max && val > parseFloat(t.max)) {
+                        val = parseFloat(t.max);
+                        t.value = val.toString();
                     }
-                    if (uniqueID === 'autoReload.interval') {
-                        val = val * 1000;
-                    }
-                    if (uniqueID === 'realsize') {
-                        document.querySelectorAll<HTMLInputElement>('input.segmentsWidth').forEach((el) => {
-                            el.disabled = Boolean(val);
-                        });
-                    }
-
-                    this.mediator.setPreference(uniqueID, val);
                 }
 
-                if (uniqueID === 'routingModeEnabled' || uniqueID === 'hideRoutingModeBlock') {
-                    this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
+                if (uniqueID === 'layerOpacity') {
+                    val = val / 100.0;
                 }
+                if (uniqueID === 'autoReload.interval') {
+                    val = val * 1000;
+                }
+                if (uniqueID === 'realsize') {
+                    document.querySelectorAll<HTMLInputElement>('input.segmentsWidth').forEach((el) => {
+                        el.disabled = Boolean(val);
+                    });
+                }
+
+                this.mediator.setPreference(uniqueID, val);
+            }
+
+            if (uniqueID === 'routingModeEnabled' || uniqueID === 'hideRoutingModeBlock') {
+                this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
+            }
         }
         this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
     }

@@ -4,7 +4,19 @@ import commonjs from '@rollup/plugin-commonjs';
 import image from '@rollup/plugin-image';
 import terser from '@rollup/plugin-terser';
 import replace from '@rollup/plugin-replace';
-import styles from "rollup-plugin-styles";
+
+function inlineCss() {
+    return {
+        name: 'inline-css',
+        transform(code, id) {
+            if (!id.endsWith('.css')) return null;
+            return {
+                code: `const style = document.createElement('style'); style.textContent = ${JSON.stringify(code)}; document.head.appendChild(style);`,
+                map: { mappings: '' }
+            };
+        }
+    };
+}
 
 // 1. Check the environment variable (NODE_ENV is standard for production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -15,7 +27,7 @@ const plugins = [
         preventAssignment: true,
         __DEBUG__: JSON.stringify(!isProduction)
     }),
-    styles(),
+    inlineCss(),
     resolve(),
     commonjs(),
     typescript(),
