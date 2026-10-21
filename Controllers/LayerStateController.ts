@@ -14,7 +14,18 @@ export default class LayerStateController extends AbstractController {
 
     private SVL_PIXEL_SIZE_CACHE = new Map<ZoomLevel, number>();
     private SVL_RESOLUTION_CACHE = new Map<ZoomLevel, number>();
+    private lastZoomLevel: ZoomLevel = 16 as ZoomLevel;
+    private lastResolution: number = 1.0;
+    private lastCenterLat: number = 0.0;
+    private olZoomOffset: number = 12;
 
+    private prefRealSize: boolean = false;
+    private prefNodeRadius: number = 3.0;
+    private prefNodeColor: string = '#0015FF';
+    private prefNodeDeadEndColor: string = '#C31CFF';
+    private prefVirtualNodeColor: string = '#045419';
+    private prefFarZoomLabelSize: number = 14;
+    private prefCloseZoomLabelSize: number = 16;
 
     private labelsVector!: OpenLayers.Layer.Vector;
 
@@ -36,14 +47,20 @@ export default class LayerStateController extends AbstractController {
             LayerStateController.instance = new LayerStateController({
                 mediator
             });
-            LayerStateController.instance.initializeLayers();
+            await LayerStateController.instance.waitForLegacyMap();
+            await LayerStateController.instance.refreshMapMetrics();
+            await LayerStateController.instance.initializeLayers();
             LayerStateController.instance.currentState = SVLLayerState.INITIALIZED;
 
             LayerStateController.instance.svlSDKLayerNames = Object.values(SDK_LAYERS);
             LayerStateController.instance.svlOLLayerNames = Object.values(OL_LAYERS);
 
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, () => {
-                LayerStateController.instance.SVL_PIXEL_SIZE_CACHE.clear();
+                void LayerStateController.instance.refreshMapMetrics(true);
+            });
+
+            mediator.subscribe(SVLEvents.ZOOM_CHANGED, () => {
+                void LayerStateController.instance.refreshMapMetrics();
             });
 
             mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED,
@@ -52,13 +69,9 @@ export default class LayerStateController extends AbstractController {
             mediator.subscribe(SVLEvents.DRAWING_ABORTED,
                 LayerStateController.instance.disableSVLRoadLayerDueToDrawingAbort.bind(LayerStateController.instance));
 
-            mediator.subscribe(SVLEvents.LAYER_ENABLED,
-                LayerStateController.instance.tryEnablingSVLRoadLayer.bind(LayerStateController.instance)
-            );
-
             mediator.wmeSDK.Events.on({
                 eventName: "wme-map-layer-removed",
-                eventHandler: LayerStateController.instance.updateGPSLayerPosition.bind(LayerStateController.instance)
+                eventHandler: () => LayerStateController.instance?.updateGPSLayerPosition()
             });
 
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, LayerStateController.instance.updateAfterPreferencesWereChanged.bind(LayerStateController.instance));
@@ -70,28 +83,27 @@ export default class LayerStateController extends AbstractController {
         }
     }
 
-    private initializeLayers(): void {
-        const OLMap = W.map.getWazeMap().getOLMap();
-        OpenLayers.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
-
-        // Override OpenLayers function
-        OpenLayers.Util.getElement = function () {
-            const elements = [];
-
-            for (let i = 0, len = arguments.length; i < len; i++) {
-                var element = arguments[i];
-                if (typeof element == 'string') {
-                    element = document.getElementById(element);
-                }
-                if (arguments.length === 1) {
-                    return element;
-                }
-                elements.push(element);
+    private async waitForLegacyMap(maxWaitMs: number = 10000): Promise<void> {
+        const start = Date.now();
+        while (
+            (!unsafeWindow.W && typeof W === 'undefined') ||
+            (!unsafeWindow.OpenLayers && typeof OpenLayers === 'undefined') ||
+            !(unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()
+        ) {
+            if (Date.now() - start > maxWaitMs) {
+                throw new Error("SVL: Timed out waiting for legacy W.map / OpenLayers to initialize.");
             }
-            return elements;
-        };
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+    }
 
-        const labelStyleMap = new OpenLayers.StyleMap({
+    private async initializeLayers(): Promise<void> {
+        const waze = unsafeWindow.W ?? W;
+        const OL = unsafeWindow.OpenLayers ?? OpenLayers;
+        const OLMap = waze.map.getWazeMap().getOLMap();
+        OL.Renderer.symbol['myTriangle'] = [-2, 0, 2, 0, 0, -6, -2, 0];
+
+        const labelStyleMap = new OL.StyleMap({
             'fontFamily': 'Rubik, Open Sans, Alef, helvetica, sans-serif',
             'fontWeight': '800',
             'fontColor': '${color}',
@@ -104,69 +116,56 @@ export default class LayerStateController extends AbstractController {
             'labelAlign': 'cm', // set to center middle
         });
 
-        /**
-         *
-         * @param {number} index
-         * @return {Element}
-         */
-        OpenLayers.ElementsIndexer.prototype.svlGetNextElement = function (index: number): HTMLElement | null {
-            // const nextIndex = index + 1;
-            // console.log(`Order length: ${this.order.length}` );
-            for (let i = index + 1; i < this.order.length; i++) {
-                let nextElement = document.getElementById(this.order[i]);
-                if (nextElement) {
-                    return nextElement;
-                }
-            }
-            return null;
-        };
-        /**
-         *
-         * @param {HTMLElement} newNode
-         * @return {Element}
-         */
-        OpenLayers.ElementsIndexer.prototype.insert = function (newNode: HTMLElement): HTMLElement | null {
-            // If the node is known to the indexer, remove it so we can
-            // recalculate where it should go.
-            const nodeId = newNode.id;
-            // if newNode exists
-            if (this.indices[nodeId] != null) {
-                this.remove(newNode);
-            }
-
-            this.determineZIndex(newNode);
-
-            var leftIndex: number = -1;
-            var rightIndex: number = this.order.length;
-            var middle;
-
-            while (rightIndex - leftIndex > 1) {
-                middle = Math.trunc((leftIndex + rightIndex) / 2);
-
-                // Changed here, great performance improvement by not using Utils.getElement
-                var placement = this.compare(this, newNode,
-                    document.getElementById(this.order[middle]));
-
-                if (placement > 0) {
-                    leftIndex = middle;
-                } else {
-                    rightIndex = middle;
-                }
-            }
-
-            this.order.splice(rightIndex, 0, nodeId);
-            this.indices[nodeId] = this.getZIndex(newNode);
-
-            // If the new node should be before another in the index
-            // order, return the node before which we have to insert the new one;
-            // else, return null to indicate that the new node can be appended.
-            return this.svlGetNextElement(rightIndex);
-        };
-
-        this.labelsVector = new OpenLayers.Layer.Vector(OL_LAYERS.LABELS, {
+        this.labelsVector = new OL.Layer.Vector(OL_LAYERS.LABELS, {
             'styleMap': labelStyleMap,
             'visibility': false,
         });
+
+        const labelsIndexer = (this.labelsVector.renderer as any)?.indexer;
+        if (labelsIndexer) {
+            labelsIndexer.svlGetNextElement = function (index: number): HTMLElement | null {
+                for (let i = index + 1; i < this.order.length; i++) {
+                    const nextElement = document.getElementById(this.order[i]);
+                    if (nextElement) {
+                        return nextElement;
+                    }
+                }
+                return null;
+            };
+            labelsIndexer.insert = function (newNode: HTMLElement): HTMLElement | null {
+                const nodeId = newNode.id;
+                if (this.indices[nodeId] != null) {
+                    this.remove(newNode);
+                }
+
+                this.determineZIndex(newNode);
+
+                let leftIndex: number = -1;
+                let rightIndex: number = this.order.length;
+                let middle: number;
+
+                while (rightIndex - leftIndex > 1) {
+                    middle = Math.trunc((leftIndex + rightIndex) / 2);
+
+                    const placement = this.compare(
+                        this,
+                        newNode,
+                        document.getElementById(this.order[middle])
+                    );
+
+                    if (placement > 0) {
+                        leftIndex = middle;
+                    } else {
+                        rightIndex = middle;
+                    }
+                }
+
+                this.order.splice(rightIndex, 0, nodeId);
+                this.indices[nodeId] = this.getZIndex(newNode);
+
+                return this.svlGetNextElement(rightIndex);
+            };
+        }
 
         /**
          *
@@ -183,7 +182,7 @@ export default class LayerStateController extends AbstractController {
 
             // Set the data for the node, then draw it.
             node['_featureId'] = featureId;
-            node['_boundsBottom'] = geometry.getBounds().bottom;
+            node['_boundsBottom'] = geometry.getBounds()?.bottom;
             node['_geometryClass'] = geometry.CLASS_NAME;
             node['_style'] = style;
 
@@ -212,26 +211,26 @@ export default class LayerStateController extends AbstractController {
             if (rendered === false) {
                 var node = document.getElementById(geometry.id);
                 if (node) {
-                    node.parentNode.removeChild(node);
+                    node.parentNode?.removeChild(node);
                 }
             }
             return rendered;
         };
 
-        this.labelsVector.drawFeature = function (feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>, farZoom = null) {
+        this.labelsVector.drawFeature = function (feature: OpenLayers.Feature.Vector, style?: Partial<StyleObject> | string, farZoom?: boolean) {
             // don't try to draw the feature with the renderer if the layer is not
             // drawn itself
             if (!this.drawn) {
                 return;
             }
             if (typeof style != "object") {
-                if (!style && feature.state === OpenLayers.State.DELETE) {
+                if (!style && feature.state === OL.State.DELETE) {
                     style = "delete";
                 }
                 var renderIntent = style || feature.renderIntent;
                 style = feature.style || this.style;
                 if (!style) {
-                    style = this.styleMap.createSymbolizer(feature, renderIntent);
+                    style = this.styleMap.createSymbolizer(feature, renderIntent) as Partial<StyleObject>;
                 }
             }
 
@@ -246,11 +245,11 @@ export default class LayerStateController extends AbstractController {
 
 
         this.labelsVector.moveTo = function (bounds: OpenLayers.Bounds, zoomChanged: boolean, dragging: boolean) {
-            OpenLayers.Layer.prototype.moveTo.apply(this, arguments);
+            OL.Layer.prototype.moveTo.call(this, bounds, zoomChanged, dragging);
 
             var coordSysUnchanged = true;
             const farZoom = LayerStateController.instance.mediator.isFarZoom();
-            if (!dragging) {
+            if (!dragging && this.map) {
                 this.renderer.root.style.visibility = 'hidden';
 
                 var viewSize = this.map.getSize(),
@@ -274,13 +273,13 @@ export default class LayerStateController extends AbstractController {
                 // Force a reflow on gecko based browsers to prevent jump/flicker.
                 // This seems to happen on only certain configurations; it was originally
                 // noticed in FF 2.0 and Linux.
-                if (OpenLayers.IS_GECKO === true) {
+                if (OL.IS_GECKO === true) {
                     this.div.scrollLeft = this.div.scrollLeft;
                 }
 
                 if (!zoomChanged && coordSysUnchanged) {
                     for (var i in this.unrenderedFeatures) {
-                        var feature = this.unrenderedFeatures[i];
+                        const feature = this.unrenderedFeatures[i];
                         this.drawFeature(feature, undefined, farZoom);
                     }
                 }
@@ -288,10 +287,9 @@ export default class LayerStateController extends AbstractController {
 
             if (!this.drawn || zoomChanged || !coordSysUnchanged) {
                 this.drawn = true;
-                var feature;
                 for (let i: number = 0, len = this.features.length; i < len; i++) {
                     this.renderer.locked = (i !== (len - 1));
-                    feature = this.features[i];
+                    const feature = this.features[i];
                     this.drawFeature(feature, undefined, farZoom);
                 }
             }
@@ -332,47 +330,48 @@ export default class LayerStateController extends AbstractController {
                 } */
         };
 
-        this.labelsVector.renderer.drawFeature = function drawFeature(feature: OpenLayers.Feature.Vector, style: Partial<StyleObject>,
+        this.labelsVector.renderer.drawFeature = function drawFeature(feature: OpenLayers.Feature.Vector, style?: Partial<StyleObject> | string | object,
             farZoom = LayerStateController.instance.mediator.isFarZoom()) {
             const { zoom } = OLMap;
-            if (style == null) {
-                style = feature.style;
-            }
+            let resolvedStyle: Partial<StyleObject> = (style && typeof style === 'object' ? style : feature.style) || {};
 
             if (feature.geometry) {
+                const lsc = LayerStateController.instance;
                 // if (bounds) {
                 if (
                     7 - feature.attributes.showAtzoom > zoom ||
                     (feature.attributes.closeZoomOnly && farZoom) ||
                     (feature.attributes.farZoomOnly && !farZoom)
                 ) {
-                    style = { 'display': 'none' };
+                    resolvedStyle = { 'display': 'none' };
                 } else {
                     const bounds = feature.geometry.getBounds();
-                    if (!bounds || !bounds.intersectsBounds(LayerStateController.instance.labelsVector.renderer.extent)) {
-                        style = { 'display': 'none' };
+                    if (!bounds || !bounds.intersectsBounds(lsc.labelsVector.renderer.extent)) {
+                        resolvedStyle = { 'display': 'none' };
                     } else {
-                        LayerStateController.instance.labelsVector.renderer.featureDx = 0;
-                        style['fontSize'] = farZoom
-                            ? LayerStateController.instance.mediator.getPreference('farZoomLabelSize')
-                            : LayerStateController.instance.mediator.getPreference('closeZoomLabelSize');
+                        lsc.labelsVector.renderer.featureDx = 0;
+                        resolvedStyle['fontSize'] = farZoom
+                            ? lsc.prefFarZoomLabelSize
+                            : lsc.prefCloseZoomLabelSize;
                     }
                 }
 
-                const rendered = LayerStateController.instance.labelsVector.renderer.drawGeometry(
+                const rendered = lsc.labelsVector.renderer.drawGeometry(
                     feature.geometry,
-                    style,
+                    resolvedStyle,
                     feature.id
                 );
                 if (
-                    style['display'] !== 'none' &&
-                    style['label'] &&
+                    resolvedStyle['display'] !== 'none' &&
+                    resolvedStyle['label'] &&
                     rendered !== false
                 ) {
-                    const location = feature.geometry.getCentroid();
-                    LayerStateController.instance.labelsVector.renderer.drawText(feature.id, style, location);
+                    const location = feature.geometry instanceof OL.Geometry.Point
+                        ? feature.geometry
+                        : feature.geometry.getCentroid();
+                    lsc.labelsVector.renderer.drawText(feature.id, resolvedStyle, location);
                 } else {
-                    LayerStateController.instance.labelsVector.renderer.removeText(feature.id);
+                    lsc.labelsVector.renderer.removeText(feature.id);
                 }
                 return rendered;
             }
@@ -446,16 +445,16 @@ export default class LayerStateController extends AbstractController {
             label.setAttribute('pointer-events', 'none');
 
             const align =
-                style['labelAlign'] ?? OpenLayers.Renderer.defaultSymbolizer.labelAlign;
+                style['labelAlign'] ?? OL.Renderer.defaultSymbolizer.labelAlign;
             label.setAttribute(
                 'text-anchor',
-                OpenLayers.Renderer.SVG.LABEL_ALIGN[align[0]] ?? 'middle'
+                OL.Renderer.SVG.LABEL_ALIGN[align[0]] ?? 'middle'
             );
 
-            if (OpenLayers.IS_GECKO === true) {
+            if (OL.IS_GECKO === true) {
                 label.setAttribute(
                     'dominant-baseline',
-                    OpenLayers.Renderer.SVG.LABEL_ALIGN[align[1]] ?? 'central'
+                    OL.Renderer.SVG.LABEL_ALIGN[align[1]] ?? 'central'
                 );
             }
 
@@ -478,15 +477,15 @@ export default class LayerStateController extends AbstractController {
                     tspan._geometryClass = location.CLASS_NAME;
                     /* eslint-enable no-underscore-dangle */
                 }
-                if (OpenLayers.IS_GECKO === false) {
+                if (OL.IS_GECKO === false) {
                     tspan.setAttribute(
                         'baseline-shift',
-                        OpenLayers.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
+                        OL.Renderer.SVG.LABEL_VSHIFT[align[1]] ?? '-35%'
                     );
                 }
                 tspan.setAttribute('x', String(x));
                 if (i === 0) {
-                    let vfactor = OpenLayers.Renderer.SVG.LABEL_VFACTOR[align[1]];
+                    let vfactor = OL.Renderer.SVG.LABEL_VFACTOR[align[1]];
                     if (vfactor == null) {
                         vfactor = -0.5;
                     }
@@ -508,7 +507,7 @@ export default class LayerStateController extends AbstractController {
         // Add layers to the map
 
         // Add segment layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.SEGMENTS,
             styleContext: {
                 'color': (context): string => {
@@ -517,14 +516,9 @@ export default class LayerStateController extends AbstractController {
                 },
                 'width': (context): number => {
                     const props = context.feature?.properties || {};
-                    if (!this.mediator.isFarZoom(context.zoomLevel as ZoomLevel)) {
-                        if (this.mediator.getPreference('realsize')) {
-                            //console.dir(style['strokeWidth']);
-                            let pixelSize = this.getCachedGeodesicPixelSizeSVL(context.zoomLevel as ZoomLevel);
-                            let width = (props['width'] as number) / pixelSize;
-                            return width;
-                            //console.dir(style['strokeWidth']);
-                        }
+                    if (this.prefRealSize && !this.mediator.isFarZoom(context.zoomLevel as ZoomLevel)) {
+                        let pixelSize = this.getCachedGeodesicPixelSizeSVL(context.zoomLevel as ZoomLevel);
+                        return (props['width'] as number) / pixelSize;
                     }
                     return (props['width'] as number || 1);
                 },
@@ -556,7 +550,7 @@ export default class LayerStateController extends AbstractController {
                         'strokeColor': '${color}',
                         'strokeWidth': '${width}',
                         'strokeOpacity': '${opacity}',
-                        'strokeDashstyle': '${dash}',
+                        'strokeDashstyle': '${dash}' as any,
                         'strokeLinecap': 'butt',
                         //TODO: only add it ^ for segments with road width (or a very large width)
                         'display': '${display}',
@@ -568,7 +562,7 @@ export default class LayerStateController extends AbstractController {
         });
 
         // Add arrow layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.ARROWS,
             styleContext: {
                 'degrees': (context): number => {
@@ -581,7 +575,14 @@ export default class LayerStateController extends AbstractController {
                 },
                 'display': (context): string | undefined => {
                     const props = context.feature?.properties || {};
-                    return props['closeZoomOnly'] === 1 && this.mediator.isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : undefined;
+                    const zoomLevel = context.zoomLevel as ZoomLevel;
+                    if (props['closeZoomOnly'] === 1 && this.mediator.isFarZoom(zoomLevel)) {
+                        return 'none';
+                    }
+                    if (typeof props['minZoom'] === 'number' && zoomLevel < props['minZoom']) {
+                        return 'none';
+                    }
+                    return undefined;
                 },
             },
             styleRules: [
@@ -598,6 +599,7 @@ export default class LayerStateController extends AbstractController {
                         'fillColor': '#fff',
                         'fillOpacity': 0.7,
                         'pointRadius': 5,
+                        'display': '${display}',
                     }
                 },
                 {
@@ -617,26 +619,26 @@ export default class LayerStateController extends AbstractController {
         });
 
         // Add node layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer({
+        await this.mediator.wmeSDK.Map.addLayer({
             layerName: SDK_LAYERS.NODES,
             styleContext: {
                 'getPointRadius': (context) => {
-                    if (this.mediator.getPreference('realsize')) {
-                        return (this.mediator.getPreference('nodeRadius') ?? 3.0) * this.getCachedResolutionFactor(context.zoomLevel as ZoomLevel); // TODO: consider computing this once instead of doing the math for each node
+                    if (this.prefRealSize) {
+                        return this.prefNodeRadius * this.getCachedResolutionFactor(context.zoomLevel as ZoomLevel);
                     }
-                    return (this.mediator.getPreference('nodeRadius') ?? 3.0);
+                    return this.prefNodeRadius;
                 },
                 'shouldDisplay': (context) => {
                     return this.mediator.isFarZoom(context.zoomLevel as ZoomLevel) ? 'none' : 'block';
                 },
                 'getDefaultColor': (context) => {
-                    return this.mediator.getPreference('nodeColor') || '#0015FF';
+                    return this.prefNodeColor;
                 },
                 'getDeadEndColor': (context) => {
-                    return this.mediator.getPreference('nodeDeadEndColor') || '#C31CFF';
+                    return this.prefNodeDeadEndColor;
                 },
                 'getVirtualNodeColor': (context) => {
-                    return this.mediator.getPreference('virtualNodeColor') || '#033a12';
+                    return this.prefVirtualNodeColor;
                 }
             },
             styleRules: [
@@ -649,6 +651,14 @@ export default class LayerStateController extends AbstractController {
                         'pointRadius': '${getPointRadius}',
                         'display': '${shouldDisplay}',
                         'pointerEvents': 'none',
+                    }
+                },
+                {
+                    predicate: (properties, zoomLevel) => {
+                        return properties["isVirtualNode"] == 1
+                    },
+                    style: {
+                        'fillColor': '${getVirtualNodeColor}',
                     }
                 },
                 {
@@ -667,7 +677,7 @@ export default class LayerStateController extends AbstractController {
         OLMap.addLayer(this.labelsVector);
 
         // Add icons layer (SDK)
-        this.mediator.wmeSDK.Map.addLayer(
+        await this.mediator.wmeSDK.Map.addLayer(
             {
                 layerName: SDK_LAYERS.ICONS,
                 styleContext: {
@@ -702,7 +712,7 @@ export default class LayerStateController extends AbstractController {
         );
 
         // Add the layer checkbox
-        this.mediator.wmeSDK.LayerSwitcher.addLayerCheckbox({
+        await this.mediator.wmeSDK.LayerSwitcher.addLayerCheckbox({
             name: SDK_LAYERS.SEGMENTS,
             isChecked: this.currentState === SVLLayerState.VISIBLE,
         });
@@ -712,72 +722,73 @@ export default class LayerStateController extends AbstractController {
         });
 
 
-        this.updateAfterPreferencesWereChanged();
-
-        if (__DEBUG__) {
-            document['lv'] = this.labelsVector;
-        }
+        await this.updateAfterPreferencesWereChanged();
     }
 
-    public enableLayerForTheFirstTime(): void {
+    public async enableLayerForTheFirstTime(): Promise<void> {
         if (this.currentState === SVLLayerState.INITIALIZED) {
             if (!this.mediator.getPreference('startDisabled')) {
                 try {
-                    this.tryEnablingSVLRoadLayer();
+                    await this.tryEnablingSVLRoadLayer();
                 } catch (error) {
                     console.error('Error enabling/disabling layers:', error);
                 }
-                this.currentState = SVLLayerState.VISIBLE;
             } else {
                 this.currentState = SVLLayerState.USER_DISABLED;
             }
         }
     }
 
-    public enableAllSVLLayers() {
+    public async enableAllSVLLayers(): Promise<void> {
+        this.currentState = SVLLayerState.VISIBLE;
         // Enable all SDK Layers
-        for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
-            this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.svlSDKLayerNames[i], visibility: true });
-        }
+        await Promise.all(
+            this.svlSDKLayerNames.map((layerName) =>
+                this.mediator.wmeSDK.Map.setLayerVisibility({ layerName, visibility: true })
+            )
+        );
         // Enable all OL Layers
+        const waze = unsafeWindow.W ?? W;
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
-            const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
+            const olLayer = waze.map.getLayerByName(this.svlOLLayerNames[i]);
             if (olLayer) {
                 olLayer.setVisibility(true);
             }
         }
 
         if (this.mediator.getPreference('disableRoadLayers') ?? true) {
-            this.disableWMERoadLayer();
+            await this.disableWMERoadLayer();
         }
-        this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
-        this.currentState = SVLLayerState.VISIBLE;
+        await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
         this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
         this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
     }
 
-    public disableAllSVLLayers(shouldEnableWMERoadLayer: boolean = false) {
+    public async disableAllSVLLayers(shouldEnableWMERoadLayer: boolean = false): Promise<void> {
         // Disable all SDK Layers
-        for (let i = 0; i < this.svlSDKLayerNames.length; i++) {
-            this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.svlSDKLayerNames[i], visibility: false });
-        }
+        await Promise.all(
+            this.svlSDKLayerNames.map((layerName) =>
+                this.mediator.wmeSDK.Map.setLayerVisibility({ layerName, visibility: false })
+            )
+        );
         // Disable all OL Layers
+        const waze = unsafeWindow.W ?? W;
         for (let i = 0; i < this.svlOLLayerNames.length; i++) {
-            const olLayer = W.map.getLayerByName(this.svlOLLayerNames[i]);
+            const olLayer = waze.map.getLayerByName(this.svlOLLayerNames[i]);
             if (olLayer) {
                 olLayer.setVisibility(false);
             }
         }
         if (shouldEnableWMERoadLayer) {
-            this.enableWMERoadLayer();
+            await this.enableWMERoadLayer();
         }
     }
 
-    public tryEnablingSVLRoadLayer(): boolean {
+    public async tryEnablingSVLRoadLayer(): Promise<boolean> {
         if ([SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED, SVLLayerState.AUTOMATICALLY_DISABLED, SVLLayerState.USER_DISABLED].includes(this.currentState)) {
             const zoomThreshold = Number(this.mediator.getPreference('useWMERoadLayerAtZoom')) || 16;
-            if (this.mediator.wmeSDK.Map.getZoomLevel() > zoomThreshold) {
-                this.enableAllSVLLayers();
+            if ((await this.mediator.wmeSDK.Map.getZoomLevel()) > zoomThreshold) {
+                await this.enableAllSVLLayers();
                 return true;
             } else if (this.currentState !== SVLLayerState.AUTOMATICALLY_DISABLED) {
                 this.mediator.alert(AlertType.INFO, this.mediator._('zoom_in_for_svl'));
@@ -788,32 +799,31 @@ export default class LayerStateController extends AbstractController {
         return false;
     }
 
-    public toggleSVLLayerEnabledState(): void {
+    public async toggleSVLLayerEnabledState(): Promise<void> {
         if ([SVLLayerState.VISIBLE,
         SVLLayerState.AUTOMATICALLY_DISABLED,
         SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
-            this.userDisabledSvl();
+            await this.userDisabledSvl();
         } else {
-            this.tryEnablingSVLRoadLayer();
+            await this.tryEnablingSVLRoadLayer();
         }
     }
 
-    public disableSVLRoadLayerDueToDrawingAbort(): boolean {
+    public async disableSVLRoadLayerDueToDrawingAbort(): Promise<boolean> {
         if (this.currentState === SVLLayerState.DRAWING_ABORTED) return true;
         if (this.currentState === SVLLayerState.VISIBLE) {
             this.currentState = SVLLayerState.DRAWING_ABORTED;
-            this.disableAllSVLLayers(true);
+            await this.disableAllSVLLayers(true);
             return true;
         }
         return false;
     }
 
-    public disableSVLRoadLayerAutomatically(): boolean {
+    public async disableSVLRoadLayerAutomatically(): Promise<boolean> {
         if (this.currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return true;
         if ([SVLLayerState.VISIBLE, SVLLayerState.USER_DISABLED, SVLLayerState.INITIALIZED, SVLLayerState.DRAWING_ABORTED].includes(this.currentState)) {
             this.currentState = SVLLayerState.AUTOMATICALLY_DISABLED;
-            this.disableAllSVLLayers(true);
-            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: true });
+            await this.disableAllSVLLayers(true);
             return true;
         }
         return false;
@@ -832,16 +842,47 @@ export default class LayerStateController extends AbstractController {
         return destination;
     }
 
-    private disableWMERoadLayer(): void {
-        this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: false });
+    private async disableWMERoadLayer(): Promise<void> {
+        await this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: false });
         // or this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.roadLayerUniqueName, visibility: false });?
     }
 
-    private enableWMERoadLayer(): void {
-        this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: true });
+    private async enableWMERoadLayer(): Promise<void> {
+        await this.mediator.wmeSDK.LayerSwitcher.setRoadsLayerCheckboxChecked({ isChecked: true });
         // or this.mediator.wmeSDK.Map.setLayerVisibility({ layerName: this.roadLayerUniqueName, visibility: true });?
     }
 
+    public async refreshMapMetrics(clearCaches: boolean = false): Promise<void> {
+        const [zoomLevel, resolution, center] = await Promise.all([
+            this.mediator.wmeSDK.Map.getZoomLevel(),
+            this.mediator.wmeSDK.Map.getMapResolution(),
+            this.mediator.wmeSDK.Map.getMapCenter(),
+        ]);
+        const latChanged = Math.abs(center.lat - this.lastCenterLat) > 0.01;
+        this.lastZoomLevel = zoomLevel;
+        this.lastResolution = resolution;
+        this.lastCenterLat = center.lat;
+        const olZoom = (unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        if (typeof olZoom === 'number') {
+            this.olZoomOffset = zoomLevel - olZoom;
+        }
+        if (clearCaches) {
+            this.SVL_RESOLUTION_CACHE.clear();
+        }
+        if (clearCaches || latChanged) {
+            this.SVL_PIXEL_SIZE_CACHE.clear();
+        }
+        this.SVL_RESOLUTION_CACHE.set(zoomLevel, 1.0 / resolution);
+        this.SVL_PIXEL_SIZE_CACHE.set(zoomLevel, resolution * Math.cos(center.lat * Utils.PI_OVER_180));
+    }
+
+    public getCurrentZoomLevel(): ZoomLevel {
+        const olZoom = (unsafeWindow.W ?? W)?.map?.getWazeMap?.()?.getOLMap?.()?.zoom;
+        if (typeof olZoom === 'number') {
+            return (olZoom + this.olZoomOffset) as ZoomLevel;
+        }
+        return this.lastZoomLevel;
+    }
 
     /**
      * Careful! The returned value is 1.0 / resolution!
@@ -851,9 +892,11 @@ export default class LayerStateController extends AbstractController {
         if (cachedValue !== undefined) {
             return cachedValue;
         }
+        const resAtZoom = this.lastResolution * Math.pow(2, this.lastZoomLevel - zoomLevel);
         // we do this division here, so that later we can multiply instead of divide, for performance.
-        const resolution_factor = (1.0 / this.mediator.wmeSDK.Map.getMapResolution());
+        const resolution_factor = 1.0 / resAtZoom;
         this.SVL_RESOLUTION_CACHE.set(zoomLevel, resolution_factor);
+        void this.refreshMapMetrics();
         return resolution_factor;
     }
 
@@ -862,31 +905,32 @@ export default class LayerStateController extends AbstractController {
         if (cachedValue !== undefined) {
             return cachedValue as number;
         }
-        const size = this.getGeodesicPixelSize();
+        const size = this.getGeodesicPixelSize(zoomLevel);
         this.SVL_PIXEL_SIZE_CACHE.set(zoomLevel, size);
+        void this.refreshMapMetrics();
         return size;
     }
 
-    private getGeodesicPixelSize(): number {
-        // 1. Get the center latitude directly from the SDK, which is in WGS84 degrees.
-        const center_lat_4326 = this.mediator.wmeSDK.Map.getMapCenter().lat;
+    private getGeodesicPixelSize(zoomLevel: ZoomLevel): number {
+        // 1. Use the cached center latitude in WGS84 degrees.
+        const center_lat_4326 = this.lastCenterLat;
 
-        // 2. Get the resolution in EPSG:3857 (meters/pixel at equator)
-        let resolution_3857 = this.mediator.wmeSDK.Map.getMapResolution();
+        // 2. Scale the resolution in EPSG:3857 (meters/pixel at equator) for the requested zoom level
+        const resolution_3857 = this.lastResolution * Math.pow(2, this.lastZoomLevel - zoomLevel);
 
         // 3. Convert Latitude from degrees to radians.
         // Assuming PI_OVER_180 is Math.PI / 180.
         const lat_radians = center_lat_4326 * Utils.PI_OVER_180;
 
         // 5. Calculate the Geodesic Pixel Size // res * Math.cos(lat_radians);
-        const geodesic_pixel_size_meters = resolution_3857 * Utils.efficientCos(lat_radians);
+        const geodesic_pixel_size_meters = resolution_3857 * Math.cos(lat_radians);
 
         return geodesic_pixel_size_meters;
     }
 
 
 
-    private updateGPSLayerPosition(trial = 0) {
+    private async updateGPSLayerPosition(trial = 0): Promise<void> {
         if (trial > 20) {
             console.log('SVL: giving up on getting GPS Layer index');
             return;
@@ -894,13 +938,12 @@ export default class LayerStateController extends AbstractController {
 
         let gpsLayerIndex = 0;
         let currentSVLIndex = 0;
-        let farTurnLayerIndex = 0;
         try {
-            gpsLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
-            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
+            gpsLayerIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' });
+            currentSVLIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
         } catch (e) {
             setTimeout(() => {
-                this.updateGPSLayerPosition(trial + 1);
+                void this.updateGPSLayerPosition(trial + 1);
             }, 500);
             return;
         }
@@ -910,7 +953,7 @@ export default class LayerStateController extends AbstractController {
         try {
             if (showSVLUnderGPS && (currentSVLIndex > gpsLayerIndex)) {
                 // alert("SHOWUNDER " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'gps_points', zIndex: currentSVLIndex + 1 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'gps_points', zIndex: currentSVLIndex + 1 });
 
                 // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex - 20 });
                 // this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex - 19 });
@@ -920,11 +963,11 @@ export default class LayerStateController extends AbstractController {
                 // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
             } else if (!showSVLUnderGPS && (currentSVLIndex < gpsLayerIndex)) {
                 // alert("SHOW_ABOVE " + gpsLayerIndex + ", SVL: " + currentSVLIndex);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS, zIndex: gpsLayerIndex + 15 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ARROWS, zIndex: gpsLayerIndex + 16 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.NODES, zIndex: gpsLayerIndex + 20 });
                 this.labelsVector.setZIndex(gpsLayerIndex + 21);
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: SDK_LAYERS.ICONS, zIndex: gpsLayerIndex + 22 });
                 // alert("Done: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'gps_points' }) + ", SVL: " + this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.SEGMENTS }));
             }
 
@@ -933,38 +976,46 @@ export default class LayerStateController extends AbstractController {
         }
 
         try {
-            const farTurnLayerIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'farTurnPathLayer' });
-            currentSVLIndex = this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
+            const farTurnLayerIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: 'farTurnPathLayer' });
+            currentSVLIndex = await this.mediator.wmeSDK.Map.getLayerZIndex({ layerName: SDK_LAYERS.ICONS });
             if (farTurnLayerIndex < currentSVLIndex) {
-                this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'farTurnPathLayer', zIndex: currentSVLIndex + 2 });
-            };
+                await this.mediator.wmeSDK.Map.setLayerZIndex({ layerName: 'farTurnPathLayer', zIndex: currentSVLIndex + 2 });
+            }
         } catch (e) {
             console.error(e);
             console.error('SVL: Error setting farTurnPathLayer z-indexes', e);
         }
     }
 
-    private updateAfterPreferencesWereChanged() {
-        this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
-        this.updateGPSLayerPosition();
+    private async updateAfterPreferencesWereChanged(): Promise<void> {
+        this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
+        this.prefNodeRadius = this.mediator.getPreference('nodeRadius') ?? 3.0;
+        this.prefNodeColor = this.mediator.getPreference('nodeColor') || '#0015FF';
+        this.prefNodeDeadEndColor = this.mediator.getPreference('nodeDeadEndColor') || '#C31CFF';
+        this.prefVirtualNodeColor = this.mediator.getPreference('virtualNodeColor') || '#045419';
+        this.prefFarZoomLabelSize = this.mediator.getPreference('farZoomLabelSize') ?? 14;
+        this.prefCloseZoomLabelSize = this.mediator.getPreference('closeZoomLabelSize') ?? 16;
+
+        await this.mediator.wmeSDK.Map.setLayerOpacity({ layerName: SDK_LAYERS.SEGMENTS, opacity: this.mediator.getPreference('layerOpacity') });
+        await this.updateGPSLayerPosition();
 
         if (this.currentState === SVLLayerState.VISIBLE) {
             if (this.mediator.getPreference('disableRoadLayers') ?? true) {
-                this.disableWMERoadLayer();
+                await this.disableWMERoadLayer();
             } else {
-                this.enableWMERoadLayer();
+                await this.enableWMERoadLayer();
             }
         }
     }
 
-    private manageSVLCheckboxUpdated({ checked, name }:
-        { checked: boolean, name: string }) {
+    private async manageSVLCheckboxUpdated({ checked, name }:
+        { checked: boolean, name: string }): Promise<void> {
         if (name !== SDK_LAYERS.SEGMENTS) return;
 
         if (checked) {
-            this.tryEnablingSVLRoadLayer();
+            await this.tryEnablingSVLRoadLayer();
         } else {
-            this.userDisabledSvl();
+            await this.userDisabledSvl();
         }
     }
 
@@ -972,14 +1023,14 @@ export default class LayerStateController extends AbstractController {
         return this.currentState;
     }
 
-    private userDisabledSvl(): void {
+    private async userDisabledSvl(): Promise<void> {
         if (this.currentState === SVLLayerState.USER_DISABLED) return;
         if ([SVLLayerState.VISIBLE,
         SVLLayerState.DRAWING_ABORTED,
         SVLLayerState.AUTOMATICALLY_DISABLED].includes(this.currentState)) {
             this.currentState = SVLLayerState.USER_DISABLED;
-            this.disableAllSVLLayers(false);
-            this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
+            await this.disableAllSVLLayers(false);
+            await this.mediator.wmeSDK.LayerSwitcher.setLayerCheckboxChecked({ name: SDK_LAYERS.SEGMENTS, isChecked: false });
             this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_DISABLED_BY_USER);
         }
     }

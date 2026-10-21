@@ -26,33 +26,12 @@ export default class Utils {
         return feet * 0.3048;
     }
 
-
-    /**
- * Efficiently calculates the sine of an angle (in radians) using a Taylor series expansion.
- * @param input Angle in radians
- * @returns Approximation of the sine of the input angle
- */
-    public static efficientSin(input: number): number {
-        // Calculate powers efficiently
-        const x_squared = input * input;
-        const x_cubed = x_squared * input;
-        const x_to_the_fifth = x_cubed * x_squared;
-
-        // Note: 3! = 6, 5! = 120
-        // sin(x) ≈ x - (x^3 / 6) + (x^5 / 120)
-        return input - (x_cubed / 6.0) + (x_to_the_fifth / 120.0);
-    }
-
-    /**
- * Efficiently calculates the cosine of an angle (in radians) using a Taylor series expansion.
- * @param input Angle in radians
- * @returns Approximation of the cosine of the input angle
- */
-    public static efficientCos(input: number): number {
-        const x_squared = input * input;
-        const x_to_the_fourth = x_squared * x_squared;
-
-        // Note: 2! = 2, 4! = 24
-        return 1.0 - (x_squared / 2.0) + (x_to_the_fourth / 24.0);
+    public static escapeHtml(str: string): string {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }

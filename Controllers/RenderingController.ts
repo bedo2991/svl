@@ -1,10 +1,9 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
-import { Node, SdkFeature, Segment } from "wme-sdk-typings";
+import { Country, Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
-import { simplify } from '@turf/simplify';
 import { lineOffset } from "@turf/line-offset";
 import Utils from "../Utils";
 
@@ -24,6 +23,8 @@ export default class RenderingController extends AbstractController {
     private static instance: RenderingController | null = null;
     // Add throttling to prevent excessive redraws
     private redrawTimeout: number | null = null;
+    private drawGeneration: number = 0;
+    private dataModelQueue: Promise<void> = Promise.resolve();
 
     private queuedSegments: Set<SdkFeature<LineString>> = new Set();
     private queuedArrows: Set<SdkFeature<Point>> = new Set();
@@ -32,18 +33,42 @@ export default class RenderingController extends AbstractController {
     private segmentsStore = new Map<Segment['id'], Set<string>>();
     private arrowsStore = new Map<Segment['id'], Set<string>>();
     private iconsStore = new Map<Segment['id'], Set<string>>();
+    private labelsStore = new Map<Segment['id'], OpenLayers.Feature.Vector[]>();
+    private nodesStore = new Set<Node['id']>();
 
-    private labelsVector = W.map.getLayerByName(OL_LAYERS.LABELS);
-
-    private currentTopCountryId: number | null = null;
+    private labelsVector: OpenLayers.Layer.Vector | undefined;
 
     private isImperial: boolean = false;
+    private cachedUserRank: number | undefined = undefined;
+    private speedColorCache = new Map<number | null, string>();
+    private superScriptCache = new Map<number, string>();
 
     private superScript: Array<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
     private streetStyles: StreetStyle[] = [];
 
     private clutterConstant: number = 7;
+    private prefRealSize: boolean = true;
+    private prefShowSLColor: boolean = true;
+    private prefShowSLSingleColor: boolean = false;
+    private prefSLColor: string = '#ffffff';
+    private prefShowSLText: boolean = true;
+    private prefShowANs: boolean = true;
+    private prefFakelock: number = 6;
+    private prefLabelOutlineWidth: number = 3;
+    private prefArrowDeclutter: number = 140;
+    private prefSegmentsThreshold: number = 2500;
+    private prefNodesThreshold: number = 2000;
+    private prefUseWMERoadLayerAtZoom: number = 15;
+    private prefRedStyle: { strokeColor: string; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeDashstyle: 'solid' };
+    private prefDirtyStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#8b4513', strokeOpacity: 0.9, strokeDashstyle: 'solid' };
+    private prefClosureStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefTollStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#0000ff', strokeOpacity: 0.7, strokeDashstyle: 'dash' };
+    private prefRestrictionStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffff00', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefHeadlightsStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#00ff00', strokeOpacity: 0.7, strokeDashstyle: 'dot' };
+    private prefNearbyHOVStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#b300ff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefLanesStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffffff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
+    private prefSpeeds: any = {};
 
     private roundaboutStyle = {
         strokeColor: '#111111',
@@ -102,16 +127,20 @@ export default class RenderingController extends AbstractController {
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<RenderingController> {
         if (!RenderingController.instance) {
             RenderingController.instance = new RenderingController({ mediator });
+            const w = unsafeWindow.W ?? W;
+            RenderingController.instance.labelsVector = w.map.getLayerByName(OL_LAYERS.LABELS);
 
             // Initialization
-            RenderingController.instance.handleWMESettingsUpdated.call(RenderingController.instance);
-            RenderingController.instance.handleSVLSettingsUpdated.call(RenderingController.instance);
+            await RenderingController.instance.handleWMESettingsUpdated(false);
+            RenderingController.instance.handleSVLSettingsUpdated(false);
 
             // Event subscriptions
             mediator.subscribe(SVLEvents.COUNTRY_CHANGED, RenderingController.instance.handleCountryChanged.bind(RenderingController.instance));
             mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, RenderingController.instance.handleSVLSettingsUpdated.bind(RenderingController.instance));
             mediator.subscribe(SVLEvents.WME_SETTINGS_CHANGED, RenderingController.instance.handleWMESettingsUpdated.bind(RenderingController.instance));
-            mediator.subscribe(SVLEvents.USER_DISABLED, RenderingController.instance.handleUserDisabledLayer.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.USER_DISABLED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.DRAWING_ABORTED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
+            mediator.subscribe(SVLEvents.AUTOMATICALLY_DISABLED, RenderingController.instance.handleLayerDisabledOrAborted.bind(RenderingController.instance));
 
             return RenderingController.instance;
         } else {
@@ -119,25 +148,55 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private handleUserDisabledLayer() {
-        this.removeAllSegmentsFromLayer();
+    private async handleLayerDisabledOrAborted(): Promise<void> {
+        if (this.redrawTimeout !== null) {
+            clearTimeout(this.redrawTimeout);
+            this.redrawTimeout = null;
+        }
+        const generation = ++this.drawGeneration;
+        await this.enqueueDataModelOp(async () => {
+            if (generation !== this.drawGeneration) return;
+            await this.destroyAllFeatures();
+        });
     }
 
-    private handleWMESettingsUpdated() {
-        const newIsImperial = this.mediator.wmeSDK.Settings.getUserSettings().isImperial === true;
+    private async handleWMESettingsUpdated(shouldRedraw: boolean = true): Promise<void> {
+        const newIsImperial = (await this.mediator.wmeSDK.Settings.getUserSettings()).isImperial === true;
         if (this.isImperial !== newIsImperial) {
             this.isImperial = newIsImperial;
-            this.redrawAll();
+            this.speedColorCache.clear();
+            this.superScriptCache.clear();
+            if (shouldRedraw) {
+                this.redrawAll();
+            }
         }
     }
 
-    private handleSVLSettingsUpdated() {
-        let shouldRedraw = true; // TODO: this can be made more efficient
-        const newClutterConstant = this.mediator.getPreference('clutterConstant');
-        if (this.clutterConstant !== newClutterConstant) {
-            this.clutterConstant = newClutterConstant;
-            shouldRedraw = true;
-        }
+    private handleSVLSettingsUpdated(shouldRedraw: boolean = true) {
+        this.speedColorCache.clear();
+        this.clutterConstant = this.mediator.getPreference('clutterConstant');
+        this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
+        this.prefShowSLColor = Boolean(this.mediator.getPreference('showSLcolor'));
+        this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor'));
+        this.prefSLColor = this.mediator.getPreference('SLColor');
+        this.prefShowSLText = Boolean(this.mediator.getPreference('showSLtext'));
+        this.prefShowANs = Boolean(this.mediator.getPreference('showANs'));
+        this.prefFakelock = Number(this.mediator.getPreference('fakelock'));
+        this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth'));
+        this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
+        this.prefSegmentsThreshold = Number(this.mediator.getPreference('segmentsThreshold'));
+        this.prefNodesThreshold = Number(this.mediator.getPreference('nodesThreshold'));
+        this.prefUseWMERoadLayerAtZoom = Number(this.mediator.getPreference('useWMERoadLayerAtZoom'));
+        this.prefRedStyle = this.mediator.getPreference('red');
+        this.prefDirtyStyle = this.mediator.getPreference('dirty');
+        this.prefClosureStyle = this.mediator.getPreference('closure');
+        this.prefTollStyle = this.mediator.getPreference('toll');
+        this.prefRestrictionStyle = this.mediator.getPreference('restriction');
+        this.prefHeadlightsStyle = this.mediator.getPreference('headlights');
+        this.prefNearbyHOVStyle = this.mediator.getPreference('nearbyHOV');
+        this.prefLanesStyle = this.mediator.getPreference('lanes');
+        this.prefSpeeds = this.mediator.getPreference('speeds');
+
         const streetStylesPref = this.mediator.getPreference('streets');
         this.streetStyles = [];
         for (let i = 0; i < streetStylesPref.length; i += 1) {
@@ -155,15 +214,22 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private createAverageSpeedCameraSDK({ id, rev, isForward, p0, p1 }:
-        { id: number, rev: boolean, isForward: boolean, p0: number[], p1: number[] }): SdkFeature<Point> {
-        const degreesInRadians = this.getAngleRadiansSDK(isForward, rev ? p1 : p0, rev ? p0 : p1);
+    private createAverageSpeedCameraSDK({ id, rev, p0, p1 }:
+        { id: number, rev: boolean, p0: number[], p1: number[] }): SdkFeature<Point> {
+        const degreesInRadians = this.getAngleRadiansSDK(true, p0, p1);
         const perpendicularAngle = degreesInRadians + Utils.PI_OVER_2;
         const shiftDegrees = 0.0001;
+        const cosLat = Math.cos(p0[1] * Utils.PI_OVER_180) || 1;
         return {
             type: 'Feature',
-            id: id,
-            geometry: { type: 'Point', coordinates: [p0[0] + Utils.efficientSin(perpendicularAngle) * shiftDegrees, p0[1] + Utils.efficientCos(perpendicularAngle) * shiftDegrees] },
+            id: `${id}_cam_${rev ? 'r' : 'f'}`,
+            geometry: {
+                type: 'Point',
+                coordinates: [
+                    p0[0] + (Math.sin(perpendicularAngle) * shiftDegrees) / cosLat,
+                    p0[1] + Math.cos(perpendicularAngle) * shiftDegrees
+                ]
+            },
             properties: {
                 'isAverageSpeedCamera': 1,
                 'closeZoomOnly': 1,
@@ -172,16 +238,9 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private handleCountryChanged(): void {
-        const topCountry = this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
+    private async handleCountryChanged(data?: { newCountry?: Country }): Promise<void> {
+        const topCountry = data?.newCountry ?? await this.mediator.wmeSDK.DataModel.Countries.getTopCountry();
         if (!topCountry) return;
-
-        if (topCountry.id === this.currentTopCountryId) {
-            // Country hasn't changed, no need to update
-            return;
-        }
-
-        this.currentTopCountryId = topCountry.id;
 
         const defaultLaneWidth = topCountry.defaultLaneWidthPerRoadType;
         if (defaultLaneWidth) {
@@ -196,30 +255,31 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    public zoomChanged(): void {
-        console.debug('zoomChanged running');
-        let currentState = this.mediator.getState();
-        if (this.mediator.wmeSDK.Map.getZoomLevel() <= +this.mediator.getPreference('useWMERoadLayerAtZoom')) {
+    public async zoomChanged(): Promise<void> {
+        Utils.debugLog('zoomChanged running');
+        const currentState = this.mediator.getState();
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.prefUseWMERoadLayerAtZoom) {
             // There is nothing to draw, enable road layer
-            console.debug('Road layer automatically enabled because of zoom out');
-            // consoleDebug("Vector visibility: ", streetVector.visibility);
+            Utils.debugLog('Road layer automatically enabled because of zoom out');
             if (currentState === SVLLayerState.VISIBLE) {
                 this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE);
                 return;
             }
-        } else if (currentState == SVLLayerState.AUTOMATICALLY_DISABLED) {
+        } else if (currentState === SVLLayerState.AUTOMATICALLY_DISABLED) {
             // Re-enable the SVL
-            console.debug('Re-enabling SVL after zoom in');
-            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+            Utils.debugLog('Re-enabling SVL after zoom in');
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_ENABLE_LAYER);
+            return;
+        } else if (currentState === SVLLayerState.DRAWING_ABORTED) {
+            await this.shouldDrawingResumeAfterAbort();
             return;
         }
     }
 
-    private async queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
-        feature.id = `${id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
         this.queuedSegments.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToSegmentsStore(id, feature.id);
+        this.addIDsToSegmentsStore(id, String(feature.id));
     }
 
     private addIDsToSegmentsStore(id: Segment['id'], ...strings: string[]) {
@@ -261,7 +321,7 @@ export default class RenderingController extends AbstractController {
         const latInRadians = startP[1] * Utils.PI_OVER_180;
 
         // Calculate the difference in the direction of travel
-        dx = (endP[0] - startP[0]) * Utils.efficientCos(latInRadians);
+        dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
         dy = endP[1] - startP[1];
 
         // Math.atan2(dx, dy) returns the bearing from the Y-axis (North)
@@ -272,9 +332,135 @@ export default class RenderingController extends AbstractController {
         return (angle * 180) / Math.PI;
     }
 
-    private getCentroid(twoPoints: number[][]): number[] {
-        const res = twoPoints.map(point => [point[0], point[1]]);
-        return [(res[0][0] + res[1][0]) / 2.0, (res[0][1] + res[1][1]) / 2.0];
+    private getCentroid(p0: number[], p1: number[]): [number, number] {
+        return [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5];
+    }
+
+    private sampleArrowPointsAlongSegment(
+        coords: number[][],
+        isInRoundabout: boolean,
+        labels?: OpenLayers.Feature.Vector[]
+    ): { coordinates: [number, number]; p0: number[]; p1: number[]; minZoom: number }[] {
+        if (coords.length < 2) {
+            return [];
+        }
+
+        const firstLatRad = coords[0][1] * Utils.PI_OVER_180;
+        const cosLat = Math.cos(firstLatRad);
+        const metersPerDegLat = 111132.92;
+        const metersPerDegLon = 111412.84 * cosLat;
+
+        const cumDist: number[] = [0];
+        for (let i = 0; i < coords.length - 1; i++) {
+            const dx = (coords[i + 1][0] - coords[i][0]) * metersPerDegLon;
+            const dy = (coords[i + 1][1] - coords[i][1]) * metersPerDegLat;
+            cumDist.push(cumDist[i] + Math.hypot(dx, dy));
+        }
+
+        const totalLength = cumDist[cumDist.length - 1];
+        if (totalLength <= 0) {
+            return [];
+        }
+
+        const effectiveDeclutter = Math.max(40, this.prefArrowDeclutter);
+        const minStepMeters = (effectiveDeclutter / 8) * (isInRoundabout ? 1.5 : 1);
+
+        const labelZones: { lon: number; lat: number; radiusMeters: number }[] = [];
+        if (labels && labels.length > 0) {
+            const MAX_EXTENT = 20037508.342789244;
+            for (const lf of labels) {
+                const geom = lf?.geometry as OpenLayers.Geometry.Point | undefined;
+                if (geom && typeof geom.x === 'number' && typeof geom.y === 'number') {
+                    const lon = (geom.x * 180) / MAX_EXTENT;
+                    const lat = (Math.atan(Math.exp((geom.y * Math.PI) / MAX_EXTENT)) * 360) / Math.PI - 90;
+                    const rawLabel: string = lf.attributes?.label ?? '';
+                    const lines = rawLabel.split('\n');
+                    let maxLineChars = 0;
+                    for (const line of lines) {
+                        if (line.length > maxLineChars) {
+                            maxLineChars = line.length;
+                        }
+                    }
+                    const radiusMeters = Math.min(
+                        totalLength * 0.15,
+                        Math.max(4, Math.min(20, maxLineChars * 1.1))
+                    );
+                    labelZones.push({ lon, lat, radiusMeters });
+                }
+            }
+        }
+
+        let numIntervals = Math.max(2, Math.round(totalLength / minStepMeters));
+        if (numIntervals === 2 && labelZones.length > 0 && totalLength >= 15) {
+            numIntervals = 3;
+        }
+
+        const step = totalLength / numIntervals;
+        const kMid = Math.floor(numIntervals / 2);
+
+        let segIdx = 0;
+        const candidates: {
+            coordinates: [number, number];
+            p0: number[];
+            p1: number[];
+            minZoom: number;
+            collides: boolean;
+        }[] = [];
+
+        for (let k = 1; k < numIntervals; k++) {
+            const targetDist = k * step;
+            while (segIdx < coords.length - 2 && cumDist[segIdx + 1] < targetDist) {
+                segIdx++;
+            }
+            const segStartDist = cumDist[segIdx];
+            const segLen = cumDist[segIdx + 1] - segStartDist;
+            const t = segLen > 0 ? (targetDist - segStartDist) / segLen : 0.5;
+            const p0 = coords[segIdx];
+            const p1 = coords[segIdx + 1];
+            const lon = p0[0] + t * (p1[0] - p0[0]);
+            const lat = p0[1] + t * (p1[1] - p0[1]);
+
+            const j = Math.abs(k - kMid);
+            const tz = j === 0 ? 5 : 31 - Math.clz32(j & -j);
+            const minZoom = tz >= 5 ? 0 : 20 - tz;
+
+            let collides = false;
+            for (const lz of labelZones) {
+                const dx = (lon - lz.lon) * metersPerDegLon;
+                const dy = (lat - lz.lat) * metersPerDegLat;
+                if (Math.hypot(dx, dy) < lz.radiusMeters) {
+                    collides = true;
+                    break;
+                }
+            }
+
+            candidates.push({
+                coordinates: [lon, lat],
+                p0,
+                p1,
+                minZoom,
+                collides,
+            });
+        }
+
+        for (let i = 0; i < candidates.length; i++) {
+            if (!candidates[i].collides) continue;
+            for (let d = 1; d < candidates.length; d++) {
+                let promoted = false;
+                if (i - d >= 0 && !candidates[i - d].collides) {
+                    candidates[i - d].minZoom = Math.min(candidates[i - d].minZoom, candidates[i].minZoom);
+                    promoted = true;
+                }
+                if (i + d < candidates.length && !candidates[i + d].collides) {
+                    candidates[i + d].minZoom = Math.min(candidates[i + d].minZoom, candidates[i].minZoom);
+                    promoted = true;
+                }
+                if (promoted) break;
+            }
+        }
+
+        const filtered = candidates.filter((c) => !c.collides);
+        return filtered.length > 0 ? filtered : candidates;
     }
 
     private addIDsToIconsStore(id: Segment['id'], ...strings: string[]) {
@@ -287,26 +473,42 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    // TODO: this function should cache values  instead of accessing preferences and sdk each time
     private getColorStringFromSpeed(metricspeed: number | null) {
-        if (this.mediator.getPreference('showSLSinglecolor')) {
-            return this.mediator.getPreference('SLColor');
+        const cached = this.speedColorCache.get(metricspeed);
+        if (cached !== undefined) {
+            return cached;
         }
-        if (metricspeed === null) {
-            return this.mediator.getPreference('speeds')['default'];
+        let color: string;
+        if (this.prefShowSLSingleColor) {
+            color = this.prefSLColor;
+        } else {
+            const speedsPref = this.prefSpeeds;
+            if (metricspeed === null) {
+                color = speedsPref['default'];
+            } else {
+                const type = this.isImperial ? 'imperial' : 'metric';
+                const speed = this.isImperial
+                    ? Math.round(metricspeed / 1.609344)
+                    : metricspeed;
+                color = speedsPref[type]?.[speed] ?? speedsPref['default'];
+            }
         }
-        const type = this.isImperial ? 'imperial' : 'metric';
-        const speed = this.isImperial
-            ? Math.round(metricspeed / 1.609344)
-            : metricspeed;
-        return (
-            this.mediator.getPreference('speeds')[type][speed] ?? this.mediator.getPreference('speeds')['default']
-        );
+        this.speedColorCache.set(metricspeed, color);
+        return color;
+    }
+
+    private enqueueDataModelOp(op: () => Promise<void>): Promise<void> {
+        const next = this.dataModelQueue.then(op, op);
+        this.dataModelQueue = next.catch((err) => {
+            console.error("SVL: Error in data model operation:", err);
+        });
+        return next;
     }
 
     public redrawAll(): void {
         // Logic to redraw all SVL layers
-        console.log("Redrawing all SVL layers…");
+        Utils.debugLog("Redrawing all SVL layers…");
+        this.drawGeneration++;
         // Clear any pending redraw to avoid multiple rapid redraws
         if (this.redrawTimeout !== null) {
             clearTimeout(this.redrawTimeout);
@@ -314,168 +516,228 @@ export default class RenderingController extends AbstractController {
 
         // Throttle redraw operations to improve performance
         this.redrawTimeout = window.setTimeout(() => {
-            if (this.mediator.getState() === SVLLayerState.VISIBLE) {
-                this.destroyAllFeatures();
-                this.addAllSegmentsSDK();
-                this.addAllNodesSDK();
-            }
             this.redrawTimeout = null;
+            const generation = ++this.drawGeneration;
+            void this.enqueueDataModelOp(async () => {
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.destroyAllFeatures();
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.addAllSegmentsSDK(generation);
+                if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+                await this.addAllNodesSDK(generation);
+            });
         }, 100); // 100ms throttle
     }
 
-    private destroyAllFeatures(): void {
-        this.removeAllSegmentsFromLayer();
-        this.labelsVector.destroyFeatures(this.labelsVector.features, { 'silent': true });
-        this.removeAllNodesFromLayer();
+    private async destroyAllFeatures(): Promise<void> {
+        await this.removeAllSegmentsFromLayer();
+        await this.removeAllNodesFromLayer();
     }
 
-    private addAllSegmentsSDK(): void {
-        this.addSegmentsByModel(this.mediator.wmeSDK.DataModel.Segments.getAll());
+    private async addAllSegmentsSDK(generation: number = this.drawGeneration): Promise<void> {
+        const segments = await this.mediator.wmeSDK.DataModel.Segments.getAll();
+        if (generation !== this.drawGeneration) return;
+        await this.addSegmentsByModel(segments, generation);
     }
 
-    public shouldDrawingResumeAfterAbort() {
-        Utils.debugLog(`Segments: ${this.mediator.wmeSDK.DataModel.Segments.getAll().length}, Nodes: ${this.mediator.wmeSDK.DataModel.Nodes.getAll().length}`);
-        Utils.debugLog(`Limits: Segments: ${this.mediator.getPreference('segmentsThreshold')}, Nodes: ${this.mediator.getPreference('nodesThreshold')}`);
+    public async shouldDrawingResumeAfterAbort(): Promise<void> {
+        const [segments, nodes] = await Promise.all([
+            this.mediator.wmeSDK.DataModel.Segments.getAll(),
+            this.mediator.wmeSDK.DataModel.Nodes.getAll()
+        ]);
+        const segmentsCount = segments.length;
+        const nodesCount = nodes.length;
+        const segmentsThreshold = this.prefSegmentsThreshold;
+        const nodesThreshold = this.prefNodesThreshold;
+        Utils.debugLog(`Segments: ${segmentsCount}, Nodes: ${nodesCount}`);
+        Utils.debugLog(`Limits: Segments: ${segmentsThreshold}, Nodes: ${nodesThreshold}`);
         if (
-            this.mediator.wmeSDK.DataModel.Segments.getAll().length < this.mediator.getPreference('segmentsThreshold') &&
-            this.mediator.wmeSDK.DataModel.Nodes.getAll().length < this.mediator.getPreference('nodesThreshold')
+            segmentsCount < segmentsThreshold &&
+            nodesCount < nodesThreshold
         ) {
-            this.mediator.notify(this, AcceptedControllerEvents.SVL_LAYER_ENABLED);
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_SHOULD_ENABLE_LAYER);
         }
     }
 
-    private addSegmentsByModel(segments: Segment[]): void {
+    private async addSegmentsByModel(segments: Segment[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
-        if (__DEBUG__) {
-            if (currentState === SVLLayerState.DRAWING_ABORTED) {
-                alert("Drawing aborted state detected in addSegmentsByModel");
-            }
-        }
-        if (segments.length === 0) return;
-        if (!(currentState === SVLLayerState.DRAWING_ABORTED) && segments.length > this.mediator.getPreference('segmentsThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+        if (currentState !== SVLLayerState.VISIBLE || segments.length === 0 || generation !== this.drawGeneration) return;
+        if (segments.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${segments.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
-        //let features: SdkFeature<LineString>[] = [];
-        let labels: any[] = [];
+
+        const [userInfo, streets] = await Promise.all([
+            this.mediator.wmeSDK.State.getUserInfo(),
+            this.mediator.wmeSDK.DataModel.Streets.getAll(),
+        ]);
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+
+        this.cachedUserRank = userInfo?.rank;
+        const streetsMap = new Map<number, Street>();
+        for (let i = 0; i < streets.length; i++) {
+            streetsMap.set(streets[i].id, streets[i]);
+        }
+
+        const results = await Promise.all(
+            segments.map(s => this.drawSegmentSDK(s, streetsMap))
+        );
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+            this.queuedSegments.clear();
+            this.queuedArrows.clear();
+            this.queuedIcons.clear();
+            return;
+        }
+
+        const labels: OpenLayers.Feature.Vector[] = [];
+        const staleLabels: OpenLayers.Feature.Vector[] = [];
         for (let i = 0; i < segments.length; i++) {
-            let s = segments[i];
-            const res = this.drawSegmentSDK(s);
-            if (res) {
-                if (res.labels)
-                    labels.push(...res.labels);
+            const s = segments[i];
+            const existing = this.labelsStore.get(s.id);
+            if (existing) {
+                staleLabels.push(...existing);
+                this.labelsStore.delete(s.id);
+            }
+            const res = results[i];
+            if (res && res.labels && res.labels.length > 0) {
+                this.labelsStore.set(s.id, res.labels);
+                labels.push(...res.labels);
             }
         }
-        this.drawAllQueues();
+        if (staleLabels.length > 0) {
+            this.labelsVector?.destroyFeatures(staleLabels, { 'silent': true });
+        }
+        await this.drawAllQueues();
 
-        if (labels.length > 0) {
-            this.labelsVector.addFeatures(labels, { 'silent': true });
+        if (labels.length > 0 && generation === this.drawGeneration && this.mediator.getState() === SVLLayerState.VISIBLE) {
+            this.labelsVector?.addFeatures(labels, { 'silent': true });
         }
     }
 
-    private async queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
         this.queuedArrows.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToArrowsStore(id, feature.id);
+        this.addIDsToArrowsStore(id, String(feature.id));
     }
-    private async queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        feature.id = `${id}_i_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
         this.queuedIcons.add(feature);
         // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToIconsStore(id, feature.id);
+        this.addIDsToIconsStore(id, String(feature.id));
     }
 
-    private drawAllQueues() {
-        this.drawQueuedSegments();
-        this.drawQueuedArrows();
-        this.drawQueuedIcons();
+    private async drawAllQueues(): Promise<void> {
+        await Promise.all([
+            this.drawQueuedSegments(),
+            this.drawQueuedArrows(),
+            this.drawQueuedIcons()
+        ]);
     }
 
-    private drawQueuedSegments() {
+    private async drawQueuedSegments(): Promise<void> {
         if (this.queuedSegments.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedSegments.size} queued segments`);
             // Convert to array once instead of calling Array.from repeatedly
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.SEGMENTS, features: Array.from(this.queuedSegments) });
+            const features = Array.from(this.queuedSegments);
             this.queuedSegments.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.SEGMENTS, features });
         }
     }
 
-    private drawQueuedArrows() {
+    private async drawQueuedArrows(): Promise<void> {
         if (this.queuedArrows.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedArrows.size} queued arrows`);
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ARROWS, features: Array.from(this.queuedArrows) });
+            const features = Array.from(this.queuedArrows);
             this.queuedArrows.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ARROWS, features });
         }
     }
 
-    private drawQueuedIcons() {
+    private async drawQueuedIcons(): Promise<void> {
         if (this.queuedIcons.size > 0) {
             this.mediator.debugLog(`Drawing ${this.queuedIcons.size} queued icons`);
-            this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ICONS, features: Array.from(this.queuedIcons) });
+            const features = Array.from(this.queuedIcons);
             this.queuedIcons.clear();
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ICONS, features });
         }
     }
 
-    private addNodesByModel(nodes: Node[]): void {
+    private async addNodesByModel(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
         const currentState = this.mediator.getState();
-        if (__DEBUG__) {
-            if (currentState === SVLLayerState.DRAWING_ABORTED) {
-                alert("Drawing aborted state detected in addAllNodesSDK");
-            }
-        }
-        if (nodes.length === 0) return;
-        if (!(currentState === SVLLayerState.DRAWING_ABORTED) && nodes.length > this.mediator.getPreference('nodesThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.mediator.getPreference('nodesThreshold')}.\nYou can change this in the SVL preferences panel.`);
+        if (currentState !== SVLLayerState.VISIBLE || nodes.length === 0 || generation !== this.drawGeneration) return;
+        if (nodes.length > this.prefNodesThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${nodes.length} nodes. The current limit is set to ${this.prefNodesThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
         // TODO: this should not happen here. First the events in layerStateController should fire and manage that
-        if (this.mediator.wmeSDK.Map.getZoomLevel() <= this.mediator.getPreference('useWMERoadLayerAtZoom')) {
-            console.debug('Not adding nodes them because of the zoom');
+        if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.prefUseWMERoadLayerAtZoom) {
+            Utils.debugLog('Not adding nodes because of the zoom');
             return;
         }
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
 
-        this.addNodesSDK(nodes);
+        await this.addNodesSDK(nodes, generation);
     }
 
-    private addAllNodesSDK(): void {
-        this.addNodesByModel(this.mediator.wmeSDK.DataModel.Nodes.getAll());
+    private async addAllNodesSDK(generation: number = this.drawGeneration): Promise<void> {
+        const nodes = await this.mediator.wmeSDK.DataModel.Nodes.getAll();
+        if (generation !== this.drawGeneration) return;
+        await this.addNodesByModel(nodes, generation);
     }
 
-    private addNodesSDK(nodes: Node[]) {
-        let sdkFeatures: SdkFeature<Point>[] = [];
-        for (let i = 0; i < nodes.length; i++) {
-            let n = nodes[i];
-            if (!this.mediator.wmeSDK.DataModel.isDeleted({
-                dataModelName: "nodes",
-                objectId: n.id
-            })) {
-                //consoleDebug(`Adding node ${n.id}`);
+    private async addNodesSDK(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
+        const nodesToProcess = nodes.filter(n => !this.nodesStore.has(n.id));
+        if (nodesToProcess.length === 0) return;
+
+        const nodeStatuses = await Promise.all(
+            nodesToProcess.map(async (n) => {
+                const isDeleted = await this.mediator.wmeSDK.DataModel.isDeleted({
+                    dataModelName: "nodes",
+                    objectId: n.id
+                });
+                if (isDeleted) return null;
+                try {
+                    const isVirtual = await this.mediator.wmeSDK.DataModel.Nodes.isVirtual({ nodeId: n.id });
+                    return isVirtual ? 1 : 0;
+                } catch {
+                    // Node is no longer in the data model (DataModelNotFoundError)
+                    return null;
+                }
+            })
+        );
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+
+        const sdkFeatures: SdkFeature<Point>[] = [];
+        for (let i = 0; i < nodesToProcess.length; i++) {
+            const n = nodesToProcess[i];
+            const isVirtualNode = nodeStatuses[i];
+            if (isVirtualNode !== null && !this.nodesStore.has(n.id)) {
+                this.nodesStore.add(n.id);
                 sdkFeatures.push(
                     {
                         id: n.id,
                         geometry: n.geometry,
                         properties: {
-                            "conSegm": n.connectedSegmentIds.length
+                            "conSegm": n.connectedSegmentIds.length,
+                            "isVirtualNode": isVirtualNode
                         },
                         type: "Feature",
                     }
                 );
-            } else {
-                // Adding a node that was deleted. This can happen if the map gets moved / zoomed while editing
             }
         }
 
-        this.mediator.wmeSDK.Map.addFeaturesToLayer({
-            features: sdkFeatures,
-            layerName: SDK_LAYERS.NODES
-        })
+        if (sdkFeatures.length > 0) {
+            await this.mediator.wmeSDK.Map.addFeaturesToLayer({
+                features: sdkFeatures,
+                layerName: SDK_LAYERS.NODES
+            });
+        }
     }
 
 
-    private removeAllSegmentsFromLayer() {
+    private async removeAllSegmentsFromLayer(): Promise<void> {
         this.queuedSegments.clear();
         this.segmentsStore.clear();
 
@@ -485,54 +747,107 @@ export default class RenderingController extends AbstractController {
         this.queuedIcons.clear();
         this.iconsStore.clear();
 
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.SEGMENTS
-        });
+        this.labelsStore.clear();
+        this.labelsVector?.destroyFeatures(this.labelsVector.features, { 'silent': true });
 
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.ARROWS
-        });
-
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-            layerName: SDK_LAYERS.ICONS
-        });
+        await Promise.all([
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.SEGMENTS
+            }),
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.ARROWS
+            }),
+            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+                layerName: SDK_LAYERS.ICONS
+            })
+        ]);
     }
 
-    private removeAllNodesFromLayer() {
-        this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
+    private async removeAllNodesFromLayer(): Promise<void> {
+        this.nodesStore.clear();
+        await this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
             layerName: SDK_LAYERS.NODES
         });
     }
 
-    public addSegmentsByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`addSegmentsSDK - Adding ${objectIds.length} segments`);
-        if (objectIds.length > this.mediator.getPreference('segmentsThreshold')) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${objectIds.length} segments. The current limit is set to ${this.mediator.getPreference('segmentsThreshold')}.\nYou can change this in the SVL preferences panel.`);
+    public async addSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.addSegmentsByIdsInternal(objectIds));
+    }
+
+    private async addSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
+        if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+        const idsToAdd = objectIds.filter(id => !this.segmentsStore.has(id));
+        if (idsToAdd.length === 0) return;
+
+        Utils.debugLog(`addSegmentsSDK - Adding ${idsToAdd.length} segments`);
+        if (idsToAdd.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${idsToAdd.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
-        const segments = objectIds.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id })).filter(s => s !== null) as Segment[];
-        this.addSegmentsByModel(segments);
+        const generation = this.drawGeneration;
+        let segments: Segment[];
+        if (idsToAdd.length > 50) {
+            const idSet = new Set(idsToAdd);
+            const allSegments = await this.mediator.wmeSDK.DataModel.Segments.getAll();
+            segments = allSegments.filter((s: Segment) => idSet.has(s.id));
+        } else {
+            segments = (await Promise.all(
+                idsToAdd.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id }))
+            )).filter((s: Segment | null): s is Segment => s !== null);
+        }
+        if (generation !== this.drawGeneration) return;
+        await this.addSegmentsByModel(segments, generation);
     }
 
-    public addNodesByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`addNodesSDK - Adding ${objectIds.length} nodes`);
-        const nodes = objectIds.map(id => this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: id })).filter(n => n !== null) as Node[];
-        this.addNodesByModel(nodes);
+    public async addNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.addNodesByIdsInternal(objectIds));
     }
 
-    public removeSegmentsByIds(objectIds: (number)[]): void {
+    private async addNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
+        if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+        const idsToAdd = objectIds.filter(id => !this.nodesStore.has(id));
+        if (idsToAdd.length === 0) return;
+
+        Utils.debugLog(`addNodesSDK - Adding ${idsToAdd.length} nodes`);
+        const generation = this.drawGeneration;
+        let nodes: Node[];
+        if (idsToAdd.length > 50) {
+            const idSet = new Set(idsToAdd);
+            const allNodes = await this.mediator.wmeSDK.DataModel.Nodes.getAll();
+            nodes = allNodes.filter((n: Node) => idSet.has(n.id));
+        } else {
+            nodes = (await Promise.all(
+                idsToAdd.map(id => this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: id }))
+            )).filter((n: Node | null): n is Node => n !== null);
+        }
+        if (generation !== this.drawGeneration) return;
+        await this.addNodesByModel(nodes, generation);
+    }
+
+    public async removeSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.removeSegmentsByIdsInternal(objectIds));
+    }
+
+    private async removeSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
         const segmentsFeatureIds: string[] = [];
+        const labelsToDestroy: OpenLayers.Feature.Vector[] = [];
         for (let i = 0; i < objectIds.length; i++) {
-            let set = this.segmentsStore.get(objectIds[i]);
+            const segId = objectIds[i];
+            const set = this.segmentsStore.get(segId);
             if (set) {
                 segmentsFeatureIds.push(...Array.from(set));
+                this.segmentsStore.delete(segId);
             }
-            this.labelsVector.destroyFeatures(
-                this.labelsVector.getFeaturesByAttribute('sID', objectIds[i]),
-                { 'silent': true }
-            );
+            const segLabels = this.labelsStore.get(segId);
+            if (segLabels) {
+                labelsToDestroy.push(...segLabels);
+                this.labelsStore.delete(segId);
+            }
+        }
+        if (labelsToDestroy.length > 0) {
+            this.labelsVector?.destroyFeatures(labelsToDestroy, { 'silent': true });
         }
 
 
@@ -541,6 +856,7 @@ export default class RenderingController extends AbstractController {
             const set = this.arrowsStore.get(objectIds[i]);
             if (set) {
                 arrowsFeatureIds.push(...Array.from(set));
+                this.arrowsStore.delete(objectIds[i]);
             }
         }
 
@@ -549,53 +865,74 @@ export default class RenderingController extends AbstractController {
             const set = this.iconsStore.get(objectIds[i]);
             if (set) {
                 iconsFeatureIds.push(...Array.from(set));
+                this.iconsStore.delete(objectIds[i]);
             }
         }
 
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: segmentsFeatureIds,
-            layerName: SDK_LAYERS.SEGMENTS
-        });
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: arrowsFeatureIds,
-            layerName: SDK_LAYERS.ARROWS
-        });
-
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: iconsFeatureIds,
-            layerName: SDK_LAYERS.ICONS
-        });
-    }
-
-    public removeNodesByIds(objectIds: (number)[]): void {
-        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
-        this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-            featureIds: objectIds,
-            layerName: SDK_LAYERS.NODES
-        })
-    }
-
-    public updateSegmentsByIds(objectIds: (number)[]): void {
-        this.removeSegmentsByIds(objectIds);
-        this.addSegmentsByIds(objectIds);
-    }
-
-    public updateNodesByIds(objectIds: (number)[]): void {
-        if (objectIds.length === 0) return;
-        let nodes = objectIds.map((nodeId) => {
-            return this.mediator.wmeSDK.DataModel.Nodes.getById({ nodeId: nodeId as number });
-        }).filter((n) => n !== null) as Node[];
-        if (nodes.length == 0) {
-            Utils.debugLog("No nodes found to update");
-            return;
+        const promises: Promise<void>[] = [];
+        if (segmentsFeatureIds.length > 0) {
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: segmentsFeatureIds,
+                layerName: SDK_LAYERS.SEGMENTS
+            }));
         }
-        this.removeNodesByIds(objectIds);
-        this.addNodesSDK(nodes);
+        if (arrowsFeatureIds.length > 0) {
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: arrowsFeatureIds,
+                layerName: SDK_LAYERS.ARROWS
+            }));
+        }
+
+        if (iconsFeatureIds.length > 0) {
+            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: iconsFeatureIds,
+                layerName: SDK_LAYERS.ICONS
+            }));
+        }
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
+    }
+
+    public async removeNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.removeNodesByIdsInternal(objectIds));
+    }
+
+    private async removeNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
+        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
+        for (let i = 0; i < objectIds.length; i++) {
+            this.nodesStore.delete(objectIds[i]);
+        }
+        if (objectIds.length > 0) {
+            await this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                featureIds: objectIds,
+                layerName: SDK_LAYERS.NODES
+            });
+        }
+    }
+
+    public async updateSegmentsByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null || objectIds.length === 0) return;
+            await this.removeSegmentsByIdsInternal(objectIds);
+            await this.addSegmentsByIdsInternal(objectIds);
+        });
+    }
+
+    public async updateNodesByIds(objectIds: (number)[]): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null || objectIds.length === 0) return;
+            await this.removeNodesByIdsInternal(objectIds);
+            await this.addNodesByIdsInternal(objectIds);
+        });
     }
 
     // TODO: refactor (Strategy pattern?)
-    private drawSegmentSDK(model: Segment): { labels: any } {
-        if (!model || this.mediator.wmeSDK.DataModel.isDeleted({
+    private async drawSegmentSDK(
+        model: Segment,
+        streetsMap: Map<number, Street>,
+    ): Promise<{ labels: OpenLayers.Feature.Vector[] | undefined }> {
+        if (!model || await this.mediator.wmeSDK.DataModel.isDeleted({
             dataModelName: "segments",
             objectId: model.id
         })) {
@@ -603,35 +940,11 @@ export default class RenderingController extends AbstractController {
             return { labels: [] };
         }
 
-        const { id, geometry, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, length, primaryStreetId } = model;
+        const { id, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, primaryStreetId } = model;
         this.mediator.debugLog(`Drawing segment: ${id}`);
         // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
 
-        //const segmentFeatures: SdkFeature<LineString>[] = [];
-
-        /*
-        const geoPoints = model.getGeometry().coordinates; // array of coordinates
-        const olPointArray = geoPoints.map(geoPoint => new OpenLayers.Geometry.Point(geoPoint[0], geoPoint[1]).transform(gmapsProjection, OLMap.projection));
-        const simplified = new OpenLayers.Geometry.LineString(olPointArray).simplify(
-          1.5
-        ).components;
-        */
         const geometryPointArray = model.geometry.coordinates;
-        const simplified = simplify(geometry, { tolerance: 0.00001, highQuality: false, mutate: false });
-        /* Visualize simplified, for testing
-        let redSegment: SdkFeature<LineString> = {
-          type: 'Feature',
-          id: model.id,
-          geometry: simplified,
-          properties: {
-            "color": preferences['red']['strokeColor'],
-            "width": 10,
-            "dash": preferences['red']['strokeDashstyle'],
-            'zIndex': 100
-          },
-        };
-        queueSegmentFeatureForDrawing(model.id, redSegment);
-        */
         const baselevel = (elevationLevel ?? 0) * 100;
         const isInRoundabout = model.junctionId !== null;
         let isBridge = false;
@@ -640,21 +953,22 @@ export default class RenderingController extends AbstractController {
         let roadType = initialRoadType;
         //Compute the segment width
         let segmentWidth: number = 0;
-        if (this.mediator.getPreference('realsize')) {
+        if (this.prefRealSize) {
+            const defaultLaneWidth = this.defaultLaneWidthMeters[initialRoadType] ?? 3.5;
             let segmentWidthFrom = 0;
             let segmentWidthTo = 0;
             if (fromLanesInfo) {
                 if (fromLanesInfo.laneWidth) {
                     segmentWidthFrom =
                         (fromLanesInfo.numberOfLanes *
-                            (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth))
+                            (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth));
                 } else {
                     segmentWidthFrom =
                         fromLanesInfo.numberOfLanes *
-                        this.defaultLaneWidthMeters[initialRoadType];
+                        defaultLaneWidth;
                 }
             } else {
-                segmentWidthFrom = this.defaultLaneWidthMeters[initialRoadType];
+                segmentWidthFrom = defaultLaneWidth;
             }
 
             if (toLanesInfo) {
@@ -665,10 +979,10 @@ export default class RenderingController extends AbstractController {
                 } else {
                     segmentWidthTo =
                         toLanesInfo.numberOfLanes *
-                        this.defaultLaneWidthMeters[initialRoadType];
+                        defaultLaneWidth;
                 }
             } else {
-                segmentWidthTo = this.defaultLaneWidthMeters[initialRoadType];
+                segmentWidthTo = defaultLaneWidth;
             }
 
             if (!isTwoWay) {
@@ -683,35 +997,41 @@ export default class RenderingController extends AbstractController {
             }
         } else {
             //Use the static value from the preferences
-            segmentWidth = this.streetStyles[roadType].strokeWidth;
+            segmentWidth = this.streetStyles[roadType]?.strokeWidth ?? 0;
         }
 
         const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
-        //console.log("TOTAL WIDTH: " + totalSegmentWidth);
         // roadWidth: the width of the "inner" segment, without decorations around it. It will be modified later
         let roadWidth = totalSegmentWidth;
         if (primaryStreetId === null) {
             // consoleDebug("RED segment", model);
-            let redSegment: SdkFeature<LineString> = {
+            const redSegment: SdkFeature<LineString> = {
                 type: 'Feature',
-                id: model.id,
+                id: `${model.id}_red`,
                 geometry: model.geometry,
                 properties: {
-                    "color": this.mediator.getPreference('red.strokeColor'),
+                    "color": this.prefRedStyle.strokeColor,
                     "width": totalSegmentWidth,
-                    "dash": this.mediator.getPreference('red.strokeDashstyle'),
+                    "dash": this.prefRedStyle.strokeDashstyle,
                 },
             };
             this.queueSegmentFeatureForDrawing(model.id, redSegment);
             return { labels: [] };
         }
 
-        // consoleDebug(width);
         if (
-            this.mediator.getPreference('routingModeEnabled') &&
+            this.mediator.isRoutingModeActive() &&
             model.routingRoadType !== null
         ) {
             roadType = model.routingRoadType;
+        }
+
+        // Compute labels first so one-way arrow placement can avoid colliding with them
+        const w = unsafeWindow.W ?? W;
+        const oldModel = w.model.segments.getObjectById(model.id);
+        let labels: OpenLayers.Feature.Vector[] | undefined;
+        if (oldModel) {
+            labels = this.drawLabels(oldModel, oldModel.getOLGeometry().simplify(7).components, model, streetsMap, roadType);
         }
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -721,9 +1041,9 @@ export default class RenderingController extends AbstractController {
                 // it is a bridge
                 // consoleDebug("Bridge");
                 isBridge = true;
-                let bridge: SdkFeature<LineString> = {
+                const bridge: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_br`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
@@ -734,7 +1054,7 @@ export default class RenderingController extends AbstractController {
                 this.queueSegmentFeatureForDrawing(model.id, bridge);
             }
 
-            hasSpeedLimitDrawn = speed && this.mediator.getPreference('showSLcolor');
+            hasSpeedLimitDrawn = Boolean(speed) && this.prefShowSLColor;
             // roadWidth: the width of the "inner" segment, without decorations around it
             if (hasSpeedLimitDrawn && isBridge) {
                 // A bridge with speed limit
@@ -749,12 +1069,12 @@ export default class RenderingController extends AbstractController {
                 // consoleDebug("SpeedLimit");
 
                 if (
-                    !this.mediator.getPreference('showSLSinglecolor') &&
+                    !this.prefShowSLSingleColor &&
                     (fwdSpeedLimit || revSpeedLimit) &&
                     fwdSpeedLimit !== revSpeedLimit &&
                     isTwoWay
                 ) {
-                    if (this.mediator.getPreference('realsize')) {
+                    if (this.prefRealSize) {
                         // consoleDebug("The segment has 2 different speed limits");
                         // It has 2 different speeds:
                         const offset = (isBridge
@@ -768,9 +1088,9 @@ export default class RenderingController extends AbstractController {
                         const revSpeedFeature = lineOffset(model.geometry, -offset, { units: 'meters' });
 
 
-                        let leftSpeedLimit: SdkFeature<LineString> = {
+                        const leftSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl_l`,
                             geometry: fwdSpeedFeature.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(fwdSpeedLimit),
@@ -782,9 +1102,9 @@ export default class RenderingController extends AbstractController {
                         };
                         this.queueSegmentFeatureForDrawing(model.id, leftSpeedLimit);
 
-                        let rightSpeedLimit: SdkFeature<LineString> = {
+                        const rightSpeedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl_r`,
                             geometry: revSpeedFeature.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(revSpeedLimit),
@@ -799,9 +1119,9 @@ export default class RenderingController extends AbstractController {
                         // realsize is disabled, we cannot draw 2 separate lines.
                         let speedValue = fwdSpeedLimit; // If the segment is two way, take any speed, they are equal.
                         if (speedValue) {
-                            let speedLimit: SdkFeature<LineString> = {
+                            const speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
-                                id: model.id,
+                                id: `${model.id}_sl_f`,
                                 geometry: model.geometry,
                                 properties: {
                                     'color': this.getColorStringFromSpeed(speedValue),
@@ -815,9 +1135,9 @@ export default class RenderingController extends AbstractController {
                         }
                         speedValue = revSpeedLimit; // If the segment is two way, take any speed, they are equal.
                         if (speedValue) {
-                            let speedLimit: SdkFeature<LineString> = {
+                            const speedLimit: SdkFeature<LineString> = {
                                 type: 'Feature',
-                                id: model.id,
+                                id: `${model.id}_sl_rv`,
                                 geometry: model.geometry,
                                 properties: {
                                     'color': this.getColorStringFromSpeed(speedValue),
@@ -839,9 +1159,9 @@ export default class RenderingController extends AbstractController {
                         speedValue = revSpeedLimit;
                     }
                     if (speedValue) {
-                        let speedLimit: SdkFeature<LineString> = {
+                        const speedLimit: SdkFeature<LineString> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_sl`,
                             geometry: model.geometry,
                             properties: {
                                 'color': this.getColorStringFromSpeed(speedValue),
@@ -857,9 +1177,9 @@ export default class RenderingController extends AbstractController {
             }
 
             // Draw the road
-            let roadFeature: SdkFeature<LineString> = {
+            const roadFeature: SdkFeature<LineString> = {
                 type: 'Feature',
-                id: model.id,
+                id: `${model.id}_rd`,
                 geometry: model.geometry,
                 properties: {
                     'color': this.streetStyles[roadType]['strokeColor'],
@@ -872,9 +1192,9 @@ export default class RenderingController extends AbstractController {
 
             if (elevationLevel && elevationLevel < 0) {
                 // Tunnel
-                let tunnel: SdkFeature<LineString> = {
+                const tunnel: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tun`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
@@ -887,14 +1207,14 @@ export default class RenderingController extends AbstractController {
             }
 
             const currentLock = lockRank + 1;
-            const userRank = this.mediator.wmeSDK.State.getUserInfo()?.rank;
+            const userRank = this.cachedUserRank ?? (await this.mediator.wmeSDK.State.getUserInfo())?.rank;
             if (
-                currentLock > this.mediator.getPreference('fakelock') ||
+                currentLock > this.prefFakelock ||
                 (typeof userRank !== "undefined" && currentLock > (userRank + 1))
             ) {
-                let fakelock: SdkFeature<LineString> = {
+                const fakelock: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_lk`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.nonEditableStyle.strokeColor,
@@ -909,16 +1229,15 @@ export default class RenderingController extends AbstractController {
             const flags = flagAttributes;
 
             if (flags.unpaved) {
-
-                let unpaved: SdkFeature<LineString> = {
+                const unpaved: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_unp`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('dirty.strokeColor'),
+                        'color': this.prefDirtyStyle.strokeColor,
                         'width': roadWidth * 0.7,
-                        'opacity': this.mediator.getPreference('dirty.strokeOpacity'),
-                        'dash': this.mediator.getPreference('dirty.strokeDashstyle'),
+                        'opacity': this.prefDirtyStyle.strokeOpacity,
+                        'dash': this.prefDirtyStyle.strokeDashstyle,
                         'zIndex': baselevel + 135,
                     },
                 };
@@ -929,15 +1248,15 @@ export default class RenderingController extends AbstractController {
 
             // CLOSE Zoom properties
             if (hasClosures) {
-                let closureLine: SdkFeature<LineString> = {
+                const closureLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_cl`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('closure.strokeColor'),
+                        'color': this.prefClosureStyle.strokeColor,
                         'width': roadWidth * 0.6,
-                        'dash': this.mediator.getPreference('closure.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('closure.strokeOpacity'),
+                        'dash': this.prefClosureStyle.strokeDashstyle,
+                        'opacity': this.prefClosureStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 140,
                     },
@@ -946,20 +1265,24 @@ export default class RenderingController extends AbstractController {
             }
 
             try {
+                const mightBeToll = !oldModel
+                    || Boolean(oldModel.attributes.fwdToll || oldModel.attributes.revToll)
+                    || (hasRestrictions && model.restrictions.some((r: any) => r.defaultType === 'TOLL'));
                 if (
-                    this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })
+                    mightBeToll &&
+                    await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })
                 ) {
                     // It is a toll road
                     // consoleDebug("Segment is toll");
-                    let tollLine: SdkFeature<LineString> = {
+                    const tollLine: SdkFeature<LineString> = {
                         type: 'Feature',
-                        id: model.id,
+                        id: `${model.id}_tl`,
                         geometry: model.geometry,
                         properties: {
-                            'color': this.mediator.getPreference('toll.strokeColor'),
+                            'color': this.prefTollStyle.strokeColor,
                             'width': roadWidth * 0.3, // TODO preferences['toll']['strokeWidth'],
-                            'dash': this.mediator.getPreference('toll.strokeDashstyle'),
-                            'opacity': this.mediator.getPreference('toll.strokeOpacity'),
+                            'dash': this.prefTollStyle.strokeDashstyle,
+                            'opacity': this.prefTollStyle.strokeOpacity,
                             'zIndex': baselevel + 145,
                         },
                     };
@@ -970,9 +1293,9 @@ export default class RenderingController extends AbstractController {
             if (isInRoundabout) {
                 // It is a roundabout
                 // consoleDebug("Segment is a roundabout");
-                let roundaboutLine: SdkFeature<LineString> = {
+                const roundaboutLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ra`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.roundaboutStyle.strokeColor,
@@ -989,51 +1312,32 @@ export default class RenderingController extends AbstractController {
             if (hasRestrictions) {
                 // It has restrictions
                 // consoleDebug("Segment has restrictions");
-                let restrictionLine: SdkFeature<LineString> = {
+                const restrictionLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_res`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('restriction.strokeColor'),
+                        'color': this.prefRestrictionStyle.strokeColor,
                         'width': roadWidth * 0.4, // this.mediator.getPreference('restriction.strokeWidth'),
-                        'dash': this.mediator.getPreference('restriction.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('restriction.strokeOpacity'),
+                        'dash': this.prefRestrictionStyle.strokeDashstyle,
+                        'opacity': this.prefRestrictionStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 155,
                     },
-                }
+                };
                 this.queueSegmentFeatureForDrawing(model.id, restrictionLine);
             }
 
-            /*
-            // TODO: not supported by SDK
-            if (model.validated === false) {
-              // Segments that needs validation
-              lineFeature = new OpenLayers.Feature.Vector(
-                new OpenLayers.Geometry.LineString(olPointArray),
-                {
-                  'sID': attributes.id,
-                  'color': validatedStyle.strokeColor,
-                  'width': roadWidth * 0.5, // validatedStyle.strokeWidth,
-                  'dash': validatedStyle.strokeDashstyle,
-                  closeZoomOnly: true,
-                  'zIndex': baselevel + 160,
-                }
-              );
-              segmentFeatures.push(lineFeature);
-            }
-            */
-
             if (flags.headlights) {
-                let headlights: SdkFeature<LineString> = {
+                const headlights: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_hl`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('headlights.strokeColor'),
+                        'color': this.prefHeadlightsStyle.strokeColor,
                         'width': roadWidth * 0.2, // this.mediator.getPreference('headlights.strokeWidth'),
-                        'dash': this.mediator.getPreference('headlights.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('headlights.strokeOpacity'),
+                        'dash': this.prefHeadlightsStyle.strokeDashstyle,
+                        'opacity': this.prefHeadlightsStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 165,
                     },
@@ -1041,15 +1345,15 @@ export default class RenderingController extends AbstractController {
                 this.queueSegmentFeatureForDrawing(model.id, headlights);
             }
             if (flags.nearbyHOV) {
-                let nearbyHOVLine: SdkFeature<LineString> = {
+                const nearbyHOVLine: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_hov`,
                     geometry: model.geometry,
                     properties: {
-                        'color': this.mediator.getPreference('nearbyHOV.strokeColor'),
+                        'color': this.prefNearbyHOVStyle.strokeColor,
                         'width': roadWidth * 0.25,
-                        'dash': this.mediator.getPreference('nearbyHOV.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('nearbyHOV.strokeOpacity'),
+                        'dash': this.prefNearbyHOVStyle.strokeDashstyle,
+                        'opacity': this.prefNearbyHOVStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 166,
                     },
@@ -1059,18 +1363,20 @@ export default class RenderingController extends AbstractController {
 
             if (toNodeLanesCount > 0) {
                 // console.log("LANE fwd");
-                const res = geometryPointArray.slice(0, 2);
-                res[1] = this.getCentroid(res);
+                const res = [
+                    geometryPointArray[0],
+                    this.getCentroid(geometryPointArray[0], geometryPointArray[1]),
+                ];
 
-                let letToNodeLanes: SdkFeature<LineString> = {
+                const letToNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ln_to`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
-                        'color': this.mediator.getPreference('lanes.strokeColor'),
+                        'color': this.prefLanesStyle.strokeColor,
                         'width': roadWidth * 0.3,
-                        'dash': this.mediator.getPreference('lanes.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('lanes.strokeOpacity'),
+                        'dash': this.prefLanesStyle.strokeDashstyle,
+                        'opacity': this.prefLanesStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 170,
                     },
@@ -1080,19 +1386,21 @@ export default class RenderingController extends AbstractController {
             if (fromNodeLanesCount > 0) {
                 // was: revLaneCount
                 // console.log("LANE rev");
-                // Deep copy the last two points to avoid mutating the original array
-                const res = geometryPointArray.slice(-2);
-                res[0] = this.getCentroid(res);
+                const len = geometryPointArray.length;
+                const res = [
+                    this.getCentroid(geometryPointArray[len - 2], geometryPointArray[len - 1]),
+                    geometryPointArray[len - 1],
+                ];
 
-                let fromNodeLanes: SdkFeature<LineString> = {
+                const fromNodeLanes: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_ln_fr`,
                     geometry: { type: 'LineString', coordinates: res },
                     properties: {
-                        'color': this.mediator.getPreference('lanes.strokeColor'),
+                        'color': this.prefLanesStyle.strokeColor,
                         'width': roadWidth * 0.3,
-                        'dash': this.mediator.getPreference('lanes.strokeDashstyle'),
-                        'opacity': this.mediator.getPreference('lanes.strokeOpacity'),
+                        'dash': this.prefLanesStyle.strokeDashstyle,
+                        'opacity': this.prefLanesStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 175,
                     },
@@ -1103,59 +1411,56 @@ export default class RenderingController extends AbstractController {
             if (
                 !isTwoWay
             ) {
-                // consoleDebug("The segment is oneway or has unknown direction");
-                let simplifiedPoints = model.geometry.coordinates;
-                // N.B. model.length is the length in meters, not the items in the array (it's an object)
-                if (
-                    !isInRoundabout &&
-                    (length / simplifiedPoints.length) < this.mediator.getPreference('arrowDeclutter')
-                ) {
-                    simplifiedPoints = simplified.coordinates;
-                }
+                const arrowSamples = this.sampleArrowPointsAlongSegment(
+                    model.geometry.coordinates,
+                    isInRoundabout,
+                    labels
+                );
 
-                if ((isAtoB || isBtoA/* || isTwoWay was already checked in the first if*/) === false
-                    && this.mediator.wmeSDK.DataModel.Segments.isRoadTypeDrivable({ roadType: model.roadType })) {
+                if (
+                    (isAtoB || isBtoA) === false &&
+                    model.isDrivable
+                ) {
                     // Unknown direction
-                    for (let p = 0; p < simplifiedPoints.length - 1; p += 1) {
-                        // let shape = OpenLayers.Geometry.Polygon.createRegularPolygon(new OpenLayers.Geometry.LineString([simplifiedPoints[p],simplifiedPoints[p+1]]).getCentroid(true), 2, 6, 0); // origin, size, edges, rotation
-                        // Unknown direction
-                        let unknownDir: SdkFeature<Point> = {
+                    for (let i = 0; i < arrowSamples.length; i++) {
+                        const sample = arrowSamples[i];
+                        const unknownDir: SdkFeature<Point> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_a_${i}`,
                             geometry: {
                                 type: 'Point',
-                                coordinates: (p + 2) < simplifiedPoints.length ? this.getCentroid(simplifiedPoints.slice(p, p + 2)) : this.getCentroid([simplifiedPoints[p], simplifiedPoints[p + 1]])
+                                coordinates: sample.coordinates,
                             },
                             properties: {
                                 'closeZoomOnly': 1,
                                 'isUnknownDirection': 1,
-                                'zIndex': baselevel + 180
+                                'minZoom': sample.minZoom,
+                                'zIndex': baselevel + 180,
                             },
                         };
                         this.queueArrowFeatureForDrawing(model.id, unknownDir);
                     }
                 } else {
                     // It is one way, draw normal arrows
-
-                    const step = isInRoundabout ? 3 : 1;
-                    for (let p = step - 1; p < simplifiedPoints.length - 1; p += step) {
+                    for (let i = 0; i < arrowSamples.length; i++) {
+                        const sample = arrowSamples[i];
                         const degrees = this.getAngleDegreesSDK(
                             isAtoB,
-                            simplifiedPoints[p],
-                            simplifiedPoints[p + 1]
+                            sample.p0,
+                            sample.p1
                         );
 
-                        let arrow: SdkFeature<Point> = {
+                        const arrow: SdkFeature<Point> = {
                             type: 'Feature',
-                            id: model.id,
+                            id: `${model.id}_a_${i}`,
                             geometry: {
                                 type: 'Point',
-                                coordinates: (p + 2) < simplifiedPoints.length ? this.getCentroid(simplifiedPoints.slice(p, p + 2)) : this.getCentroid([simplifiedPoints[p], simplifiedPoints[p + 1]])
-
+                                coordinates: sample.coordinates,
                             },
                             properties: {
                                 'degrees': degrees,
-                                'zIndex': baselevel + 180
+                                'minZoom': sample.minZoom,
+                                'zIndex': baselevel + 180,
                             },
                         };
                         this.queueArrowFeatureForDrawing(model.id, arrow);
@@ -1167,7 +1472,6 @@ export default class RenderingController extends AbstractController {
                 const avg = this.createAverageSpeedCameraSDK({
                     id: model.id,
                     rev: false,
-                    isForward: isAtoB || isTwoWay,
                     p0: model.geometry.coordinates[0],
                     p1: model.geometry.coordinates[1],
                 });
@@ -1178,7 +1482,6 @@ export default class RenderingController extends AbstractController {
                 const avg = this.createAverageSpeedCameraSDK({
                     id: model.id,
                     rev: true,
-                    isForward: isAtoB,
                     p0: model.geometry.coordinates[model.geometry.coordinates.length - 1],
                     p1: model.geometry.coordinates[model.geometry.coordinates.length - 2],
                 });
@@ -1188,9 +1491,9 @@ export default class RenderingController extends AbstractController {
 
             // In any 'Zoom':
             if (flags.tunnel) {
-                let tunnelFlag: SdkFeature<LineString> = {
+                const tunnelFlag: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tf1`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle1.strokeColor,
@@ -1202,9 +1505,9 @@ export default class RenderingController extends AbstractController {
                 };
                 this.queueSegmentFeatureForDrawing(model.id, tunnelFlag);
 
-                let tunnelFlag2: SdkFeature<LineString> = {
+                const tunnelFlag2: SdkFeature<LineString> = {
                     type: 'Feature',
-                    id: model.id,
+                    id: `${model.id}_tf2`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle2.strokeColor,
@@ -1217,57 +1520,57 @@ export default class RenderingController extends AbstractController {
             } // 'else': road type is not supported, just add the label
         }
 
-        // Add Label
-        const oldModel = W.model.segments.getObjectById(model.id);
-        let labels;
-        if (oldModel) {
-            labels = this.drawLabels(oldModel, oldModel?.getOLGeometry().simplify(7).components);
-        }
         return { labels };
     }
 
     /**
   *
-  * @param {Waze.Feature.Vector.Segment} segmentModel
+  * @param {Waze.Feature.Vector.Segment} _segmentModel
   * @param {Array<OpenLayers.Geometry.Point>} simplified
   */
-    private drawLabels(segmentModel: Waze.Feature.Vector.Segment, simplified: Array<OpenLayers.Geometry.Point>) {
-        // consoleDebug('drawLabels');
+    private drawLabels(
+        _segmentModel: Waze.Feature.Vector.Segment,
+        simplified: Array<OpenLayers.Geometry.Point>,
+        sdkSegment: Segment,
+        streetsMap: Map<number, Street>,
+        roadType: number = sdkSegment.roadType
+    ): OpenLayers.Feature.Vector[] {
+        const ol = unsafeWindow.OpenLayers ?? OpenLayers;
         let labelFeature;
         let labelText: string;
 
-        // let centroid;
         /** @type {string} */
         let directionArrow: string;
-        // let streetNameThresholdDistance;
         let p0: OpenLayers.Geometry.Point;
         let p1: OpenLayers.Geometry.Point;
-        // let doubleLabelDistance;
         const labels = [];
         labelFeature = null;
-        const attributes = segmentModel.getAttributes();
-        const address = this.mediator.wmeSDK.DataModel.Segments.getAddress({ segmentId: attributes.id })
-        const hasStreetName = !address.isEmpty && typeof (address.street?.name) == 'string';
+        const primaryStreet = sdkSegment.primaryStreetId !== null ? streetsMap.get(sdkSegment.primaryStreetId) : undefined;
+        const hasStreetName = Boolean(
+            primaryStreet &&
+            !primaryStreet.isEmpty &&
+            typeof primaryStreet.name === 'string' &&
+            primaryStreet.name.length > 0
+        );
         let streetPart = '';
         if (hasStreetName) {
-            streetPart = address.street?.name as string;
-        } else if (attributes.roadType < 10 && !segmentModel.isInRoundabout()) {
+            streetPart = primaryStreet!.name as string;
+        } else if (roadType < 10 && sdkSegment.junctionId === null) {
             streetPart = '⚑';
         }
-        // consoleDebug(`Streetpart: ${streetPart}`);
 
         // add alt street names
         let altStreetPart = '';
-        if (this.mediator.getPreference('showANs')) {
+        if (this.prefShowANs && sdkSegment.alternateStreetIds?.length > 0) {
             let ANsShown = 0;
-            for (let i = 0; i < address.altStreets.length; i += 1) {
-                const altStreet = address.altStreets[i];
+            for (let i = 0; i < sdkSegment.alternateStreetIds.length; i += 1) {
+                const altStreet = streetsMap.get(sdkSegment.alternateStreetIds[i]);
                 if (ANsShown === 2) {
                     // Show maximum 2 alternative names
                     altStreetPart += ' …';
                     break;
                 }
-                const altStreetName = altStreet.street?.name;
+                const altStreetName = !altStreet?.isEmpty ? altStreet?.name : undefined;
                 if (altStreetName && altStreetName !== streetPart) {
                     ANsShown += 1;
                     altStreetPart += `(${altStreetName})`;
@@ -1280,32 +1583,32 @@ export default class RenderingController extends AbstractController {
             }
         }
 
-        if (!this.streetStyles[attributes.roadType]) {
+        if (!this.streetStyles[roadType]) {
             streetPart += '\n!! UNSUPPORTED ROAD TYPE !!';
         }
 
         let speedPart = '';
-        const speed = attributes.fwdMaxSpeed ?? attributes.revMaxSpeed;
-        if (speed && this.mediator.getPreference('showSLtext')) {
-            if (attributes.fwdMaxSpeed === attributes.revMaxSpeed) {
-                speedPart = this.getSuperScript(attributes.fwdMaxSpeed);
-            } else if (attributes.fwdMaxSpeed) {
-                speedPart = this.getSuperScript(attributes.fwdMaxSpeed);
-                if (attributes.revMaxSpeed) {
-                    speedPart += `'${this.getSuperScript(attributes.revMaxSpeed)}`;
+        const fwdMaxSpeed = sdkSegment.fwdSpeedLimit;
+        const revMaxSpeed = sdkSegment.revSpeedLimit;
+        const speed = fwdMaxSpeed ?? revMaxSpeed;
+        if (speed && this.prefShowSLText) {
+            if (fwdMaxSpeed === revMaxSpeed) {
+                speedPart = this.getSuperScript(fwdMaxSpeed!);
+            } else if (fwdMaxSpeed) {
+                speedPart = this.getSuperScript(fwdMaxSpeed);
+                if (revMaxSpeed) {
+                    speedPart += `'${this.getSuperScript(revMaxSpeed)}`;
                 }
-            } else {
-                speedPart = this.getSuperScript(attributes.revMaxSpeed);
-                if (attributes.fwdMaxSpeed) {
-                    speedPart += `'${this.getSuperScript(attributes.fwdMaxSpeed)}`;
+            } else if (revMaxSpeed) {
+                speedPart = this.getSuperScript(revMaxSpeed);
+                if (fwdMaxSpeed) {
+                    speedPart += `'${this.getSuperScript(fwdMaxSpeed)}`;
                 }
             }
-            /* jslint bitwise: true */
             if (
-                attributes.fwdMaxSpeedUnverified ||
-                attributes.revMaxSpeedUnverified
+                !sdkSegment.isFwdSpeedLimitVerified ||
+                !sdkSegment.isRevSpeedLimitVerified
             ) {
-                /* jslint bitwise: false */
                 speedPart += '?';
             }
         }
@@ -1313,26 +1616,24 @@ export default class RenderingController extends AbstractController {
         if (labelText === ' ') {
             return [];
         }
-        /* streetNameThresholdDistance =
-          labelText.length * 2.3 * (8 - OLMap.zoom) + Math.random() * 30;
-        doubleLabelDistance = 4 * streetNameThresholdDistance; */
 
-        const roadTypeID = attributes.roadType;
-        const sampleLabel = new OpenLayers.Feature.Vector(simplified[0], {
-            'sID': attributes.id,
+        const roadTypeID = roadType;
+        const sampleLabel = new ol.Feature.Vector(simplified[0], {
+            'sID': sdkSegment.id,
             'color': this.streetStyles[roadTypeID]
                 ? this.streetStyles[roadTypeID]['strokeColor']
                 : '#f00',
             'outlinecolor': this.streetStyles[roadTypeID]
                 ? this.streetStyles[roadTypeID]['outlineColor']
                 : '#fff',
-            'outlinewidth': this.mediator.getPreference('labelOutlineWidth'),
+            'outlinewidth': this.prefLabelOutlineWidth,
         });
 
         const distances: { index: number, distance: number }[] = [];
-        // TODO: compute all distances, sort them from larger to smaller and start placing labels there.
         for (let p = 0; p < simplified.length - 1; p += 1) {
-            const distance = <number>simplified[p].distanceTo(simplified[p + 1]);
+            const ptA = simplified[p];
+            const ptB = simplified[p + 1];
+            const distance = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
             distances.push({ index: p, distance });
         }
         // sort them by distance, descending
@@ -1341,43 +1642,26 @@ export default class RenderingController extends AbstractController {
         );
         let labelsToInsert = streetPart === '' ? 1 : distances.length;
         const requiredSpace = this.clutterConstant * Math.max(labelText.length, altStreetPart.length);
-        // console.log(`${segmentModel.getID()} - ${labelText}: ${requiredSpace}`);
 
-        // console.debug(segmentModel.getID(), distances);
+        const isOneWay = !sdkSegment.isTwoWay && (sdkSegment.isAtoB || sdkSegment.isBtoA);
         for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
-            // console.log(`LabelsToInsert: ${labelsToInsert}`);
             if (
                 distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
             ) {
-                // console.log(`Breaking at index ${i}`);
                 break;
             }
             const p = distances[i].index;
-            // consoleDebug('Label can be inserted:');
-            // console.dir(address);
             let dx = 0;
             let dy = 0;
-            // if (distance > streetNameThresholdDistance) {
-            // consoleDebug('Label inserted');
-            // p = maxDistanceIndex;
-            // if (distance < doubleLabelDistance) {
-            // || farzoom
-            // p0 = simplified[p];
-            // p1 = simplified[p + 1];
-            // } else {
             p0 = simplified[p];
-            p1 = new OpenLayers.Geometry.LineString([
-                p0,
-                simplified[p + 1],
-            ]).getCentroid(
-                true
-            ); /* Important: pass true parameter otherwise it will return start point as centroid */ // Clone the label
-        // }
-        /* centroid = new OpenLayers.Geometry.LineString([p0, p1]).getCentroid(
-          true
-        ); */ labelFeature = sampleLabel.clone();
+            const pNext = simplified[p + 1];
+            p1 = new ol.Geometry.Point(
+                (p0.x + pNext.x) * 0.5,
+                (p0.y + pNext.y) * 0.5
+            );
+            labelFeature = sampleLabel.clone();
             labelFeature.geometry = p1;
-            if (attributes.fwdDirection) {
+            if (sdkSegment.isAtoB) {
                 dx = p1.x - p0.x;
                 dy = p1.y - p0.y;
             } else {
@@ -1397,12 +1681,11 @@ export default class RenderingController extends AbstractController {
             } else {
                 directionArrow = '';
             }
-            if (!segmentModel.isOneWay()) {
+            if (!isOneWay) {
                 directionArrow = ''; // The degree has to be computed anyway
             }
             labelFeature.attributes.label =
-                directionArrow + labelText + directionArrow + altStreetPart; // +
-            // labelsToInsert; //TODO remove
+                directionArrow + labelText + directionArrow + altStreetPart;
 
             labelFeature.attributes['angle'] = degrees;
             labelFeature.attributes.closeZoomOnly = p % 2 === 1;
@@ -1410,28 +1693,22 @@ export default class RenderingController extends AbstractController {
             labelsToInsert -= 1;
             labels.push(labelFeature);
         }
-        // console.dir(distances);
-        /* for (let p = 0; p < simplified.length - 1 && labelsToInsert > 1; p += 1) {
-     
-        } */
 
         return labels;
     }
 
-    // TODO: cache for efficiency
     private getSuperScript(number: number): string {
-        let res = '';
-        if (number) {
-            let numberString: string = number.toString();
-            if (this.isImperial) {
-                // Convert the speed limit to mph
-                numberString = Math.round(number / 1.609344).toString();
-            }
-            numberString = numberString.toString();
-            for (let i = 0; i < numberString.length; i += 1) {
-                res += this.superScript[Number(numberString.charAt(i))];
-            }
+        if (!number) return '';
+        const cached = this.superScriptCache.get(number);
+        if (cached !== undefined) {
+            return cached;
         }
+        const numberString = (this.isImperial ? Math.round(number / 1.609344) : number).toString();
+        let res = '';
+        for (let i = 0; i < numberString.length; i += 1) {
+            res += this.superScript[Number(numberString.charAt(i))];
+        }
+        this.superScriptCache.set(number, res);
         return res;
     }
 

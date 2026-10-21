@@ -10,6 +10,8 @@ export default class PreferencesController extends AbstractController {
     // Singleton pattern
     private static instance: PreferencesController | null = null;
     private preferences: PreferenceObject;
+    private previousVersion: string | null = null;
+    private userRank: number | undefined;
     private constructor({ mediator }: { mediator: SVLMediator }) {
         // Private constructor to prevent direct instantiation
         super(mediator);
@@ -22,9 +24,14 @@ export default class PreferencesController extends AbstractController {
         return PreferencesController.instance;
     }
 
+    public getPreviousVersion(): string | null {
+        return this.previousVersion;
+    }
+
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<PreferencesController> {
         if (!PreferencesController.instance) {
             PreferencesController.instance = new PreferencesController({ mediator });
+            PreferencesController.instance.userRank = (await mediator.wmeSDK.State.getUserInfo())?.rank;
             let oldUser = PreferencesController.instance.loadPreferences();
             if (!oldUser) {
                 PreferencesController.instance.mediator.notify(PreferencesController.instance, AcceptedControllerEvents.FIRST_RUN);
@@ -40,6 +47,9 @@ export default class PreferencesController extends AbstractController {
      * @returns 
      */
     public getPreference(key: string): any {
+        if (!key.includes('.')) {
+            return this.preferences?.[key];
+        }
         const keys = key.split('.');
         let value = this.preferences;
 
@@ -93,21 +103,30 @@ export default class PreferencesController extends AbstractController {
                     this.preferences[keys[i]] = preset[keys[i]];
                 }
             }
-            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
         }
     }
 
-    private loadPreferences(overwrite = false) {
+    private loadPreferences(overwrite = false, customPreferences: PreferenceObject | null = null) {
         let oldUser = true;
         let loadedPreferences = null;
+        const storage = unsafeWindow?.localStorage ?? localStorage;
 
         if (overwrite === true) {
-            unsafeWindow.localStorage.removeItem('svl');
+            storage.removeItem('svl');
+        } else if (customPreferences !== null) {
+            loadedPreferences = customPreferences;
         } else {
-            const pref = unsafeWindow.localStorage.getItem('svl');
+            const pref = storage.getItem('svl');
             if (pref) {
-                loadedPreferences = JSON.parse(pref);
+                try {
+                    loadedPreferences = JSON.parse(pref);
+                    if (this.previousVersion === null && typeof loadedPreferences?.version === 'string') {
+                        this.previousVersion = loadedPreferences.version;
+                    }
+                } catch (e) {
+                    console.error('SVL: Failed to parse stored preferences, resetting to defaults.', e);
+                    loadedPreferences = null;
+                }
             }
         }
 
@@ -134,7 +153,7 @@ export default class PreferencesController extends AbstractController {
             loadedPreferences?.['showSLSinglecolor'] ?? false;
         this.preferences['SLColor'] = loadedPreferences?.['SLColor'] ?? '#ffdf00';
 
-        let userLevel = this.mediator.wmeSDK.State.getUserInfo()?.rank;
+        let userLevel = this.userRank;
         if (typeof userLevel !== 'undefined') {
             userLevel += 1;
         }
@@ -180,7 +199,7 @@ export default class PreferencesController extends AbstractController {
         this.preferences['nodeRadius'] = loadedPreferences?.['nodeRadius'] ?? 3.0;
         this.preferences['nodeColor'] = loadedPreferences?.['nodeColor'] ?? '#0015FF';
         this.preferences['nodeDeadEndColor'] = loadedPreferences?.['nodeDeadEndColor'] ?? '#C31CFF';
-        this.preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#033a12';
+        this.preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#045419';
 
         this.preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
         this.preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
@@ -191,144 +210,136 @@ export default class PreferencesController extends AbstractController {
         // Street: 1
         this.preferences['streets'][1] = {
             'strokeColor':
-                loadedPreferences?.['streets'][1]?.['strokeColor'] ?? '#FFFFFF',
-            'strokeWidth': loadedPreferences?.['streets'][1]?.['strokeWidth'] ?? 10,
+                loadedPreferences?.['streets']?.[1]?.['strokeColor'] ?? '#FFFFFF',
+            'strokeWidth': loadedPreferences?.['streets']?.[1]?.['strokeWidth'] ?? 10,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][1]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[1]?.['strokeDashstyle'] ?? 'solid',
         };
         // Parking: 20
         this.preferences['streets'][20] = {
             'strokeColor':
-                loadedPreferences?.['streets'][20]?.['strokeColor'] ?? '#2282AB',
-            'strokeWidth': loadedPreferences?.['streets'][20]?.['strokeWidth'] ?? 9,
+                loadedPreferences?.['streets']?.[20]?.['strokeColor'] ?? '#2282AB',
+            'strokeWidth': loadedPreferences?.['streets']?.[20]?.['strokeWidth'] ?? 9,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][20]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[20]?.['strokeDashstyle'] ?? 'solid',
         };
         // Ramp: 4
         this.preferences['streets'][4] = {
             'strokeColor':
-                loadedPreferences?.['streets'][4]?.['strokeColor'] ?? '#3FC91C',
-            'strokeWidth': loadedPreferences?.['streets'][4]?.['strokeWidth'] ?? 11,
+                loadedPreferences?.['streets']?.[4]?.['strokeColor'] ?? '#3FC91C',
+            'strokeWidth': loadedPreferences?.['streets']?.[4]?.['strokeWidth'] ?? 11,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][4]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[4]?.['strokeDashstyle'] ?? 'solid',
         };
         // Freeway: 3
         this.preferences['streets'][3] = {
             'strokeColor':
-                loadedPreferences?.['streets'][3]?.['strokeColor'] ?? '#387FB8',
-            'strokeWidth': loadedPreferences?.['streets'][3]?.['strokeWidth'] ?? 18,
+                loadedPreferences?.['streets']?.[3]?.['strokeColor'] ?? '#387FB8',
+            'strokeWidth': loadedPreferences?.['streets']?.[3]?.['strokeWidth'] ?? 18,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][3]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[3]?.['strokeDashstyle'] ?? 'solid',
         };
         // Minor: 7
         this.preferences['streets'][7] = {
             'strokeColor':
-                loadedPreferences?.['streets'][7]?.['strokeColor'] ?? '#ECE589',
-            'strokeWidth': loadedPreferences?.['streets'][7]?.['strokeWidth'] ?? 14,
+                loadedPreferences?.['streets']?.[7]?.['strokeColor'] ?? '#ECE589',
+            'strokeWidth': loadedPreferences?.['streets']?.[7]?.['strokeWidth'] ?? 14,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][7]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[7]?.['strokeDashstyle'] ?? 'solid',
         };
         // Major: 6
         this.preferences['streets'][6] = {
             'strokeColor':
-                loadedPreferences?.['streets'][6]?.['strokeColor'] ?? '#C13040',
-            'strokeWidth': loadedPreferences?.['streets'][6]?.['strokeWidth'] ?? 16,
+                loadedPreferences?.['streets']?.[6]?.['strokeColor'] ?? '#C13040',
+            'strokeWidth': loadedPreferences?.['streets']?.[6]?.['strokeWidth'] ?? 16,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][6]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[6]?.['strokeDashstyle'] ?? 'solid',
         };
         // Stairway: 16
         this.preferences['streets'][16] = {
             'strokeColor':
-                loadedPreferences?.['streets'][16]?.['strokeColor'] ?? '#B700FF',
-            'strokeWidth': loadedPreferences?.['streets'][16]?.['strokeWidth'] ?? 5,
+                loadedPreferences?.['streets']?.[16]?.['strokeColor'] ?? '#B700FF',
+            'strokeWidth': loadedPreferences?.['streets']?.[16]?.['strokeWidth'] ?? 5,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][16]?.['strokeDashstyle'] ?? 'dash',
+                loadedPreferences?.['streets']?.[16]?.['strokeDashstyle'] ?? 'dash',
         };
         // Walking: 5
         this.preferences['streets'][5] = {
             'strokeColor':
-                loadedPreferences?.['streets'][5]?.['strokeColor'] ?? '#00FF00',
-            'strokeWidth': loadedPreferences?.['streets'][5]?.['strokeWidth'] ?? 5,
+                loadedPreferences?.['streets']?.[5]?.['strokeColor'] ?? '#00FF00',
+            'strokeWidth': loadedPreferences?.['streets']?.[5]?.['strokeWidth'] ?? 5,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][5]?.['strokeDashstyle'] ?? 'dash',
+                loadedPreferences?.['streets']?.[5]?.['strokeDashstyle'] ?? 'dash',
         };
         // Dirty: 8
         this.preferences['streets'][8] = {
             'strokeColor':
-                loadedPreferences?.['streets'][8]?.['strokeColor'] ?? '#82614A',
-            'strokeWidth': loadedPreferences?.['streets'][8]?.['strokeWidth'] ?? 7,
+                loadedPreferences?.['streets']?.[8]?.['strokeColor'] ?? '#82614A',
+            'strokeWidth': loadedPreferences?.['streets']?.[8]?.['strokeWidth'] ?? 7,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][8]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[8]?.['strokeDashstyle'] ?? 'solid',
         };
         // Ferry: 15
         this.preferences['streets'][15] = {
             'strokeColor':
-                loadedPreferences?.['streets'][15]?.['strokeColor'] ?? '#FF8000',
-            'strokeWidth': loadedPreferences?.['streets'][15]?.['strokeWidth'] ?? 5,
+                loadedPreferences?.['streets']?.[15]?.['strokeColor'] ?? '#FF8000',
+            'strokeWidth': loadedPreferences?.['streets']?.[15]?.['strokeWidth'] ?? 5,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][15]?.['strokeDashstyle'] ?? 'dashdot',
+                loadedPreferences?.['streets']?.[15]?.['strokeDashstyle'] ?? 'dashdot',
         };
         // Railroad: 18
         this.preferences['streets'][18] = {
             'strokeColor':
-                loadedPreferences?.['streets'][18]?.['strokeColor'] ?? '#FFFFFF',
-            'strokeWidth': loadedPreferences?.['streets'][18]?.['strokeWidth'] ?? 8,
+                loadedPreferences?.['streets']?.[18]?.['strokeColor'] ?? '#FFFFFF',
+            'strokeWidth': loadedPreferences?.['streets']?.[18]?.['strokeWidth'] ?? 8,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][18]?.['strokeDashstyle'] ?? 'dash',
+                loadedPreferences?.['streets']?.[18]?.['strokeDashstyle'] ?? 'dash',
         };
         // Private: 17
         this.preferences['streets'][17] = {
             'strokeColor':
-                loadedPreferences?.['streets'][17]?.['strokeColor'] ?? '#00FFB3',
-            'strokeWidth': loadedPreferences?.['streets'][17]?.['strokeWidth'] ?? 7,
+                loadedPreferences?.['streets']?.[17]?.['strokeColor'] ?? '#00FFB3',
+            'strokeWidth': loadedPreferences?.['streets']?.[17]?.['strokeWidth'] ?? 7,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][17]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[17]?.['strokeDashstyle'] ?? 'solid',
         };
         // Alley: 22
         this.preferences['streets'][22] = {
             'strokeColor':
-                loadedPreferences?.['streets'][22]?.['strokeColor'] ?? '#C6C7FF',
-            'strokeWidth': loadedPreferences?.['streets'][22]?.['strokeWidth'] ?? 6,
+                loadedPreferences?.['streets']?.[22]?.['strokeColor'] ?? '#C6C7FF',
+            'strokeWidth': loadedPreferences?.['streets']?.[22]?.['strokeWidth'] ?? 6,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][22]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[22]?.['strokeDashstyle'] ?? 'solid',
         };
         // Runway: 19
         this.preferences['streets'][19] = {
             'strokeColor':
-                loadedPreferences?.['streets'][19]?.['strokeColor'] ?? '#00FF00',
-            'strokeWidth': loadedPreferences?.['streets'][19]?.['strokeWidth'] ?? 5,
+                loadedPreferences?.['streets']?.[19]?.['strokeColor'] ?? '#00FF00',
+            'strokeWidth': loadedPreferences?.['streets']?.[19]?.['strokeWidth'] ?? 5,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][19]?.['strokeDashstyle'] ?? 'dashdot',
+                loadedPreferences?.['streets']?.[19]?.['strokeDashstyle'] ?? 'dashdot',
         };
         // Primary: 2
         this.preferences['streets'][2] = {
             'strokeColor':
-                loadedPreferences?.['streets'][2]?.['strokeColor'] ?? '#CBA12E',
-            'strokeWidth': loadedPreferences?.['streets'][2]?.['strokeWidth'] ?? 12,
+                loadedPreferences?.['streets']?.[2]?.['strokeColor'] ?? '#CBA12E',
+            'strokeWidth': loadedPreferences?.['streets']?.[2]?.['strokeWidth'] ?? 12,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][2]?.['strokeDashstyle'] ?? 'solid',
+                loadedPreferences?.['streets']?.[2]?.['strokeDashstyle'] ?? 'solid',
         };
         // Pedestrian: 10
         this.preferences['streets'][10] = {
             'strokeColor':
-                loadedPreferences?.['streets'][10]?.['strokeColor'] ?? '#0000FF',
-            'strokeWidth': loadedPreferences?.['streets'][10]?.['strokeWidth'] ?? 5,
+                loadedPreferences?.['streets']?.[10]?.['strokeColor'] ?? '#0000FF',
+            'strokeWidth': loadedPreferences?.['streets']?.[10]?.['strokeWidth'] ?? 5,
             'strokeDashstyle':
-                loadedPreferences?.['streets'][10]?.['strokeDashstyle'] ?? 'dash',
+                loadedPreferences?.['streets']?.[10]?.['strokeDashstyle'] ?? 'dash',
         };
         // Red segments (without names)
         this.preferences['red'] = {
             'strokeColor': loadedPreferences?.['red']?.['strokeColor'] ?? '#FF0000',
             'strokeDashstyle':
                 loadedPreferences?.['red']?.['strokeDashstyle'] ?? 'solid',
-        };
-
-        this.preferences['roundabout'] = {
-            'strokeColor':
-                loadedPreferences?.['roundabout']?.['strokeColor'] ?? '#111',
-            'strokeWidth': loadedPreferences?.['roundabout']?.['strokeWidth'] ?? 1,
-            'strokeDashstyle':
-                loadedPreferences?.['roundabout']?.['strokeDashstyle'] ?? 'dash',
         };
         this.preferences['lanes'] = {
             'strokeColor': loadedPreferences?.['lanes']?.['strokeColor'] ?? '#454443',
@@ -382,46 +393,46 @@ export default class PreferencesController extends AbstractController {
 
         this.preferences['speeds'] = {};
         this.preferences['speeds']['default'] =
-            loadedPreferences?.['speed']?.['default'] ?? '#cc0000';
+            loadedPreferences?.['speeds']?.['default'] ?? '#cc0000';
 
         if (loadedPreferences?.['speeds']?.['metric']) {
             this.preferences['speeds']['metric'] = loadedPreferences['speeds']['metric'];
         } else {
             this.preferences['speeds']['metric'] = {};
             this.preferences['speeds']['metric'][5] =
-                loadedPreferences?.['speeds']?.['metric'][5] ?? '#542344';
+                loadedPreferences?.['speeds']?.['metric']?.[5] ?? '#542344';
             this.preferences['speeds']['metric'][7] =
-                loadedPreferences?.['speeds']?.['metric'][7] ?? '#ff5714';
+                loadedPreferences?.['speeds']?.['metric']?.[7] ?? '#ff5714';
             this.preferences['speeds']['metric'][10] =
-                loadedPreferences?.['speeds']?.['metric'][10] ?? '#ffbf00';
+                loadedPreferences?.['speeds']?.['metric']?.[10] ?? '#ffbf00';
             this.preferences['speeds']['metric'][20] =
-                loadedPreferences?.['speeds']?.['metric'][20] ?? '#ee0000';
+                loadedPreferences?.['speeds']?.['metric']?.[20] ?? '#ee0000';
             this.preferences['speeds']['metric'][30] =
-                loadedPreferences?.['speeds']?.['metric'][30] ?? '#e4ff1a';
+                loadedPreferences?.['speeds']?.['metric']?.[30] ?? '#e4ff1a';
             this.preferences['speeds']['metric'][40] =
-                loadedPreferences?.['speeds']?.['metric'][40] ?? '#993300';
+                loadedPreferences?.['speeds']?.['metric']?.[40] ?? '#993300';
             this.preferences['speeds']['metric'][50] =
-                loadedPreferences?.['speeds']?.['metric'][50] ?? '#33ff33';
+                loadedPreferences?.['speeds']?.['metric']?.[50] ?? '#33ff33';
             this.preferences['speeds']['metric'][60] =
-                loadedPreferences?.['speeds']?.['metric'][60] ?? '#639fab';
+                loadedPreferences?.['speeds']?.['metric']?.[60] ?? '#639fab';
             this.preferences['speeds']['metric'][70] =
-                loadedPreferences?.['speeds']?.['metric'][70] ?? '#00ffff';
+                loadedPreferences?.['speeds']?.['metric']?.[70] ?? '#00ffff';
             this.preferences['speeds']['metric'][80] =
-                loadedPreferences?.['speeds']?.['metric'][80] ?? '#00bfff';
+                loadedPreferences?.['speeds']?.['metric']?.[80] ?? '#00bfff';
             this.preferences['speeds']['metric'][90] =
-                loadedPreferences?.['speeds']?.['metric'][90] ?? '#0066ff';
+                loadedPreferences?.['speeds']?.['metric']?.[90] ?? '#0066ff';
             this.preferences['speeds']['metric'][100] =
-                loadedPreferences?.['speeds']?.['metric'][100] ?? '#ff00ff';
+                loadedPreferences?.['speeds']?.['metric']?.[100] ?? '#ff00ff';
             this.preferences['speeds']['metric'][110] =
-                loadedPreferences?.['speeds']?.['metric'][110] ?? '#ff0080';
+                loadedPreferences?.['speeds']?.['metric']?.[110] ?? '#ff0080';
             this.preferences['speeds']['metric'][120] =
-                loadedPreferences?.['speeds']?.['metric'][120] ?? '#ff0000';
+                loadedPreferences?.['speeds']?.['metric']?.[120] ?? '#ff0000';
             this.preferences['speeds']['metric'][130] =
-                loadedPreferences?.['speeds']?.['metric'][130] ?? '#ff9000';
+                loadedPreferences?.['speeds']?.['metric']?.[130] ?? '#ff9000';
             this.preferences['speeds']['metric'][140] =
-                loadedPreferences?.['speeds']?.['metric'][140] ?? '#ff4000';
+                loadedPreferences?.['speeds']?.['metric']?.[140] ?? '#ff4000';
             this.preferences['speeds']['metric'][150] =
-                loadedPreferences?.['speeds']?.['metric'][150] ?? '#0040ff';
+                loadedPreferences?.['speeds']?.['metric']?.[150] ?? '#0040ff';
         }
 
         if (loadedPreferences?.['speeds']?.['imperial']) {
@@ -430,39 +441,39 @@ export default class PreferencesController extends AbstractController {
         } else {
             this.preferences['speeds']['imperial'] = {};
             this.preferences['speeds']['imperial'][5] =
-                loadedPreferences?.['speeds']?.['imperial'][5] ?? '#ff0000';
+                loadedPreferences?.['speeds']?.['imperial']?.[5] ?? '#ff0000';
             this.preferences['speeds']['imperial'][10] =
-                loadedPreferences?.['speeds']?.['imperial'][10] ?? '#ff8000';
+                loadedPreferences?.['speeds']?.['imperial']?.[10] ?? '#ff8000';
             this.preferences['speeds']['imperial'][15] =
-                loadedPreferences?.['speeds']?.['imperial'][15] ?? '#ffb000';
+                loadedPreferences?.['speeds']?.['imperial']?.[15] ?? '#ffb000';
             this.preferences['speeds']['imperial'][20] =
-                loadedPreferences?.['speeds']?.['imperial'][20] ?? '#bfff00';
+                loadedPreferences?.['speeds']?.['imperial']?.[20] ?? '#bfff00';
             this.preferences['speeds']['imperial'][25] =
-                loadedPreferences?.['speeds']?.['imperial'][25] ?? '#993300';
+                loadedPreferences?.['speeds']?.['imperial']?.[25] ?? '#993300';
             this.preferences['speeds']['imperial'][30] =
-                loadedPreferences?.['speeds']?.['imperial'][30] ?? '#33ff33';
+                loadedPreferences?.['speeds']?.['imperial']?.[30] ?? '#33ff33';
             this.preferences['speeds']['imperial'][35] =
-                loadedPreferences?.['speeds']?.['imperial'][35] ?? '#00ff90';
+                loadedPreferences?.['speeds']?.['imperial']?.[35] ?? '#00ff90';
             this.preferences['speeds']['imperial'][40] =
-                loadedPreferences?.['speeds']?.['imperial'][40] ?? '#00ffff';
+                loadedPreferences?.['speeds']?.['imperial']?.[40] ?? '#00ffff';
             this.preferences['speeds']['imperial'][45] =
-                loadedPreferences?.['speeds']?.['imperial'][45] ?? '#00bfff';
+                loadedPreferences?.['speeds']?.['imperial']?.[45] ?? '#00bfff';
             this.preferences['speeds']['imperial'][50] =
-                loadedPreferences?.['speeds']?.['imperial'][50] ?? '#0066ff';
+                loadedPreferences?.['speeds']?.['imperial']?.[50] ?? '#0066ff';
             this.preferences['speeds']['imperial'][55] =
-                loadedPreferences?.['speeds']?.['imperial'][55] ?? '#ff00ff';
+                loadedPreferences?.['speeds']?.['imperial']?.[55] ?? '#ff00ff';
             this.preferences['speeds']['imperial'][60] =
-                loadedPreferences?.['speeds']?.['imperial'][60] ?? '#ff0050';
+                loadedPreferences?.['speeds']?.['imperial']?.[60] ?? '#ff0050';
             this.preferences['speeds']['imperial'][65] =
-                loadedPreferences?.['speeds']?.['imperial'][65] ?? '#ff9010';
+                loadedPreferences?.['speeds']?.['imperial']?.[65] ?? '#ff9010';
             this.preferences['speeds']['imperial'][70] =
-                loadedPreferences?.['speeds']?.['imperial'][70] ?? '#0040ff';
+                loadedPreferences?.['speeds']?.['imperial']?.[70] ?? '#0040ff';
             this.preferences['speeds']['imperial'][75] =
-                loadedPreferences?.['speeds']?.['imperial'][75] ?? '#10ff10';
+                loadedPreferences?.['speeds']?.['imperial']?.[75] ?? '#10ff10';
             this.preferences['speeds']['imperial'][80] =
-                loadedPreferences?.['speeds']?.['imperial'][80] ?? '#ff4000';
+                loadedPreferences?.['speeds']?.['imperial']?.[80] ?? '#ff4000';
             this.preferences['speeds']['imperial'][85] =
-                loadedPreferences?.['speeds']?.['imperial'][85] ?? '#ff0000';
+                loadedPreferences?.['speeds']?.['imperial']?.[85] ?? '#ff0000';
         }
         // jshint ignore: end
         this.storePreferences(this.preferences);
@@ -478,7 +489,7 @@ export default class PreferencesController extends AbstractController {
     private storePreferences(pref: PreferenceObject, silent = true) {
         pref.version = this.mediator.SVL_VERSION;
         try {
-            unsafeWindow.localStorage.setItem('svl', JSON.stringify(pref));
+            (unsafeWindow?.localStorage ?? localStorage).setItem('svl', JSON.stringify(pref));
             if (!silent) {
                 this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_saved'));
             }
@@ -500,7 +511,7 @@ export default class PreferencesController extends AbstractController {
     public rollbackPreferences() {
         this.loadPreferences(false);
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-        this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
+        this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
     }
 
     public resetPreferences() {
@@ -521,11 +532,13 @@ export default class PreferencesController extends AbstractController {
             (_: any, input: string) => {
                 try {
                     const importedPreferences = JSON.parse(input);
-                    this.preferences = importedPreferences;
-                    this.storePreferences(this.preferences, true);
+                    if (!importedPreferences || typeof importedPreferences !== 'object' || Array.isArray(importedPreferences)) {
+                        throw new Error('Invalid preferences object');
+                    }
+                    this.loadPreferences(false, importedPreferences);
                     this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
-                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW);
-                    //this.updateStylesFromPreferences(importedPreferences);
+                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+                    this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
                 } catch (e) {
                     console.error(e);
                     this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_importing_error'));

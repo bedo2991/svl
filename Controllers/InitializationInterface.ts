@@ -1,4 +1,4 @@
 export interface InitializationInterface {
     setInitializationCompleted(): void;
-    protected initializationCompleted(): Promise<void>;
+    initializationCompleted(): Promise<void>;
 }

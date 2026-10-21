@@ -6,19 +6,19 @@ export default class LocalizationController extends AbstractController {
     private static instance: LocalizationController | null = null;
     readonly tr: { [s: string]: Array<string>; } = {};
     readonly tr_keys: { [s: string]: number; } = {};
-    private locale: string;
+    private locale: string = 'en';
     private readonly fallback: Record<string, string> = {};
     private areOnlineTranslationsLoaded: boolean = false;
 
     private constructor({ mediator }: { mediator: SVLMediator }) {
         super(mediator);
         // Private constructor to prevent direct instantiation
-        this.locale = this.mediator.wmeSDK.Settings.getLocale()?.localeCode || 'en';
     }
 
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<LocalizationController> {
         if (!LocalizationController.instance) {
             LocalizationController.instance = new LocalizationController({ mediator });
+            LocalizationController.instance.locale = (await mediator.wmeSDK.Settings.getLocale())?.localeCode || 'en';
             let success = await LocalizationController.instance.loadTranslations();
             if (!success) {
                 console.warn("LocalizationController: Could not load online translations, using fallback translations.");
@@ -47,11 +47,11 @@ export default class LocalizationController extends AbstractController {
         this.fallbackSource = [];
     }
 
-    private setMinimalFallbackTranslations(setAll = false) {
+    private setMinimalFallbackTranslations() {
         for (let i = 0; i < this.fallbackSource.length; i++) {
             let item = this.fallbackSource[i];
             const key_index = this.tr_keys[item.key];
-            if (key_index) {
+            if (key_index !== undefined) {
                 if (this.locale && this.tr[this.locale] && this.tr[this.locale][key_index]) {
                     continue; //skip if local translation exists
                 }
@@ -85,30 +85,33 @@ export default class LocalizationController extends AbstractController {
 
     private async loadTranslations(): Promise<boolean> {
         //console.debug('Loading translations...');
-        const response = await this.request(
-            {
-                method: 'GET',
-                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
-            }
-        );
+        try {
+            const response = await this.request(
+                {
+                    method: 'GET',
+                    url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRjug3umcYtdN9iVQc2SAqfK03o6HvozEEoxBrdg_Xf73Dt6TuApRCmT_V6UIIkMyVjRjKydl9CP8qE/pub?gid=565129786&single=true&output=tsv'
+                }
+            );
 
-        if (response.readyState === 4 && response.status === 200) {
-            const data = response.responseText;
-            let temp = data.split('\n');
-            for (const [i, line] of temp.entries()) {
-                if (i > 0) {
-                    const [first, ...rest] = line.split('\t');
-                    this.tr[first] = rest.map((e: string) => e.trim());
-                } else {
-                    const [, ...rest] = line.split('\t');
-                    for (const [j, value] of rest.entries()) {
-                        this.tr_keys[value.trim()] = parseInt(j, 10);
+            if (response.readyState === 4 && response.status === 200) {
+                const data = response.responseText;
+                let temp = data.split(/\r?\n/);
+                for (const [i, line] of temp.entries()) {
+                    if (i > 0) {
+                        const [first, ...rest] = line.split('\t');
+                        this.tr[first] = rest.map((e: string) => e.trim().replace(/[<>]/g, ''));
+                    } else {
+                        const [, ...rest] = line.split('\t');
+                        for (const [j, value] of rest.entries()) {
+                            this.tr_keys[value.trim()] = parseInt(j, 10);
+                        }
                     }
                 }
+                this.areOnlineTranslationsLoaded = true;
+                return true;
             }
-            this.areOnlineTranslationsLoaded = true;
-            this.setMinimalFallbackTranslations();
-            return true;
+        } catch (error) {
+            console.warn('SVL: Failed to load online translations, using built-in fallback.', error);
         }
         return false;
     }
@@ -122,7 +125,7 @@ export default class LocalizationController extends AbstractController {
 
     private invalidTranslation(key: string): string {
         console.error('[SVL] Invalid translation key: ' + key);
-        return '<invalid translation key>';
+        return '[invalid translation key]';
     }
 
     /**
@@ -132,23 +135,18 @@ export default class LocalizationController extends AbstractController {
  */
     public translate(key: string, ...args: any[]): string {
         const key_index = this.tr_keys[key];
-        if (typeof key_index === 'undefined' && Object.keys(this.tr).length > 0) {
-            const local_key = this.fallback[key];
-            if (typeof local_key === 'undefined') {
-                return this.invalidTranslation(key);
+        if (key_index !== undefined) {
+            const locale = this.locale || 'en';
+            const localized = this.tr[locale]?.[key_index];
+            if (localized) {
+                return localized;
             }
-            return this.fallback[key];
-        }
-        const locale = this.locale || 'en';
-        if (this.tr[locale]) {
-            if (this.tr[locale][key_index] && this.tr[locale][key_index] !== '') {
-                return this.tr[locale][key_index];
+            const english = this.tr['en']?.[key_index];
+            if (english) {
+                return english;
             }
         }
-        if (this.tr['en'] && this.tr['en'][key_index]) {
-            return this.tr['en'][key_index];
-        }
-        return this.fallback[key];
+        return this.fallback[key] ?? this.invalidTranslation(key);
     }
 
     private fallbackSource = [
@@ -177,7 +175,7 @@ export default class LocalizationController extends AbstractController {
         { key: `whats_new`, value: `What's new?` },
         { key: `first_time`, value: `This is the first time that you run Street Vector Layer in this browser.` },
         { key: `some_info`, value: `Some info about it:` },
-        { key: `default_shortcut_instruction`, value: `By default, use ALT+L to toggle the layer.` },
+        { key: `default_shortcut_instruction`, value: `By default, use Shift + s to toggle the layer.` },
         { key: `instructions_1`, value: `You can change the streets color, thickness and style using the panel on the left sidebar.` },
         { key: `instructions_2`, value: `Your preferences will be saved for the next time in your browser.` },
         { key: `instructions_3`, value: `The other road layers will be automatically hidden (you can change this behaviour in the preference panel).` },

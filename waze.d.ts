@@ -754,6 +754,9 @@ interface Navigator {
 
 interface Window {
   // 'navigator.scheduling' is handled by augmenting Navigator above
+  W?: IW;
+  OpenLayers?: typeof OpenLayers;
+  I18n?: II18n;
 }
 
 interface Document {
