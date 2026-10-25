@@ -1,3 +1,9 @@
+/// <reference types="tampermonkey" />
+
+declare global {
+    const __DEBUG__: boolean;
+}
+
 export const enum SVLLayerState {
     UNINITIALIZED,
     INITIALIZED,
@@ -33,12 +39,8 @@ export const SDK_LAYERS = {
     SEGMENTS: "Street Vector Layer (SVL)",
     ARROWS: "SVL_ARROWS_SDK",
     NODES: "SVL_NODES_SDK",
-    //LABELS: "SVL_LABELS_SDK",
+    LABELS: "SVL_LABELS_SDK",
     ICONS: "SVL_ICONS_SDK" // e.g. average speed cameras
-};
-
-export const OL_LAYERS = {
-    LABELS: "vectorLabels"
 };
 
 export const PRESETS = {

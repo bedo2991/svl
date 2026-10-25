@@ -12,6 +12,7 @@ export default class UserInterfaceController extends AbstractController {
 
     private preferencesController!: PreferencesController;
     private badgeElement: HTMLElement | null = null;
+    private roadTypeNames: Map<number, string> = new Map();
 
     /** @type{number} */
     private readonly clutterMax: number = 20;
@@ -61,7 +62,7 @@ export default class UserInterfaceController extends AbstractController {
                 <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
                 <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
                 <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
-                GM_info.script.supportURL
+                GM_info.script.supportURL ?? undefined
             );
             this.preferencesController.savePreferences(true);
         }
@@ -284,6 +285,10 @@ export default class UserInterfaceController extends AbstractController {
     }
 
     private async initPreferencePanel() {
+        const roadTypes = await this.mediator.wmeSDK.DataModel.Segments.getRoadTypes();
+        this.roadTypeNames = new Map(
+            roadTypes.map((rt: { id: number; localizedName: string }) => [rt.id, rt.localizedName])
+        );
         //console.debug('Init Preference Panel');
         const style = <HTMLStyleElement>document.createElement('style');
         style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
@@ -340,7 +345,7 @@ export default class UserInterfaceController extends AbstractController {
         supportForum.innerText = `${this.mediator._('something_not_working')} ${this.mediator._(
             'report_it_here'
         )}.`;
-        supportForum.href = GM_info.script.supportURL;
+        supportForum.href = GM_info.script.supportURL ?? '';
         supportForum.target = '_blank';
         supportForum.className = 'svl_support-link';
         mainDiv.appendChild(supportForum);
@@ -1232,36 +1237,29 @@ export default class UserInterfaceController extends AbstractController {
         return newSelect;
     }
 
-    // This rather belongs in the localitation controller!
-    private getLocalisedString(i: (string | number)) {
-        const i18n = unsafeWindow.I18n ?? (typeof I18n !== 'undefined' ? I18n : undefined);
-        const locale = i18n?.translations?.[i18n.currentLocale()];
+    private getLocalisedString(i: (string | number)): string {
         switch (i) {
             case 'red':
-                return locale?.['segment']?.['address']?.['none'] ?? i;
+                return this.mediator._('dec_red');
             case 'toll':
-                return locale?.['edit']?.['segment']?.['fields']?.['toll_road'] ?? i;
+                return this.mediator._('dec_toll');
             case 'restriction':
-                return (
-                    locale?.['restrictions']?.['modal_headers']?.[
-                    'restriction_summary'
-                    ] ?? i
-                );
+                return this.mediator._('dec_restriction');
             case 'dirty':
-                return locale?.['edit']?.['segment']?.['fields']?.['unpaved'] ?? i;
+                return this.mediator._('dec_dirty');
             case 'closure':
-                return locale?.['objects']?.['roadClosure']?.['name'] ?? i;
+                return this.mediator._('dec_closure');
             case 'headlights':
-                return locale?.['edit']?.['segment']?.['fields']?.['headlights'] ?? i;
+                return this.mediator._('dec_headlights');
             case 'lanes':
-                return locale?.['objects']?.['lanes']?.['title'] ?? i;
+                return this.mediator._('dec_lanes');
             case 'speed limit':
-                return locale?.['edit']?.['segment']?.['fields']?.['speed_limit'] ?? i;
+                return this.mediator._('dec_speed_limit');
             case 'nearbyHOV':
-                return locale?.['edit']?.['segment']?.['fields']?.['nearbyHOV'] ?? i;
+                return this.mediator._('dec_nearby_hov');
             default:
+                return this.roadTypeNames.get(Number(i)) ?? String(i);
         }
-        return locale?.['segment']?.['road_types']?.[i] ?? i; // jshint ignore:line
     }
 
     private getOptions() {

@@ -15,20 +15,16 @@ Userscript for the Waze Map Editor (WME) that renders segment and node data mode
 
 ## Critical Rules & Constraints
 
-1. **WME SDK Mode (`AsyncWmeSDK` — Target Architecture):**
-   - SVL is migrating to the **asynchronous `AsyncWmeSDK`** interface (`import { AsyncWmeSDK } from "wme-sdk-typings"`), initialized with `mode: "async"`.
+1. **WME SDK Mode (`AsyncWmeSDK`):**
+   - SVL uses the **asynchronous `AsyncWmeSDK`** interface (`import { AsyncWmeSDK } from "wme-sdk-typings"`), initialized with `mode: "async"`.
    - Always pass `mode: "async"` to `getWmeSdk`. Under `AsyncWmeSDK`, SDK calls (`DataModel`, `Map`, `Events.trackDataModelEvents`, `Settings`, `Shortcuts`, `LayerSwitcher`, `Sidebar`) return `Promise`s and must be `await`ed (note: `Events.on` / `Events.off` and layer `styleContext` functions remain synchronous).
-   - *(Migration Note: Existing code in `main.user.ts`, `SVLMediator.ts`, and `Controllers/*` currently types `wmeSDK` as synchronous `WmeSDK` and is being transitioned to `AsyncWmeSDK`.)*
 2. **SDK Documentation & Typings:**
    - Refer to `https://www.waze.com/editor/sdk/` (production) and `https://beta.waze.com/editor/sdk/` (beta).
-   - Import types from `wme-sdk-typings` (e.g., `AsyncWmeSDK`, `Segment`, `Node`, `SdkFeature`, `LayerStyleRule`, `AllEvents`).
-   - Local ambient types for `W`, `OpenLayers`, `I18n`, and `WazeWrap` live in [`waze.d.ts`](./waze.d.ts).
-3. **Bounded Exceptions for Legacy Globals (`W`, `OpenLayers`, `I18n`):**
-   - **Default Rule:** Do NOT introduce new uses of `W`, `W.model`, `W.map`, `OpenLayers`, `I18n`, or `WazeWrap` where a WME SDK equivalent exists.
-   - **Existing Bounded Exceptions (Do Not Expand):**
-     - **Labels Layer (`OpenLayers` & `W.map`):** The WME SDK does not yet support rotated multi-line text labels along segments. [`LayerStateController.ts`](./Controllers/LayerStateController.ts) and [`RenderingController.ts`](./Controllers/RenderingController.ts) manage a custom `OpenLayers.Layer.Vector` (`OL_LAYERS.LABELS` / `"vectorLabels"`) with custom SVG renderer overrides (`OpenLayers.ElementsIndexer`, `labelsVector.renderer`, and `OpenLayers.Renderer.symbol['myTriangle']`).
-     - **Label Geometry Simplification (`W.model.segments`):** [`RenderingController.ts`](./Controllers/RenderingController.ts) accesses `W.model.segments.getObjectById(model.id)` solely to pass the legacy segment model and its `getOLGeometry().simplify(7)` into `drawLabels()`.
-     - **Native Translations (`I18n`):** [`UserInterfaceController.ts`](./Controllers/UserInterfaceController.ts) reads `I18n.translations[I18n.currentLocale()]` to display WME's native localized road type and restriction names in the settings UI.
+   - Import types from `wme-sdk-typings` (e.g., `AsyncWmeSDK`, `Segment`, `Node`, `SdkFeature`, `LayerStyleRule`, `AllEvents`) and `@types/tampermonkey`.
+   - The compile-time `__DEBUG__` ambient declaration lives in [`svlGlobals.ts`](./svlGlobals.ts).
+3. **Zero Legacy Globals (`W`, `OpenLayers`, `I18n`, `WazeWrap`):**
+   - SVL's active codebase is 100% migrated to `AsyncWmeSDK`.
+   - Do NOT introduce any uses of `W`, `W.model`, `W.map`, `OpenLayers`, `I18n`, or `WazeWrap`. All layers (including rotated multi-line street/speed labels on `SDK_LAYERS.LABELS`), geometry operations, map metrics, and translations use WME SDK APIs and pure TypeScript/Turf.js utilities.
 
 ---
 
@@ -73,7 +69,7 @@ SVL follows a strict **Mediator + Singleton Controllers** pattern. Controllers n
 
 ### Layer State Machine (`SVLLayerState`)
 Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and defined in [`svlGlobals.ts`](./svlGlobals.ts):
-- `UNINITIALIZED`: Initial state before SDK & OL layers are registered.
+- `UNINITIALIZED`: Initial state before SDK layers are registered.
 - `INITIALIZED`: Layers created and configured; transitions immediately toward active states.
 - `VISIBLE`: Layer is enabled and actively rendering segments, nodes, arrows, icons, and labels.
 - `DRAWING_ABORTED`: Drawing exceeded segment threshold (`disableMasterLayerThreshold`, default `8000` segments); partial features are cleared.
@@ -82,12 +78,12 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
 
 ### Controller Responsibilities ([`Controllers/`](./Controllers/))
 - [`SVLMediator.ts`](./SVLMediator.ts) (extends [`AbstractMediator.ts`](./Controllers/AbstractMediator.ts)): Central orchestrator. Initializes controllers in dependency order, routes notifications, manages active drawing locks (`#currentlyDrawing`), and exposes shared read-only state (`getPreference`, `getString`, `getLayerState`, `getCurrentZoom`, `getPixelSize`).
-- [`LayerStateController.ts`](./Controllers/LayerStateController.ts): Registers the 4 SDK layers (`SDK_LAYERS.SEGMENTS`, `NODES`, `ARROWS`, `ICONS`) via `wmeSDK.Map.addLayer` with `styleContext` & `styleRules`, plus the legacy OpenLayers label layer (`OL_LAYERS.LABELS`). Manages the `SVLLayerState` state machine, layer visibility, Z-index ordering (including GPS points and `farTurnPathLayer`), and geodesic pixel size caching.
-- [`RenderingController.ts`](./Controllers/RenderingController.ts): Converts WME `Segment` and `Node` models into GeoJSON `SdkFeature` objects. Handles road styling, patterns/dashes, routing mode styles, ANR/red-road highlights, head/tail/direction arrows, restriction/closure/elevation icons, and OpenLayers street/speed labels.
-  - **Batching & Feature Stores:** Queues features in `queuedSegments`, `queuedArrows`, and `queuedIcons` (`Set<SdkFeature>`) and flushes them in batches via `wmeSDK.Map.addFeaturesToLayer`. Tracks rendered feature IDs per segment in `segmentsStore`, `arrowsStore`, and `iconsStore` (`Map<number, (string | number)[]>`) for targeted updates and removals via `wmeSDK.Map.removeFeaturesFromLayer`.
+- [`LayerStateController.ts`](./Controllers/LayerStateController.ts): Registers the 5 SDK layers (`SDK_LAYERS.SEGMENTS`, `NODES`, `ARROWS`, `ICONS`, `LABELS`) via `wmeSDK.Map.addLayer` with `styleContext` & `styleRules`. Manages the `SVLLayerState` state machine, layer visibility, Z-index ordering (including GPS points and `farTurnPathLayer`), and geodesic pixel size caching (`wmeSDK.Map.getMapExtent()` + `wmeSDK.Map.getMapResolution()`).
+- [`RenderingController.ts`](./Controllers/RenderingController.ts): Converts WME `Segment` and `Node` models into GeoJSON `SdkFeature` objects. Handles road styling, patterns/dashes, routing mode styles, ANR/red-road highlights, head/tail/direction arrows, restriction/closure/elevation icons, and SDK street/speed labels (rendered as rotated point features using cached SVG data URIs via `Utils.getLabelGraphicInfo`).
+  - **Batching & Feature Stores:** Queues features in `queuedSegments`, `queuedArrows`, `queuedIcons`, and `queuedLabels` (`Set<SdkFeature>`) and flushes them in batches via `wmeSDK.Map.addFeaturesToLayer`. Tracks rendered feature IDs per segment in `segmentsStore`, `arrowsStore`, `iconsStore`, and `labelsStore` (`Map<number, (string | number)[]>`, grouped in `segmentLayerStores`) for targeted updates and removals via `wmeSDK.Map.removeFeaturesFromLayer`.
 - [`WMEEventsController.ts`](./Controllers/WMEEventsController.ts): Dynamically attaches and detaches WME SDK event listeners (`wmeSDK.Events.on` / `wmeSDK.Events.off`) and data model tracking (`trackDataModelEvents` / `stopDataModelEventsTracking`) based on `SVLLayerState` transitions so SVL consumes zero data-model event overhead when disabled. Includes built-in debounce (`deferInMs`) per event handler.
 - [`PreferencesController.ts`](./Controllers/PreferencesController.ts): Manages user preferences persisted in `localStorage` under the `"svl"` key, default presets (`PRESETS` in [`svlGlobals.ts`](./svlGlobals.ts)), schema migrations, import/export, and change rollback.
-- [`UserInterfaceController.ts`](./Controllers/UserInterfaceController.ts): Registers the sidebar tab (`wmeSDK.Sidebar.registerScriptTab()`), layer switcher checkbox (`wmeSDK.LayerSwitcher.addLayerCheckbox`), keyboard shortcut (`wmeSDK.Shortcuts.createShortcut`), WME topbar status badge (`#svl-status-badge`), and routing-mode overlay.
+- [`UserInterfaceController.ts`](./Controllers/UserInterfaceController.ts): Registers the sidebar tab (`wmeSDK.Sidebar.registerScriptTab()`), layer switcher checkbox (`wmeSDK.LayerSwitcher.addLayerCheckbox`), keyboard shortcut (`wmeSDK.Shortcuts.createShortcut`), WME topbar status badge (`#svl-status-badge`), and routing-mode overlay. Caches localized road type names via `wmeSDK.DataModel.Segments.getRoadTypes()`.
 - [`LocalizationController.ts`](./Controllers/LocalizationController.ts): Fetches localized UI strings (TSV) from Google Sheets via `GM_xmlhttpRequest` with fallback to built-in English strings.
 - [`AlertController.ts`](./Controllers/AlertController.ts): Displays toast notifications (`toastr`) and modals/prompts (`sweetalert2`), replacing legacy `WazeWrap.Alerts`.
 
@@ -96,7 +92,7 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
 ## WME SDK Usage Patterns in SVL
 
 1. **Data Access (`wmeSDK.DataModel`):**
-   - Segments: `wmeSDK.DataModel.Segments.getAll()`, `getById({ segmentId })`, `getHeadlightsRequired()`, `getNearbyRestrictions()`, `getUnpaved()`, `isRoadClosureAdded({ segmentId })`.
+   - Segments: `wmeSDK.DataModel.Segments.getAll()`, `getById({ segmentId })`, `getRoadTypes()`, `getHeadlightsRequired()`, `getNearbyRestrictions()`, `getUnpaved()`, `isRoadClosureAdded({ segmentId })`, `isTollSegment({ segmentId })`.
    - Nodes: `wmeSDK.DataModel.Nodes.getAll()`, `getById({ nodeId })`, `isTurnAllowedByNode({ fromSegmentId, nodeId, toSegmentId })`.
    - Venues: `wmeSDK.DataModel.Venues.getById({ venueId })` (for parking lot roads).
 2. **Map & Layers (`wmeSDK.Map`):**
@@ -104,6 +100,7 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
    - Add features: `wmeSDK.Map.addFeaturesToLayer({ features: Array.from(queuedFeatures), layerName })`.
    - Remove features: `wmeSDK.Map.removeFeaturesFromLayer({ featureIds, layerName })` or `wmeSDK.Map.removeAllFeaturesFromLayer({ layerName })`.
    - Visibility & Z-Index: `wmeSDK.Map.setLayerVisibility({ layerName, visibility })`, `setLayerZIndex({ layerName, zIndex })`, `setLayerOpacity({ layerName, opacity })`.
+   - Metrics: `wmeSDK.Map.getZoomLevel()`, `getMapExtent()`, `getMapResolution()`.
 3. **Events (`wmeSDK.Events`):**
    - Note the parameter name is `eventHandler` (not `callback`):
      ```typescript
@@ -119,9 +116,10 @@ Managed by [`LayerStateController`](./Controllers/LayerStateController.ts) and d
 
 ## Geometry, Math & Debugging Utilities
 
-- **Turf.js Packages Used:**
-  - `@turf/simplify` (`simplify`) for simplifying segment geometries at lower zoom levels.
-  - `@turf/line-offset` (`lineOffset`) for offsetting one-way / dual-carriageway / ANR lines.
+- **Turf.js & Geometry Utilities:**
+  - `@turf/turf` (`simplify`, `lineOffset`) for simplifying segment geometries at lower zoom levels and offsetting one-way / dual-carriageway / ANR lines.
+  - `Utils.simplifyLonLatAsMercator`: Ramer-Douglas-Peucker geometry simplification in Web Mercator (`EPSG:3857`) meters for label placement.
+  - `Utils.getLabelGraphicInfo`: Generates and caches multi-line SVG data URIs (with optional triangle arrow symbol) for rotated street and speed labels on `SDK_LAYERS.LABELS`.
   - Coordinates are always `[lon, lat]` (GeoJSON standard).
 - **Compile-Time Debug Flag (`__DEBUG__`):**
   - Rollup replaces `__DEBUG__` with `true` in development builds and `false` in production (`NODE_ENV=production`).

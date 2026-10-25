@@ -3,7 +3,7 @@ import SVLMediator from "../SVLMediator";
 import { Country, Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
-import { AcceptedControllerEvents, OL_LAYERS, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
+import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
 import { lineOffset } from "@turf/line-offset";
 import Utils from "../Utils";
 
@@ -29,14 +29,25 @@ export default class RenderingController extends AbstractController {
     private queuedSegments: Set<SdkFeature<LineString>> = new Set();
     private queuedArrows: Set<SdkFeature<Point>> = new Set();
     private queuedIcons: Set<SdkFeature<Point>> = new Set();
+    private queuedLabels: Set<SdkFeature<Point>> = new Set();
 
     private segmentsStore = new Map<Segment['id'], Set<string>>();
     private arrowsStore = new Map<Segment['id'], Set<string>>();
     private iconsStore = new Map<Segment['id'], Set<string>>();
-    private labelsStore = new Map<Segment['id'], OpenLayers.Feature.Vector[]>();
+    private labelsStore = new Map<Segment['id'], Set<string>>();
     private nodesStore = new Set<Node['id']>();
 
-    private labelsVector: OpenLayers.Layer.Vector | undefined;
+    private readonly segmentLayerStores: ReadonlyArray<{
+        queue: Set<SdkFeature<any>>;
+        store: Map<Segment['id'], Set<string>>;
+        layerName: string;
+        debugName: string;
+    }> = [
+            { queue: this.queuedSegments, store: this.segmentsStore, layerName: SDK_LAYERS.SEGMENTS, debugName: 'segments' },
+            { queue: this.queuedArrows, store: this.arrowsStore, layerName: SDK_LAYERS.ARROWS, debugName: 'arrows' },
+            { queue: this.queuedIcons, store: this.iconsStore, layerName: SDK_LAYERS.ICONS, debugName: 'icons' },
+            { queue: this.queuedLabels, store: this.labelsStore, layerName: SDK_LAYERS.LABELS, debugName: 'labels' },
+        ];
 
     private isImperial: boolean = false;
     private cachedUserRank: number | undefined = undefined;
@@ -127,8 +138,6 @@ export default class RenderingController extends AbstractController {
     public static async initialize({ mediator }: { mediator: SVLMediator }): Promise<RenderingController> {
         if (!RenderingController.instance) {
             RenderingController.instance = new RenderingController({ mediator });
-            const w = unsafeWindow.W ?? W;
-            RenderingController.instance.labelsVector = w.map.getLayerByName(OL_LAYERS.LABELS);
 
             // Initialization
             await RenderingController.instance.handleWMESettingsUpdated(false);
@@ -276,28 +285,56 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>) {
-        this.queuedSegments.add(feature);
-        // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToSegmentsStore(id, String(feature.id));
+    private queueFeatureForSegment<G extends Point | LineString>(
+        id: Segment['id'],
+        feature: SdkFeature<G>,
+        queue: Set<SdkFeature<G>>,
+        store: Map<Segment['id'], Set<string>>
+    ): void {
+        queue.add(feature);
+        let idSet = store.get(id);
+        if (!idSet) {
+            idSet = new Set();
+            store.set(id, idSet);
+        }
+        idSet.add(String(feature.id));
     }
 
-    private addIDsToSegmentsStore(id: Segment['id'], ...strings: string[]) {
-        if (!this.segmentsStore.has(id)) {
-            this.segmentsStore.set(id, new Set());
-        }
-        const stringSet = <Set<string>>this.segmentsStore.get(id);
-        for (const str of strings) {
-            stringSet.add(str);
-        }
+    private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>): void {
+        this.queueFeatureForSegment(id, feature, this.queuedSegments, this.segmentsStore);
     }
-    private addIDsToArrowsStore(id: Segment['id'], ...strings: string[]) {
-        if (!this.arrowsStore.has(id)) {
-            this.arrowsStore.set(id, new Set());
+
+    private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
+        this.queueFeatureForSegment(id, feature, this.queuedArrows, this.arrowsStore);
+    }
+
+    private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
+        this.queueFeatureForSegment(id, feature, this.queuedIcons, this.iconsStore);
+    }
+
+    private queueLabelFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
+        this.queueFeatureForSegment(id, feature, this.queuedLabels, this.labelsStore);
+    }
+
+    private collectAndDeleteStoredFeatureIds(
+        segmentIds: readonly Segment['id'][],
+        store: Map<Segment['id'], Set<string>>
+    ): string[] {
+        const featureIds: string[] = [];
+        for (let i = 0; i < segmentIds.length; i++) {
+            const segId = segmentIds[i];
+            const set = store.get(segId);
+            if (set) {
+                featureIds.push(...set);
+                store.delete(segId);
+            }
         }
-        const stringSet = <Set<string>>this.arrowsStore.get(id);
-        for (const str of strings) {
-            stringSet.add(str);
+        return featureIds;
+    }
+
+    private clearAllSegmentQueues(): void {
+        for (const { queue } of this.segmentLayerStores) {
+            queue.clear();
         }
     }
 
@@ -339,7 +376,7 @@ export default class RenderingController extends AbstractController {
     private sampleArrowPointsAlongSegment(
         coords: number[][],
         isInRoundabout: boolean,
-        labels?: OpenLayers.Feature.Vector[]
+        labels?: SdkFeature<Point>[]
     ): { coordinates: [number, number]; p0: number[]; p1: number[]; minZoom: number }[] {
         if (coords.length < 2) {
             return [];
@@ -367,13 +404,12 @@ export default class RenderingController extends AbstractController {
 
         const labelZones: { lon: number; lat: number; radiusMeters: number }[] = [];
         if (labels && labels.length > 0) {
-            const MAX_EXTENT = 20037508.342789244;
             for (const lf of labels) {
-                const geom = lf?.geometry as OpenLayers.Geometry.Point | undefined;
-                if (geom && typeof geom.x === 'number' && typeof geom.y === 'number') {
-                    const lon = (geom.x * 180) / MAX_EXTENT;
-                    const lat = (Math.atan(Math.exp((geom.y * Math.PI) / MAX_EXTENT)) * 360) / Math.PI - 90;
-                    const rawLabel: string = lf.attributes?.label ?? '';
+                const labelCoords = lf?.geometry?.coordinates;
+                if (labelCoords && labelCoords.length >= 2) {
+                    const lon = labelCoords[0];
+                    const lat = labelCoords[1];
+                    const rawLabel = String(lf.properties?.['label'] ?? '');
                     const lines = rawLabel.split('\n');
                     let maxLineChars = 0;
                     for (const line of lines) {
@@ -461,16 +497,6 @@ export default class RenderingController extends AbstractController {
 
         const filtered = candidates.filter((c) => !c.collides);
         return filtered.length > 0 ? filtered : candidates;
-    }
-
-    private addIDsToIconsStore(id: Segment['id'], ...strings: string[]) {
-        if (!this.iconsStore.has(id)) {
-            this.iconsStore.set(id, new Set());
-        }
-        const stringSet = <Set<string>>this.iconsStore.get(id);
-        for (const str of strings) {
-            stringSet.add(str);
-        }
     }
 
     private getColorStringFromSpeed(metricspeed: number | null) {
@@ -580,86 +606,44 @@ export default class RenderingController extends AbstractController {
             streetsMap.set(streets[i].id, streets[i]);
         }
 
-        const results = await Promise.all(
+        const staleLabelIds = this.collectAndDeleteStoredFeatureIds(
+            segments.map(s => s.id),
+            this.labelsStore
+        );
+
+        await Promise.all(
             segments.map(s => this.drawSegmentSDK(s, streetsMap))
         );
         if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
-            this.queuedSegments.clear();
-            this.queuedArrows.clear();
-            this.queuedIcons.clear();
+            this.clearAllSegmentQueues();
             return;
         }
 
-        const labels: OpenLayers.Feature.Vector[] = [];
-        const staleLabels: OpenLayers.Feature.Vector[] = [];
-        for (let i = 0; i < segments.length; i++) {
-            const s = segments[i];
-            const existing = this.labelsStore.get(s.id);
-            if (existing) {
-                staleLabels.push(...existing);
-                this.labelsStore.delete(s.id);
-            }
-            const res = results[i];
-            if (res && res.labels && res.labels.length > 0) {
-                this.labelsStore.set(s.id, res.labels);
-                labels.push(...res.labels);
+        if (staleLabelIds.length > 0) {
+            await this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                layerName: SDK_LAYERS.LABELS,
+                featureIds: staleLabelIds,
+            });
+            if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+                this.clearAllSegmentQueues();
+                return;
             }
         }
-        if (staleLabels.length > 0) {
-            this.labelsVector?.destroyFeatures(staleLabels, { 'silent': true });
-        }
+
         await this.drawAllQueues();
-
-        if (labels.length > 0 && generation === this.drawGeneration && this.mediator.getState() === SVLLayerState.VISIBLE) {
-            this.labelsVector?.addFeatures(labels, { 'silent': true });
-        }
-    }
-
-    private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        this.queuedArrows.add(feature);
-        // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToArrowsStore(id, String(feature.id));
-    }
-    private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>) {
-        this.queuedIcons.add(feature);
-        // TODO: there might be IDs in the list that have not been drawn yet
-        this.addIDsToIconsStore(id, String(feature.id));
     }
 
     private async drawAllQueues(): Promise<void> {
-        await Promise.all([
-            this.drawQueuedSegments(),
-            this.drawQueuedArrows(),
-            this.drawQueuedIcons()
-        ]);
-    }
-
-    private async drawQueuedSegments(): Promise<void> {
-        if (this.queuedSegments.size > 0) {
-            this.mediator.debugLog(`Drawing ${this.queuedSegments.size} queued segments`);
-            // Convert to array once instead of calling Array.from repeatedly
-            const features = Array.from(this.queuedSegments);
-            this.queuedSegments.clear();
-            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.SEGMENTS, features });
-        }
-    }
-
-    private async drawQueuedArrows(): Promise<void> {
-        if (this.queuedArrows.size > 0) {
-            this.mediator.debugLog(`Drawing ${this.queuedArrows.size} queued arrows`);
-            const features = Array.from(this.queuedArrows);
-            this.queuedArrows.clear();
-            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ARROWS, features });
-        }
-    }
-
-    private async drawQueuedIcons(): Promise<void> {
-        if (this.queuedIcons.size > 0) {
-            this.mediator.debugLog(`Drawing ${this.queuedIcons.size} queued icons`);
-            const features = Array.from(this.queuedIcons);
-            this.queuedIcons.clear();
-            await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName: SDK_LAYERS.ICONS, features });
-        }
+        await Promise.all(
+            this.segmentLayerStores.map(async ({ queue, layerName, debugName }) => {
+                if (queue.size > 0) {
+                    this.mediator.debugLog(`Drawing ${queue.size} queued ${debugName}`);
+                    const features = Array.from(queue);
+                    queue.clear();
+                    await this.mediator.wmeSDK.Map.addFeaturesToLayer({ layerName, features });
+                }
+            })
+        );
     }
 
     private async addNodesByModel(nodes: Node[], generation: number = this.drawGeneration): Promise<void> {
@@ -736,31 +720,17 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-
     private async removeAllSegmentsFromLayer(): Promise<void> {
-        this.queuedSegments.clear();
-        this.segmentsStore.clear();
+        for (const { queue, store } of this.segmentLayerStores) {
+            queue.clear();
+            store.clear();
+        }
 
-        this.queuedArrows.clear();
-        this.arrowsStore.clear();
-
-        this.queuedIcons.clear();
-        this.iconsStore.clear();
-
-        this.labelsStore.clear();
-        this.labelsVector?.destroyFeatures(this.labelsVector.features, { 'silent': true });
-
-        await Promise.all([
-            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-                layerName: SDK_LAYERS.SEGMENTS
-            }),
-            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-                layerName: SDK_LAYERS.ARROWS
-            }),
-            this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({
-                layerName: SDK_LAYERS.ICONS
-            })
-        ]);
+        await Promise.all(
+            this.segmentLayerStores.map(({ layerName }) =>
+                this.mediator.wmeSDK.Map.removeAllFeaturesFromLayer({ layerName })
+            )
+        );
     }
 
     private async removeAllNodesFromLayer(): Promise<void> {
@@ -831,63 +801,17 @@ export default class RenderingController extends AbstractController {
 
     private async removeSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
-        const segmentsFeatureIds: string[] = [];
-        const labelsToDestroy: OpenLayers.Feature.Vector[] = [];
-        for (let i = 0; i < objectIds.length; i++) {
-            const segId = objectIds[i];
-            const set = this.segmentsStore.get(segId);
-            if (set) {
-                segmentsFeatureIds.push(...Array.from(set));
-                this.segmentsStore.delete(segId);
-            }
-            const segLabels = this.labelsStore.get(segId);
-            if (segLabels) {
-                labelsToDestroy.push(...segLabels);
-                this.labelsStore.delete(segId);
-            }
-        }
-        if (labelsToDestroy.length > 0) {
-            this.labelsVector?.destroyFeatures(labelsToDestroy, { 'silent': true });
-        }
-
-
-        const arrowsFeatureIds: string[] = [];
-        for (let i = 0; i < objectIds.length; i++) {
-            const set = this.arrowsStore.get(objectIds[i]);
-            if (set) {
-                arrowsFeatureIds.push(...Array.from(set));
-                this.arrowsStore.delete(objectIds[i]);
-            }
-        }
-
-        const iconsFeatureIds: string[] = [];
-        for (let i = 0; i < objectIds.length; i++) {
-            const set = this.iconsStore.get(objectIds[i]);
-            if (set) {
-                iconsFeatureIds.push(...Array.from(set));
-                this.iconsStore.delete(objectIds[i]);
-            }
-        }
-
         const promises: Promise<void>[] = [];
-        if (segmentsFeatureIds.length > 0) {
-            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-                featureIds: segmentsFeatureIds,
-                layerName: SDK_LAYERS.SEGMENTS
-            }));
-        }
-        if (arrowsFeatureIds.length > 0) {
-            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-                featureIds: arrowsFeatureIds,
-                layerName: SDK_LAYERS.ARROWS
-            }));
-        }
-
-        if (iconsFeatureIds.length > 0) {
-            promises.push(this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-                featureIds: iconsFeatureIds,
-                layerName: SDK_LAYERS.ICONS
-            }));
+        for (const { store, layerName } of this.segmentLayerStores) {
+            const featureIds = this.collectAndDeleteStoredFeatureIds(objectIds, store);
+            if (featureIds.length > 0) {
+                promises.push(
+                    this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                        featureIds,
+                        layerName,
+                    })
+                );
+            }
         }
         if (promises.length > 0) {
             await Promise.all(promises);
@@ -931,13 +855,13 @@ export default class RenderingController extends AbstractController {
     private async drawSegmentSDK(
         model: Segment,
         streetsMap: Map<number, Street>,
-    ): Promise<{ labels: OpenLayers.Feature.Vector[] | undefined }> {
+    ): Promise<void> {
         if (!model || await this.mediator.wmeSDK.DataModel.isDeleted({
             dataModelName: "segments",
             objectId: model.id
         })) {
             // Skip deleted segments (this happens when the user pans away and comes back on a deleted segment)
-            return { labels: [] };
+            return;
         }
 
         const { id, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, primaryStreetId } = model;
@@ -1016,7 +940,7 @@ export default class RenderingController extends AbstractController {
                 },
             };
             this.queueSegmentFeatureForDrawing(model.id, redSegment);
-            return { labels: [] };
+            return;
         }
 
         if (
@@ -1027,11 +951,9 @@ export default class RenderingController extends AbstractController {
         }
 
         // Compute labels first so one-way arrow placement can avoid colliding with them
-        const w = unsafeWindow.W ?? W;
-        const oldModel = w.model.segments.getObjectById(model.id);
-        let labels: OpenLayers.Feature.Vector[] | undefined;
-        if (oldModel) {
-            labels = this.drawLabels(oldModel, oldModel.getOLGeometry().simplify(7).components, model, streetsMap, roadType);
+        const labels = this.drawLabels(model, streetsMap, roadType);
+        for (let i = 0; i < labels.length; i++) {
+            this.queueLabelFeatureForDrawing(model.id, labels[i]);
         }
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -1265,13 +1187,7 @@ export default class RenderingController extends AbstractController {
             }
 
             try {
-                const mightBeToll = !oldModel
-                    || Boolean(oldModel.attributes.fwdToll || oldModel.attributes.revToll)
-                    || (hasRestrictions && model.restrictions.some((r: any) => r.defaultType === 'TOLL'));
-                if (
-                    mightBeToll &&
-                    await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })
-                ) {
+                if (await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })) {
                     // It is a toll road
                     // consoleDebug("Segment is toll");
                     const tollLine: SdkFeature<LineString> = {
@@ -1519,32 +1435,13 @@ export default class RenderingController extends AbstractController {
                 this.queueSegmentFeatureForDrawing(model.id, tunnelFlag2);
             } // 'else': road type is not supported, just add the label
         }
-
-        return { labels };
     }
 
-    /**
-  *
-  * @param {Waze.Feature.Vector.Segment} _segmentModel
-  * @param {Array<OpenLayers.Geometry.Point>} simplified
-  */
     private drawLabels(
-        _segmentModel: Waze.Feature.Vector.Segment,
-        simplified: Array<OpenLayers.Geometry.Point>,
         sdkSegment: Segment,
         streetsMap: Map<number, Street>,
         roadType: number = sdkSegment.roadType
-    ): OpenLayers.Feature.Vector[] {
-        const ol = unsafeWindow.OpenLayers ?? OpenLayers;
-        let labelFeature;
-        let labelText: string;
-
-        /** @type {string} */
-        let directionArrow: string;
-        let p0: OpenLayers.Geometry.Point;
-        let p1: OpenLayers.Geometry.Point;
-        const labels = [];
-        labelFeature = null;
+    ): SdkFeature<Point>[] {
         const primaryStreet = sdkSegment.primaryStreetId !== null ? streetsMap.get(sdkSegment.primaryStreetId) : undefined;
         const hasStreetName = Boolean(
             primaryStreet &&
@@ -1612,22 +1509,19 @@ export default class RenderingController extends AbstractController {
                 speedPart += '?';
             }
         }
-        labelText = `${streetPart} ${speedPart}`;
+        const labelText = `${streetPart} ${speedPart}`;
         if (labelText === ' ') {
             return [];
         }
 
-        const roadTypeID = roadType;
-        const sampleLabel = new ol.Feature.Vector(simplified[0], {
-            'sID': sdkSegment.id,
-            'color': this.streetStyles[roadTypeID]
-                ? this.streetStyles[roadTypeID]['strokeColor']
-                : '#f00',
-            'outlinecolor': this.streetStyles[roadTypeID]
-                ? this.streetStyles[roadTypeID]['outlineColor']
-                : '#fff',
-            'outlinewidth': this.prefLabelOutlineWidth,
-        });
+        const simplified = Utils.simplifyLonLatAsMercator(sdkSegment.geometry.coordinates, 7);
+        if (simplified.length < 2) {
+            return [];
+        }
+
+        const roadTypeStyle = this.streetStyles[roadType];
+        const color = roadTypeStyle ? roadTypeStyle['strokeColor'] : '#f00';
+        const outlinecolor = roadTypeStyle ? roadTypeStyle['outlineColor'] : '#fff';
 
         const distances: { index: number, distance: number }[] = [];
         for (let p = 0; p < simplified.length - 1; p += 1) {
@@ -1644,6 +1538,7 @@ export default class RenderingController extends AbstractController {
         const requiredSpace = this.clutterConstant * Math.max(labelText.length, altStreetPart.length);
 
         const isOneWay = !sdkSegment.isTwoWay && (sdkSegment.isAtoB || sdkSegment.isBtoA);
+        const labels: SdkFeature<Point>[] = [];
         for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
             if (
                 distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
@@ -1651,25 +1546,15 @@ export default class RenderingController extends AbstractController {
                 break;
             }
             const p = distances[i].index;
-            let dx = 0;
-            let dy = 0;
-            p0 = simplified[p];
+            const p0 = simplified[p];
             const pNext = simplified[p + 1];
-            p1 = new ol.Geometry.Point(
-                (p0.x + pNext.x) * 0.5,
-                (p0.y + pNext.y) * 0.5
-            );
-            labelFeature = sampleLabel.clone();
-            labelFeature.geometry = p1;
-            if (sdkSegment.isAtoB) {
-                dx = p1.x - p0.x;
-                dy = p1.y - p0.y;
-            } else {
-                dx = p0.x - p1.x;
-                dy = p0.y - p1.y;
-            }
+            const midX = (p0.x + pNext.x) * 0.5;
+            const midY = (p0.y + pNext.y) * 0.5;
+            const dx = sdkSegment.isAtoB ? midX - p0.x : p0.x - midX;
+            const dy = sdkSegment.isAtoB ? midY - p0.y : p0.y - midY;
             const angle = Math.atan2(dx, dy);
             let degrees = 90 + (angle * 180) / Math.PI;
+            let directionArrow: string;
             if (streetPart !== '') {
                 directionArrow = ' ▶ '; // for debugging, ▷ is an alternative.
                 if (degrees > 90 && degrees < 270) {
@@ -1684,14 +1569,27 @@ export default class RenderingController extends AbstractController {
             if (!isOneWay) {
                 directionArrow = ''; // The degree has to be computed anyway
             }
-            labelFeature.attributes.label =
-                directionArrow + labelText + directionArrow + altStreetPart;
 
-            labelFeature.attributes['angle'] = degrees;
-            labelFeature.attributes.closeZoomOnly = p % 2 === 1;
-            labelFeature.attributes.showAtzoom = labelsToInsert;
+            labels.push({
+                type: 'Feature',
+                id: `${sdkSegment.id}_lbl_${i}`,
+                geometry: {
+                    type: 'Point',
+                    coordinates: Utils.mercatorToLonLat(midX, midY),
+                },
+                properties: {
+                    'sID': sdkSegment.id,
+                    'label': directionArrow + labelText + directionArrow + altStreetPart,
+                    'degrees': degrees,
+                    'color': color,
+                    'outlinecolor': outlinecolor,
+                    'outlinewidth': this.prefLabelOutlineWidth,
+                    'closeZoomOnly': p % 2 === 1 ? 1 : 0,
+                    'showAtzoom': labelsToInsert,
+                    'zIndex': 650,
+                },
+            });
             labelsToInsert -= 1;
-            labels.push(labelFeature);
         }
 
         return labels;
