@@ -202,7 +202,14 @@ export default class PreferencesController extends AbstractController {
         this.preferences['virtualNodeColor'] = loadedPreferences?.['virtualNodeColor'] ?? '#045419';
 
         this.preferences['realsize'] = loadedPreferences?.['realsize'] ?? true;
-        this.preferences['showANs'] = loadedPreferences?.['showANs'] ?? false;
+        const loadedShowANs = loadedPreferences?.['showANs'];
+        if (typeof loadedShowANs === 'boolean') {
+            this.preferences['showANs'] = loadedShowANs ? 2 : 0;
+        } else if (typeof loadedShowANs === 'number' && !Number.isNaN(loadedShowANs)) {
+            this.preferences['showANs'] = Math.min(4, Math.max(0, Math.round(loadedShowANs)));
+        } else {
+            this.preferences['showANs'] = 2;
+        }
 
         this.preferences['layerOpacity'] = loadedPreferences?.['layerOpacity'] ?? 0.8;
 

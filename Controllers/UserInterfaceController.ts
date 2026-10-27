@@ -56,12 +56,11 @@ export default class UserInterfaceController extends AbstractController {
                 'Street Vector Layer',
                 this.mediator.SVL_VERSION,
                 `<b>${this.mediator._('whats_new')}</b>
+                <br>- 8.1.1 - Support displaying more than 2 alternative street names (this value can be set in the settings).
                 <br>- 8.0.0 - Improved arrows placement, virtual nodes, and overall visual quality. Various bug fixes and performance improvements.
                 <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
                 <br>- 7.0.0 - Fixed: SVL covers the WME's paths. The option "Show GPS layer above roads" now also works consistently. Flickering is possible at every deselection (current SDK limitation).
-                <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!
-                <br>- 6.2.7 - Default shortcut for toggling the layer is now "Shift + s".
-                <br>- 6.2.6 - Fix: restart drawing after aborting more often.`,
+                <br>- 7.0.0 - Code completely rewritten, with many internal improvements and optimizations. Please report any issue you find!`,
                 GM_info.script.supportURL ?? undefined
             );
             this.preferencesController.savePreferences(true);
@@ -479,10 +478,13 @@ export default class UserInterfaceController extends AbstractController {
         streets.appendChild(decorations);
 
         streets.appendChild(
-            this.createCheckboxOption({
+            this.createIntegerOption({
                 id: 'showANs',
                 title: this.mediator._('show_ans'),
                 description: this.mediator._('show_ans_descr'),
+                min: 0,
+                max: 4,
+                step: 1,
             })
         );
 
@@ -1074,7 +1076,7 @@ export default class UserInterfaceController extends AbstractController {
         this.setCheckboxChecked('svl_showUnderGPSPoints', this.mediator.getPreference('showUnderGPSPoints'));
         this.setCheckboxChecked('svl_routingModeEnabled', this.mediator.getPreference('routingModeEnabled'));
         this.setCheckboxChecked('svl_hideRoutingModeBlock', this.mediator.getPreference('hideRoutingModeBlock'));
-        this.setCheckboxChecked('svl_showANs', this.mediator.getPreference('showANs'));
+        this.setInputValue('svl_showANs', this.mediator.getPreference('showANs'));
 
         this.setInputValue('svl_layerOpacity', this.mediator.getPreference('layerOpacity') * 100);
 

@@ -64,7 +64,7 @@ export default class RenderingController extends AbstractController {
     private prefShowSLSingleColor: boolean = false;
     private prefSLColor: string = '#ffffff';
     private prefShowSLText: boolean = true;
-    private prefShowANs: boolean = true;
+    private prefShowANs: number = 2;
     private prefFakelock: number = 6;
     private prefLabelOutlineWidth: number = 3;
     private prefArrowDeclutter: number = 140;
@@ -189,7 +189,7 @@ export default class RenderingController extends AbstractController {
         this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor'));
         this.prefSLColor = this.mediator.getPreference('SLColor');
         this.prefShowSLText = Boolean(this.mediator.getPreference('showSLtext'));
-        this.prefShowANs = Boolean(this.mediator.getPreference('showANs'));
+        this.prefShowANs = Number(this.mediator.getPreference('showANs')) || 0;
         this.prefFakelock = Number(this.mediator.getPreference('fakelock'));
         this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth'));
         this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
@@ -1458,23 +1458,23 @@ export default class RenderingController extends AbstractController {
 
         // add alt street names
         let altStreetPart = '';
-        if (this.prefShowANs && sdkSegment.alternateStreetIds?.length > 0) {
+        if (this.prefShowANs > 0 && sdkSegment.alternateStreetIds?.length > 0) {
             let ANsShown = 0;
             for (let i = 0; i < sdkSegment.alternateStreetIds.length; i += 1) {
                 const altStreet = streetsMap.get(sdkSegment.alternateStreetIds[i]);
-                if (ANsShown === 2) {
-                    // Show maximum 2 alternative names
-                    altStreetPart += ' …';
-                    break;
-                }
                 const altStreetName = !altStreet?.isEmpty ? altStreet?.name : undefined;
                 if (altStreetName && altStreetName !== streetPart) {
+                    if (ANsShown === this.prefShowANs) {
+                        // Show maximum prefShowANs alternative names
+                        altStreetPart += ' …';
+                        break;
+                    }
                     ANsShown += 1;
                     altStreetPart += `(${altStreetName})`;
                 }
             }
 
-            altStreetPart = altStreetPart.replace(')(', ', ');
+            altStreetPart = altStreetPart.replaceAll(')(', '｜');
             if (altStreetPart !== '') {
                 altStreetPart = `\n${altStreetPart}`;
             }
