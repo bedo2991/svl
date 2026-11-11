@@ -6,9 +6,8 @@ import LocalizationController from "./Controllers/LocalizationController";
 import { AsyncWmeSDK, DataModelName } from "wme-sdk-typings";
 import AbstractMediator, { AlertType, SVLEvents } from "./Controllers/AbstractMediator";
 import UserInterfaceController from "./Controllers/UserInterfaceController";
-import { AcceptedControllerEvents, SVLLayerState } from "./svlGlobals";
+import { AcceptedControllerEvents, ChangedIDsInfo, DEFAULT_PREFERENCES, SVLLayerState } from "./svlGlobals";
 import AlertController from "./Controllers/AlertController";
-
 
 export default class SVLMediator extends AbstractMediator {
     // Singleton pattern
@@ -31,47 +30,72 @@ export default class SVLMediator extends AbstractMediator {
     private constructor({ wmeSDK }: { wmeSDK: AsyncWmeSDK }) {
         super();
         this.alertController = new AlertController();
-        // Private constructor to prevent direct instantiation
         this.wmeSDK = wmeSDK;
+    }
+
+    private async waitForInitialMapData(): Promise<void> {
+        if (await this.wmeSDK.State.isInitialMapDataLoaded()) {
+            return;
+        }
+        await this.wmeSDK.Events.once({ eventName: "wme-map-initial-data-loaded" });
     }
 
     public static async initialize({ wmeSDK }: { wmeSDK: AsyncWmeSDK }): Promise<SVLMediator> {
         if (!SVLMediator.instance) {
-            SVLMediator.instance = new SVLMediator({ wmeSDK });
-            SVLMediator.instance.localizationController = await LocalizationController.initialize({ mediator: SVLMediator.instance });
-            SVLMediator.instance.preferencesController = await PreferencesController.initialize({ mediator: SVLMediator.instance });
-            SVLMediator.instance.layerStateController = await LayerStateController.initialize({
-                mediator: SVLMediator.instance
-            });
-            SVLMediator.instance.renderingController = await RenderingController.initialize({ mediator: SVLMediator.instance });
-            SVLMediator.instance.wmeEventsController = await WMEEventsController.initialize({ mediator: SVLMediator.instance });
+            const instance = new SVLMediator({ wmeSDK });
+            SVLMediator.instance = instance;
+
+            const [localizationController] = await Promise.all([
+                LocalizationController.initialize({ mediator: instance }),
+                instance.waitForInitialMapData(),
+            ]);
+            instance.localizationController = localizationController;
+            instance.preferencesController = await PreferencesController.initialize({ mediator: instance });
+            instance.layerStateController = await LayerStateController.initialize({ mediator: instance });
+            instance.renderingController = await RenderingController.initialize({ mediator: instance });
+            instance.wmeEventsController = await WMEEventsController.initialize({ mediator: instance });
+
             try {
-                SVLMediator.instance.userInterfaceController = await UserInterfaceController.initialize({ mediator: SVLMediator.instance, preferencesController: SVLMediator.instance.preferencesController });
+                instance.userInterfaceController = await UserInterfaceController.initialize({
+                    mediator: instance,
+                    preferencesController: instance.preferencesController,
+                });
             } catch (e) {
                 console.error("Error initializing UserInterfaceController:", e);
-                SVLMediator.instance.alert(AlertType.ERROR, `Error initializing SVL User Interface.`);
+                instance.alert(AlertType.ERROR, 'Error initializing SVL User Interface.');
             }
-            SVLMediator.instance.registerCallbacks();
 
-            await SVLMediator.instance.layerStateController.enableLayerForTheFirstTime();
+            instance.registerCallbacks();
 
-            await SVLMediator.instance.checkCountryChanged();
+            await instance.checkCountryChanged();
+            await instance.layerStateController.enableLayerForTheFirstTime();
 
-            SVLMediator.instance.updateRefreshStatus();
+            instance.updateRefreshStatus();
 
-            SVLMediator.instance.emit(SVLEvents.INITIALIZED);
-            return SVLMediator.instance;
+            instance.emit(SVLEvents.INITIALIZED);
+            return instance;
         } else {
             throw new Error("SVLMediator is already initialized.");
         }
     }
 
     private registerCallbacks(): void {
+        this.wmeSDK.Events.on({
+            eventName: "wme-logged-in",
+            eventHandler: async () => {
+                const userInfo = await this.wmeSDK.State.getUserInfo();
+                this.preferencesController.updateUserRank(userInfo?.rank);
+            },
+        });
+
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.COUNTRY_CHANGE,
             sdkName: "wme-map-data-loaded",
-            callback: this.checkCountryChanged.bind(this),
-            deferInMs: 1000
+            callback: async () => {
+                await this.layerStateController.refreshMapMetrics();
+                await this.checkCountryChanged();
+            },
+            deferInMs: 1000,
         });
 
         this.wmeEventsController.registerSVLCallback({
@@ -79,11 +103,10 @@ export default class SVLMediator extends AbstractMediator {
             sdkName: "wme-map-zoom-changed",
             deferInMs: 500,
             callback: async () => {
-                //this.alertDebug(AlertType.WARNING, "Zoom");
                 await this.layerStateController.refreshMapMetrics();
                 await this.renderingController.zoomChanged();
                 this.emit(SVLEvents.ZOOM_CHANGED);
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
@@ -92,7 +115,7 @@ export default class SVLMediator extends AbstractMediator {
             callback: () => {
                 this.alertDebug(AlertType.INFO, "WME Settings Changed");
                 this.notify(this, AcceptedControllerEvents.WME_SETTINGS_UPDATED);
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
@@ -102,13 +125,13 @@ export default class SVLMediator extends AbstractMediator {
                 this.alertDebug(AlertType.INFO, "Drawing Aborted Callback");
                 await this.renderingController.shouldDrawingResumeAfterAbort();
             },
-            deferInMs: 500
+            deferInMs: 500,
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.DATA_MODEL,
             sdkName: "wme-data-model-objects-added",
-            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => {
+            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
                 switch (dataModelName) {
                     case "segments":
                         await this.renderingController.addSegmentsByIds(objectIds as number[]);
@@ -116,14 +139,17 @@ export default class SVLMediator extends AbstractMediator {
                     case "nodes":
                         await this.renderingController.addNodesByIds(objectIds as number[]);
                         break;
+                    case "roadClosures":
+                        await this.renderingController.refreshRoadClosureSegments(objectIds);
+                        break;
                 }
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.DATA_MODEL,
             sdkName: "wme-data-model-objects-removed",
-            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => {
+            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
                 switch (dataModelName) {
                     case "segments":
                         await this.renderingController.removeSegmentsByIds(objectIds as number[]);
@@ -131,14 +157,17 @@ export default class SVLMediator extends AbstractMediator {
                     case "nodes":
                         await this.renderingController.removeNodesByIds(objectIds as number[]);
                         break;
+                    case "roadClosures":
+                        await this.renderingController.refreshRoadClosureSegments(objectIds);
+                        break;
                 }
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.DATA_MODEL,
             sdkName: "wme-data-model-objects-changed",
-            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => {
+            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
                 switch (dataModelName) {
                     case "segments":
                         await this.renderingController.updateSegmentsByIds(objectIds as number[]);
@@ -146,14 +175,17 @@ export default class SVLMediator extends AbstractMediator {
                     case "nodes":
                         await this.renderingController.updateNodesByIds(objectIds as number[]);
                         break;
+                    case "roadClosures":
+                        await this.renderingController.refreshRoadClosureSegments(objectIds);
+                        break;
                 }
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.DATA_MODEL,
             sdkName: "wme-data-model-object-state-deleted",
-            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => {
+            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
                 switch (dataModelName) {
                     case "segments":
                         await this.renderingController.removeSegmentsByIds(objectIds as number[]);
@@ -161,50 +193,56 @@ export default class SVLMediator extends AbstractMediator {
                     case "nodes":
                         await this.renderingController.removeNodesByIds(objectIds as number[]);
                         break;
+                    case "roadClosures":
+                        await this.renderingController.refreshRoadClosureSegments(objectIds);
+                        break;
                 }
-            }
+            },
+        });
+
+        this.wmeEventsController.registerSVLCallback({
+            eventType: SVLCallbackEventTypes.DATA_MODEL,
+            sdkName: "wme-data-model-object-changed-id",
+            callback: async ({ dataModelName, objectIds }: { dataModelName: DataModelName; objectIds: ChangedIDsInfo }) => {
+                const { oldID, newID } = objectIds;
+                if (oldID === null || newID === null) return;
+                switch (dataModelName) {
+                    case "segments":
+                        await this.renderingController.handleSegmentIdChanged(Number(oldID), Number(newID));
+                        break;
+                    case "nodes":
+                        await this.renderingController.handleNodeIdChanged(Number(oldID), Number(newID));
+                        break;
+                    case "roadClosures":
+                        await this.renderingController.refreshRoadClosureSegments([newID]);
+                        break;
+                }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.DATA_MODEL,
             sdkName: "wme-data-model-objects-saved",
-            callback: ({ dataModelName, objectIds }: { dataModelName: DataModelName, objectIds: Array<string | number> }) => {
+            callback: ({ dataModelName }: { dataModelName: DataModelName; objectIds: Array<string | number> }) => {
                 if (dataModelName === "segments") {
                     this.renderingController.redrawAll();
-                    // here we redraw everything, we do it only once for the segments
                 }
-            }
+            },
         });
 
         this.wmeEventsController.registerSVLCallback({
             eventType: SVLCallbackEventTypes.LAYER_VISIBILITY_CHANGED,
             sdkName: "wme-layer-visibility-changed",
             callback: async (e: { layerName: string }) => {
-                // we only care about the road layer visibility changes
                 if (e.layerName !== "roads") return;
-
-                const currentState = this.getState();
-                if (currentState === SVLLayerState.USER_DISABLED || currentState === SVLLayerState.AUTOMATICALLY_DISABLED) return;
-
-                if (!(this.getPreference('disableRoadLayers') ?? true)) return;
-
-                // The roadlayer was changed
-                if (currentState === SVLLayerState.VISIBLE) {
-                    // if SVL is currently enabled, disable it
-                    await this.wmeSDK.Map.setLayerVisibility({ layerName: "roads", visibility: false });
-                }
-            }
+                await this.layerStateController.hideWMERoadLayerIfNeeded();
+            },
         });
-
     }
 
     private async checkCountryChanged(): Promise<void> {
-        //this.alertDebug(AlertType.INFO, "Merge end for country check");
         const topCountry = await this.wmeSDK.DataModel.Countries.getTopCountry();
-        if (!topCountry) return;
-
-        if (topCountry.id === this.currentTopCountryId) {
-            // Country hasn't changed, no need to update
+        if (!topCountry || topCountry.id === this.currentTopCountryId) {
             return;
         }
 
@@ -214,14 +252,14 @@ export default class SVLMediator extends AbstractMediator {
         this.emit(SVLEvents.COUNTRY_CHANGED, { newCountry: topCountry });
     }
 
-    public debugLog(message: string, ...args: any[]): void {
+    public debugLog(message: string, ...args: unknown[]): void {
         if (__DEBUG__) {
             console.debug(`[SVL DEBUG]: ${message}`, ...args);
         }
     }
 
     public getState(): SVLLayerState {
-        return this.layerStateController.getCurrentState();
+        return this.layerStateController?.getCurrentState() ?? SVLLayerState.UNINITIALIZED;
     }
 
     private handleFirstRun(): void {
@@ -238,7 +276,7 @@ export default class SVLMediator extends AbstractMediator {
         );
     }
 
-    public notify(sender: any, event: AcceptedControllerEvents): void {
+    public notify(sender: unknown, event: AcceptedControllerEvents): void {
         switch (event) {
             case AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE:
                 this.emit(SVLEvents.AUTOMATICALLY_DISABLED);
@@ -262,33 +300,41 @@ export default class SVLMediator extends AbstractMediator {
                 void this.layerStateController.toggleSVLLayerEnabledState();
                 break;
             case AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST:
-                return this.preferencesController.savePreferences();
+                this.preferencesController.savePreferences();
+                return;
             case AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST:
-                return this.preferencesController.rollbackPreferences();
+                this.preferencesController.rollbackPreferences();
+                return;
             case AcceptedControllerEvents.PREFERENCES_RESET_REQUEST:
-                return this.preferencesController.resetPreferences();
+                this.preferencesController.resetPreferences();
+                return;
             case AcceptedControllerEvents.PREFERENCES_IMPORT_REQUEST:
-                return this.preferencesController.importPreferences();
+                this.preferencesController.importPreferences();
+                return;
             case AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST:
-                return this.preferencesController.exportPreferences();
+                this.preferencesController.exportPreferences();
+                return;
             case AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES:
             case AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW:
                 this.updateRefreshStatus();
-                return this.emit(SVLEvents.SVL_SETTINGS_CHANGED);
+                this.emit(SVLEvents.SVL_SETTINGS_CHANGED);
+                return;
             case AcceptedControllerEvents.WME_SETTINGS_UPDATED:
-                return this.emit(SVLEvents.WME_SETTINGS_CHANGED);
+                this.emit(SVLEvents.WME_SETTINGS_CHANGED);
+                return;
             case AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH:
-                void this.userInterfaceController.updatePreferencesUI();
+                void this.userInterfaceController?.updatePreferencesUI();
                 return;
             case AcceptedControllerEvents.FIRST_RUN:
-                return this.handleFirstRun();
-            default:
+                this.handleFirstRun();
+                return;
+            default: {
+                const senderName = (sender as { constructor?: { name?: string } } | null)?.constructor?.name ?? 'Unknown';
                 console.warn(`Unhandled event type: ${event} from sender:`, sender);
-                this.alert(AlertType.WARNING, `Unhandled event type: ${event} from sender: ${sender.constructor.name}`);
+                this.alert(AlertType.WARNING, `Unhandled event type: ${event} from sender: ${senderName}`);
                 break;
+            }
         }
-        // TODO
-        //alert(`SVLMediator notified by ${sender} of event ${event}`);
     }
 
     public prompt(title: string, message: string, defaultValue: string = '', okFunction: (target: EventTarget | null, input: string) => void): void {
@@ -302,7 +348,6 @@ export default class SVLMediator extends AbstractMediator {
     public alertDebug(type: AlertType, message: string): void {
         if (__DEBUG__) {
             this.alertController.debug(type, message);
-            // Also log to console
             console.debug("SVL DEBUG ALERT:", message);
         }
     }
@@ -345,13 +390,14 @@ export default class SVLMediator extends AbstractMediator {
         this.preferencesController.setPreference(key, value);
     }
 
-    public _(key: string, ...args: any[]): string {
+    public _(key: string, ...args: unknown[]): string {
         return this.localizationController.translate(key, ...args);
     }
 
     public getWmeSDK(): AsyncWmeSDK {
         return this.wmeSDK;
     }
+
     public static getInstance(): SVLMediator {
         if (!SVLMediator.instance) {
             throw new Error("SVLMediator is not initialized. Call SVLMediator.initialize() first.");
@@ -359,22 +405,22 @@ export default class SVLMediator extends AbstractMediator {
         return SVLMediator.instance;
     }
 
-    public isFarZoom(zoom = this.layerStateController.getCurrentZoomLevel()) {
-        return zoom < this.getPreference('switchZoom');
+    public isFarZoom(zoom = this.layerStateController.getCurrentZoomLevel()): boolean {
+        return zoom < (this.getPreference('switchZoom') ?? DEFAULT_PREFERENCES.switchZoom);
     }
 
     private updateRefreshStatus(): void {
-        if (this.autoReloadInterval) {
+        if (this.autoReloadInterval !== null) {
             window.clearInterval(this.autoReloadInterval);
             this.autoReloadInterval = null;
         }
 
-        const enabled = this.getPreference('autoReload.enabled');
-        const interval = this.getPreference('autoReload.interval'); // Value in ms
+        const enabled = Boolean(this.getPreference('autoReload.enabled'));
+        const interval = Number(this.getPreference('autoReload.interval')); // Value in ms
 
-        if (enabled && interval && interval >= 20000) {
+        if (enabled && interval >= 20000) {
             this.autoReloadInterval = window.setInterval(
-                this.refreshWME.bind(this),
+                () => { void this.refreshWME(); },
                 interval
             );
             this.alertDebug(AlertType.INFO, `Auto refresh enabled. Interval: ${interval / 1000}s`);
@@ -382,21 +428,28 @@ export default class SVLMediator extends AbstractMediator {
     }
 
     private async refreshWME(): Promise<void> {
-        const editing = this.wmeSDK.Editing;
-        const [unsavedChangesCount, selection, isDrawing] = await Promise.all([
-            editing.getUnsavedChangesCount(),
-            editing.getSelection(),
-            editing.isDrawingInProgress()
-        ]);
-        if (unsavedChangesCount === 0 &&
-            !selection &&
-            !isDrawing &&
-            document.querySelector('#panel-container')?.hasChildNodes() === false
-        ) {
-            this.alertDebug(AlertType.INFO, "Auto refreshing WME data...");
-            await this.wmeSDK.DataModel.refreshData();
-        } else {
-            // this.alertDebug(AlertType.INFO, "Auto refresh skipped due to unsaved changes, selection or active panel.");
+        try {
+            const editing = this.wmeSDK.Editing;
+            const [isMapLoading, unsavedChangesCount, selection, isDrawing] = await Promise.all([
+                this.wmeSDK.State.isMapLoading(),
+                editing.getUnsavedChangesCount(),
+                editing.getSelection(),
+                editing.isDrawingInProgress(),
+            ]);
+            const hasActivePanel = (document.querySelector('#panel-container')?.childElementCount ?? 0) > 0;
+
+            if (
+                !isMapLoading &&
+                unsavedChangesCount === 0 &&
+                !selection &&
+                !isDrawing &&
+                !hasActivePanel
+            ) {
+                this.alertDebug(AlertType.INFO, "Auto refreshing WME data...");
+                await this.wmeSDK.DataModel.refreshData();
+            }
+        } catch (error) {
+            this.debugLog("Auto refresh skipped (refresh currently unavailable):", error);
         }
     }
 
@@ -411,6 +464,4 @@ export default class SVLMediator extends AbstractMediator {
     public isRoutingModeActive(): boolean {
         return Boolean(this.getPreference('routingModeEnabled')) && !this.routingModeSuppressed;
     }
-
-
 }

@@ -47,15 +47,23 @@ export default class LocalizationController extends AbstractController {
         this.fallbackSource = [];
     }
 
+    private getBaseLocale(locale: string): string {
+        return locale.split(/[-_]/)[0];
+    }
+
     private setMinimalFallbackTranslations() {
+        const baseLocale = this.getBaseLocale(this.locale || 'en');
         for (let i = 0; i < this.fallbackSource.length; i++) {
-            let item = this.fallbackSource[i];
+            const item = this.fallbackSource[i];
             const key_index = this.tr_keys[item.key];
             if (key_index !== undefined) {
-                if (this.locale && this.tr[this.locale] && this.tr[this.locale][key_index]) {
+                if (this.locale && this.tr[this.locale]?.[key_index]) {
                     continue; //skip if local translation exists
                 }
-                if (this.tr['en'] && this.tr['en'][key_index]) {
+                if (baseLocale && this.tr[baseLocale]?.[key_index]) {
+                    continue; //skip if base language translation exists
+                }
+                if (this.tr['en']?.[key_index]) {
                     continue; //skip if online translation exists
                 }
             }
@@ -69,18 +77,18 @@ export default class LocalizationController extends AbstractController {
      * @param {Tampermonkey.Request<any>} opt
      * @return {Promise}
      */
-    private request(opt: Tampermonkey.Request<any>): Promise<any> {
+    private request(opt: Tampermonkey.Request<any>): Promise<Tampermonkey.Response<any>> {
         if (!opt || !opt.method || !opt.url)
-            return Promise.reject('Invalid parameters for request()');
+            return Promise.reject(new Error('Invalid parameters for request()'));
         Object.assign(opt, {
-            timeout: 30000, //in ms
-        })
+            timeout: 8000, // in ms - keep short so slow/offline networks don't stall startup
+        });
 
         return new Promise((resolve, reject) => {
             opt.onerror = opt.ontimeout = reject;
             opt.onload = resolve;
             GM_xmlhttpRequest(opt);
-        })
+        });
     }
 
     private async loadTranslations(): Promise<boolean> {
@@ -95,15 +103,20 @@ export default class LocalizationController extends AbstractController {
 
             if (response.readyState === 4 && response.status === 200) {
                 const data = response.responseText;
-                let temp = data.split(/\r?\n/);
-                for (const [i, line] of temp.entries()) {
+                const lines = data.split(/\r?\n/);
+                for (const [i, line] of lines.entries()) {
+                    if (!line.trim()) {
+                        continue;
+                    }
                     if (i > 0) {
                         const [first, ...rest] = line.split('\t');
-                        this.tr[first] = rest.map((e: string) => e.trim().replace(/[<>]/g, ''));
+                        if (first) {
+                            this.tr[first.trim()] = rest.map((e: string) => e.trim().replace(/[<>]/g, ''));
+                        }
                     } else {
                         const [, ...rest] = line.split('\t');
                         for (const [j, value] of rest.entries()) {
-                            this.tr_keys[value.trim()] = parseInt(j, 10);
+                            this.tr_keys[value.trim()] = j;
                         }
                     }
                 }
@@ -133,13 +146,20 @@ export default class LocalizationController extends AbstractController {
  * @param {string} key
  * @returns {string}
  */
-    public translate(key: string, ...args: any[]): string {
+    public translate(key: string, ..._args: unknown[]): string {
         const key_index = this.tr_keys[key];
         if (key_index !== undefined) {
             const locale = this.locale || 'en';
             const localized = this.tr[locale]?.[key_index];
             if (localized) {
                 return localized;
+            }
+            const baseLocale = this.getBaseLocale(locale);
+            if (baseLocale !== locale) {
+                const baseLocalized = this.tr[baseLocale]?.[key_index];
+                if (baseLocalized) {
+                    return baseLocalized;
+                }
             }
             const english = this.tr['en']?.[key_index];
             if (english) {

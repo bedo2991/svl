@@ -1,10 +1,11 @@
 import { KeyboardShortcut } from "wme-sdk-typings";
-import { AcceptedControllerEvents, SVLLayerState } from "../svlGlobals";
+import { AcceptedControllerEvents, DashStyle, DEFAULT_PREFERENCES, SVLLayerState } from "../svlGlobals";
 import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import PreferencesController from "./PreferencesController";
 
+type StatusIconKind = 'play' | 'pause' | 'stop';
 
 export default class UserInterfaceController extends AbstractController {
     // Singleton pattern
@@ -12,11 +13,10 @@ export default class UserInterfaceController extends AbstractController {
 
     private preferencesController!: PreferencesController;
     private badgeElement: HTMLElement | null = null;
+    private badgeRetryTimeoutId: number | undefined;
     private roadTypeNames: Map<number, string> = new Map();
 
-    /** @type{number} */
     private readonly clutterMax: number = 20;
-    /** @type{number} */
     private readonly fontSizeMax: number = 32;
 
     private constructor({ mediator, preferencesController }: { mediator: SVLMediator, preferencesController: PreferencesController }) {
@@ -24,14 +24,12 @@ export default class UserInterfaceController extends AbstractController {
         this.preferencesController = preferencesController;
     }
 
-
     public static getInstance(): UserInterfaceController {
         if (!UserInterfaceController.instance) {
             throw new Error("UserInterfaceController not initialized. Call initialize() first.");
         }
         return UserInterfaceController.instance;
     }
-
 
     public static async initialize({ mediator, preferencesController }: { mediator: SVLMediator, preferencesController: PreferencesController }): Promise<UserInterfaceController> {
         if (!UserInterfaceController.instance) {
@@ -49,7 +47,7 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private checkVersionAndUpdate() {
+    private checkVersionAndUpdate(): void {
         const previousVersion = this.preferencesController.getPreviousVersion();
         if (previousVersion && previousVersion !== this.mediator.SVL_VERSION) {
             this.mediator.alertController.showScriptUpdate(
@@ -71,23 +69,26 @@ export default class UserInterfaceController extends AbstractController {
         const defaultShortcut = "S+s";
 
         const toggleShortcut: KeyboardShortcut = {
-            callback: () => { UserInterfaceController.instance.mediator.notify(UserInterfaceController.instance, AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED); },
+            callback: () => {
+                UserInterfaceController.instance.mediator.notify(
+                    UserInterfaceController.instance,
+                    AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED
+                );
+            },
             description: "Toggle SVL",
             shortcutId: "svl",
             shortcutKeys: defaultShortcut,
         };
-
 
         if (!(await this.mediator.wmeSDK.Shortcuts.areShortcutKeysInUse({
             shortcutKeys: defaultShortcut
         }))) {
             try {
                 await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-                console.log('SVL: Keyboard shortcut successfully added.');
+                this.debugLog('Keyboard shortcut successfully added.');
             } catch (e) {
                 this.mediator.alert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
-                console.error('SVL: Error while adding the keyboard shortcut:');
-                console.error(e);
+                console.error('SVL: Error while adding the keyboard shortcut:', e);
             }
         } else {
             setTimeout(() => {
@@ -96,18 +97,13 @@ export default class UserInterfaceController extends AbstractController {
             try {
                 toggleShortcut.shortcutKeys = null;
                 await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
-                console.log('SVL: Empty Keyboard shortcut successfully added.');
+                this.debugLog('Empty keyboard shortcut successfully added.');
             } catch (e) {
-                console.error('SVL: Error while adding the empty keyboard shortcut:');
-                console.error(e);
+                console.error('SVL: Error while adding the empty keyboard shortcut:', e);
             }
         }
     }
 
-    /**
-  *
-  * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined)}} param0
-  */
     private createRangeOption({
         id,
         title,
@@ -116,7 +112,7 @@ export default class UserInterfaceController extends AbstractController {
         max,
         step,
         isNew,
-    }: { id: string; title: string; description: string; min: number; max: number; step?: (number | undefined); isNew?: (string | undefined); }) {
+    }: { id: string; title: string; description: string; min: number; max: number; step?: number; isNew?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineSlider';
         if (typeof isNew === 'string') {
@@ -153,7 +149,7 @@ export default class UserInterfaceController extends AbstractController {
         title,
         description,
         isNew,
-    }: { id: string; title: string; description: string; isNew?: (string | undefined); }) {
+    }: { id: string; title: string; description: string; isNew?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineCheckbox';
         if (typeof isNew === 'string') {
@@ -182,12 +178,8 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-    /**
-   *
-   * @param {{id:string,type:string,className:(string|undefined),title:(string|undefined)}} param0
-   */
-    private createInput({ id, type, className, title, min, max, step, uniqueId }: { id: string; type: string; className?: (string | undefined); title: (string | undefined); min?: number; max?: number; step?: number; uniqueId?: string }) {
-        const input = <HTMLInputElement>document.createElement('input');
+    private createInput({ id, type, className, title, min, max, step, uniqueId }: { id: string; type: string; className?: string; title?: string; min?: number; max?: number; step?: number; uniqueId?: string }) {
+        const input = document.createElement('input');
         input.id = 'svl_' + id;
         if (className) {
             input.className = className;
@@ -198,31 +190,31 @@ export default class UserInterfaceController extends AbstractController {
         input.type = type;
         input.dataset.uniqueId = uniqueId ?? id;
         if (type === 'range' || type === 'number') {
-            input.min = min?.toString() || "";
-            input.max = max?.toString() || "";
-            input.step = step?.toString() || "";
+            input.min = min?.toString() ?? "";
+            input.max = max?.toString() ?? "";
+            input.step = step?.toString() ?? "";
         }
         return input;
     }
 
     private createDropdownOption({ id, title, description, options, isNew }: { id: string, title: string, description: string, options: { text: string; value: string }[], isNew?: string }) {
-        const line = <HTMLDivElement>document.createElement('div');
+        const line = document.createElement('div');
         line.className = 'prefLineSelect';
         if (typeof isNew === 'string') {
             line.classList.add('newOption');
             line.dataset.version = isNew;
         }
 
-        const newSelect = <HTMLSelectElement>document.createElement('select');
+        const newSelect = document.createElement('select');
         newSelect.className = 'prefElement';
 
-        const label = <HTMLLabelElement>document.createElement('label');
+        const label = document.createElement('label');
         label.innerText = title;
         newSelect.id = `svl_${id}`;
         newSelect.dataset.uniqueId = id;
         if (options && options.length > 0) {
             options.forEach((o) => {
-                const option = <HTMLOptionElement>document.createElement('option');
+                const option = document.createElement('option');
                 option.text = o.text;
                 option.value = o.value;
                 newSelect.add(option);
@@ -245,82 +237,143 @@ export default class UserInterfaceController extends AbstractController {
         return details;
     }
 
-    private updateRoutingModePanel() {
-        const ID = 'svl_routingModeDiv';
-        const div = document.getElementById(ID);
-        if (
-            this.mediator.getPreference('routingModeEnabled') &&
-            this.mediator.getPreference('hideRoutingModeBlock') !== true
-        ) {
-            if (div !== null) {
-                //The panel already exists
-                return;
-            }
-            // Show the routing panel
-            let routingModeDiv = <HTMLDivElement>document.createElement('div');
-            routingModeDiv.id = ID;
-            routingModeDiv.className = 'routingDiv';
-            routingModeDiv.textContent = this.mediator._('routing_mode_panel_title');
-            routingModeDiv.appendChild(document.createElement('br'));
-            const smallEl = document.createElement('small');
-            smallEl.textContent = this.mediator._('routing_mode_panel_body');
-            routingModeDiv.appendChild(smallEl);
-            routingModeDiv.addEventListener('mouseenter', () => {
-                // Temporary disable routing mode
-                this.mediator.setRoutingModeSuppressed(true);
-                this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
-            });
-            routingModeDiv.addEventListener('mouseleave', () => {
-                // Enable routing mode again
-                this.mediator.setRoutingModeSuppressed(false);
-                this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
-            });
-            document.getElementById('map')?.appendChild(routingModeDiv);
-        } else {
-            // Remove the routing panel
-            this.mediator.setRoutingModeSuppressed(false);
-            div?.remove();
+    private async resolveMapViewportContainer(): Promise<HTMLElement | null> {
+        try {
+            return await this.mediator.wmeSDK.Map.getMapViewportElement();
+        } catch {
+            return document.getElementById('map');
         }
     }
 
-    private async initPreferencePanel() {
+    private async updateRoutingModePanel(): Promise<void> {
+        const ID = 'svl_routingModeDiv';
+        const shouldShow = Boolean(this.mediator.getPreference('routingModeEnabled')) &&
+            this.mediator.getPreference('hideRoutingModeBlock') !== true;
+
+        if (!shouldShow) {
+            this.mediator.setRoutingModeSuppressed(false);
+            document.getElementById(ID)?.remove();
+            return;
+        }
+
+        if (document.getElementById(ID) !== null) {
+            return;
+        }
+
+        const mapContainer = await this.resolveMapViewportContainer();
+        if (!mapContainer || document.getElementById(ID) !== null) {
+            return;
+        }
+
+        // Re-verify preference state after async await
+        if (
+            !this.mediator.getPreference('routingModeEnabled') ||
+            this.mediator.getPreference('hideRoutingModeBlock') === true
+        ) {
+            return;
+        }
+
+        const routingModeDiv = document.createElement('div');
+        routingModeDiv.id = ID;
+        routingModeDiv.className = 'routingDiv';
+        routingModeDiv.textContent = this.mediator._('routing_mode_panel_title');
+        routingModeDiv.appendChild(document.createElement('br'));
+        const smallEl = document.createElement('small');
+        smallEl.textContent = this.mediator._('routing_mode_panel_body');
+        routingModeDiv.appendChild(smallEl);
+        routingModeDiv.addEventListener('mouseenter', () => {
+            this.mediator.setRoutingModeSuppressed(true);
+            this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
+        });
+        routingModeDiv.addEventListener('mouseleave', () => {
+            this.mediator.setRoutingModeSuppressed(false);
+            this.mediator.notify(this, AcceptedControllerEvents.REDRAW_ALL_REQUEST);
+        });
+        mapContainer.appendChild(routingModeDiv);
+    }
+
+    private buildTranslationBanner(currentLocale: string | undefined): HTMLDivElement {
+        const translationMessage = document.createElement('div');
+        translationMessage.className = 'svl_translationblock';
+
+        if (this.mediator._('language_code') === currentLocale) {
+            const translationPercentage = this.mediator._('completition_percentage');
+            if (translationPercentage === '100%') {
+                translationMessage.textContent = `${this.mediator._('fully_translated_in')} ${this.mediator._('translated_by')}`;
+            } else {
+                translationMessage.append(
+                    `${translationPercentage} ${this.mediator._('translation_thanks')} ${this.mediator._('translated_by')}. `
+                );
+                const helpLink = document.createElement('a');
+                helpLink.href = 'https://www.waze.com/discuss/t/script-street-vector-layer/250377';
+                helpLink.target = '_blank';
+                helpLink.rel = 'noopener noreferrer';
+                helpLink.textContent = this.mediator._('would_you_like_to_help');
+                translationMessage.appendChild(helpLink);
+            }
+        } else if (this.mediator.areOnlineTranslationsLoaded()) {
+            const bold = document.createElement('b');
+            bold.style.color = 'red';
+            bold.append('Unfortunately, SVL is not yet available in your language. Would you like to help translating?');
+            bold.appendChild(document.createElement('br'));
+            const contactLink = document.createElement('a');
+            contactLink.href = 'https://www.waze.com/discuss/t/script-street-vector-layer/250377';
+            contactLink.target = '_blank';
+            contactLink.rel = 'noopener noreferrer';
+            contactLink.textContent = 'Please contact bedo2991';
+            bold.appendChild(contactLink);
+            bold.append('.');
+            translationMessage.appendChild(bold);
+        } else {
+            const bold = document.createElement('b');
+            bold.style.color = '#8b0000';
+            bold.textContent = 'An error occurred while fetching the translations. If it persists, please report it on the Waze forum.';
+            translationMessage.appendChild(bold);
+        }
+
+        return translationMessage;
+    }
+
+    private async initPreferencePanel(): Promise<void> {
         const roadTypes = await this.mediator.wmeSDK.DataModel.Segments.getRoadTypes();
         this.roadTypeNames = new Map(
             roadTypes.map((rt: { id: number; localizedName: string }) => [rt.id, rt.localizedName])
         );
-        //console.debug('Init Preference Panel');
-        const style = <HTMLStyleElement>document.createElement('style');
-        style['innerHTML'] = `.svl_unsaved{background-color:#ffcc00 !important;}
-        .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
-        .prefLineSelect{width:100%; margin-bottom:1vh;}
-        .prefLineSelect label{display:block;width:100%}
-        .prefLineCheckbox{width:100%; margin-bottom:1vh;}
-        .prefLineCheckbox label{display:block;width:100%;}
-        .prefLineCheckbox input{float:right;}
-        .prefLineInteger{width:100%; margin-bottom:1vh;}
-        .prefLineInteger label{display:block;width:100%}
-        .prefLineInteger input{float:right;}
-        .prefLineSlider {width:100%; margin-bottom:1vh;}
-        .prefLineSlider label{display:block;width:100%}
-        .prefLineSlider input{float:right;}
-        .newOption::before {content:"${this.mediator._('new_since_version')} " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
-        .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}
-        .svl_logo {width:130px; display:inline-block; float:right}
-        .svl_support-link{display:inline-block; width:100%; text-align:center;}
-        .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
-        .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:var(--background_variant); top:0; }
-        .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000; z-index: 10000;}
-        .routingDiv:hover{background-color:#ff3377;}
-        #sidepanel-svl summary{font-weight:bold; margin:10px;}
-        #sidepanel-svl {width:96%;margin:auto;padding-right:13px;}
-        #sidepanel-svl details{margin-bottom:9pt;}
-        #sidepanel-svl i{font-size:small;}`;
 
-        document.body.appendChild(style);
-        const panelDiv = document.createElement('div');
+        if (!document.getElementById('svl-ui-styles')) {
+            const style = document.createElement('style');
+            style.id = 'svl-ui-styles';
+            const newSinceLabel = this.mediator._('new_since_version').replace(/["\\]/g, '');
+            style.textContent = `.svl_unsaved{background-color:#ffcc00 !important;}
+            .expand{display:flex; width:100%; justify-content:space-around;align-items: center;}
+            .prefLineSelect{width:100%; margin-bottom:1vh;}
+            .prefLineSelect label{display:block;width:100%}
+            .prefLineCheckbox{width:100%; margin-bottom:1vh;}
+            .prefLineCheckbox label{display:block;width:100%;}
+            .prefLineCheckbox input{float:right;}
+            .prefLineInteger{width:100%; margin-bottom:1vh;}
+            .prefLineInteger label{display:block;width:100%}
+            .prefLineInteger input{float:right;}
+            .prefLineSlider {width:100%; margin-bottom:1vh;}
+            .prefLineSlider label{display:block;width:100%}
+            .prefLineSlider input{float:right;}
+            .newOption::before {content:"${newSinceLabel} " attr(data-version)"!"; font-weight:bolder; color:#e65c00;}
+            .newOption{border:1px solid #ff9900; padding: 1px; box-shadow: 2px 3px #cc7a00;}
+            .svl_logo {width:130px; display:inline-block; float:right}
+            .svl_support-link{display:inline-block; width:100%; text-align:center;}
+            .svl_translationblock{display:inline-block; width:100%; text-align:center; font-size:x-small}
+            .svl_buttons{clear:both; position:sticky; padding: 1vh; background-color:var(--background_variant); top:0; }
+            .routingDiv{opacity: 0.95; font-size:1.2em; color:#ffffff; border:0.2em #000 solid; position:absolute; top:3em; right:3.7em; padding:0.5em; background-color:#b30000; z-index: 10000;}
+            .routingDiv:hover{background-color:#ff3377;}
+            #sidepanel-svl summary{font-weight:bold; margin:10px;}
+            #sidepanel-svl {width:96%;margin:auto;padding-right:13px;}
+            #sidepanel-svl details{margin-bottom:9pt;}
+            #sidepanel-svl i{font-size:small;}`;
+            (document.head ?? document.body).appendChild(style);
+        }
+
         const mainDiv = document.createElement('div');
         mainDiv.id = 'sidepanel-svl';
-        panelDiv.append(mainDiv);
 
         const logo = document.createElement('img');
         logo.className = 'svl_logo';
@@ -346,40 +399,12 @@ export default class UserInterfaceController extends AbstractController {
         )}.`;
         supportForum.href = GM_info.script.supportURL ?? '';
         supportForum.target = '_blank';
+        supportForum.rel = 'noopener noreferrer';
         supportForum.className = 'svl_support-link';
         mainDiv.appendChild(supportForum);
 
-        const translationMessage = document.createElement('div');
-        translationMessage.className = 'svl_translationblock';
         const currentLocale = (await this.mediator.wmeSDK.Settings.getLocale())?.localeCode;
-        if (this.mediator._('language_code') === currentLocale) {
-            //Translations are available for this language
-            const translationPercentage = this.mediator._('completition_percentage');
-            if (translationPercentage === '100%') {
-                translationMessage.innerText = `${this.mediator._('fully_translated_in')} ${this.mediator._(
-                    'translated_by'
-                )}`;
-            } else {
-                translationMessage.innerHTML = `${translationPercentage} ${this.mediator._(
-                    'translation_thanks'
-                )} ${this.mediator._(
-                    'translated_by'
-                )}. <a href="https://www.waze.com/forum/viewtopic.php?f=819&t=149535&start=310#p2114167" target="_blank">${this.mediator._(
-                    'would_you_like_to_help'
-                )}</a>`;
-            }
-        } else {
-            if (this.mediator.areOnlineTranslationsLoaded()) {
-                //Call for action
-                //No need to translate this.
-                translationMessage.innerHTML = `<b style="color:red">Unfortunately, SVL is not yet available in your language. Would you like to help translating?<br><a href="https://www.waze.com/discuss/t/script-street-vector-layer/250377" target="_blank">Please contact bedo2991</a>.</b>`;
-            } else {
-                translationMessage.innerHTML = `<b style="color:#8b0000">An error occurred while fetching the translations. If it persists, please report it on the Waze forum.</b>`;
-            }
-        }
-        mainDiv.appendChild(translationMessage);
-
-        // mainDiv.id = "svl_PrefDiv";
+        mainDiv.appendChild(this.buildTranslationBanner(currentLocale));
 
         const saveButton = document.createElement('button');
         saveButton.id = 'svl_saveNewPref';
@@ -434,7 +459,7 @@ export default class UserInterfaceController extends AbstractController {
             })
         );
 
-        { // Create options for streets styles
+        {
             const streetsPreferences = this.mediator.getPreference('streets');
             for (let i = 0; i < streetsPreferences.length; i += 1) {
                 if (streetsPreferences[i]) {
@@ -455,7 +480,7 @@ export default class UserInterfaceController extends AbstractController {
         const speedLimits = this.createPreferencesSection(this.mediator._('speed_limits'));
 
         const options = this.getOptions();
-        options['streets'].forEach((o) => {
+        options.streets.forEach((o) => {
             streets.appendChild(
                 this.createStreetOptionLine({
                     i: o,
@@ -465,7 +490,7 @@ export default class UserInterfaceController extends AbstractController {
             );
         });
 
-        options['decorations'].forEach((o) => {
+        options.decorations.forEach((o) => {
             decorations.appendChild(
                 this.createStreetOptionLine({
                     i: o,
@@ -551,21 +576,21 @@ export default class UserInterfaceController extends AbstractController {
         );
 
         streets.appendChild(this.createColorOption({
-            id: `nodeColor`,
+            id: 'nodeColor',
             title: this.mediator._('node_color'),
             description: this.mediator._('node_color_descr'),
             isNew: '6.2.3',
         }));
 
         streets.appendChild(this.createColorOption({
-            id: `nodeDeadEndColor`,
+            id: 'nodeDeadEndColor',
             title: this.mediator._('dead_end_node_color'),
             description: this.mediator._('dead_end_node_color_descr'),
             isNew: '6.2.3',
         }));
 
         streets.appendChild(this.createColorOption({
-            id: `virtualNodeColor`,
+            id: 'virtualNodeColor',
             title: this.mediator._('virtual_node_color'),
             description: this.mediator._('virtual_node_color_descr'),
             isNew: '6.2.3',
@@ -677,7 +702,6 @@ export default class UserInterfaceController extends AbstractController {
         mainDiv.appendChild(utilities);
 
         // Performance settings
-
         performance.appendChild(
             this.createIntegerOption({
                 id: 'useWMERoadLayerAtZoom',
@@ -739,20 +763,6 @@ export default class UserInterfaceController extends AbstractController {
             })
         );
 
-        /*
-            for (let k = wmeSDK.Settings.getUserSettings().isImperial ? 9 : 15; k > 1; k -= 1) {
-                const span = document.createElement("span");
-                if (wmeSDK.Settings.getUserSettings().isImperial) {
-                    span.style['color'] = getColorStringFromSpeed((k * 10 - 5) * 1.609344);
-                    span.innerText = k * 10 - 5;
-                } else {
-                    span.style['color'] = getColorStringFromSpeed(k * 10);
-                    span.innerText = k * 10;
-                }
-                span.style['marginRight'] = "1pt";
-                speedLimits.appendChild(span);
-            } */
-
         speedLimits.appendChild(
             this.createCheckboxOption({
                 id: 'showSLSinglecolor',
@@ -773,7 +783,7 @@ export default class UserInterfaceController extends AbstractController {
         slTitle.innerText = this.getLocalisedString('speed limit');
         speedLimits.appendChild(slTitle);
 
-        //Metric
+        // Metric
         let type = 'metric';
         speedLimits.appendChild(this.createSpeedOptionLine('Default', true));
         let typeKeys = Object.keys(this.mediator.getPreference(`speeds.${type}`)).map(Number).sort((a, b) => a - b);
@@ -782,6 +792,7 @@ export default class UserInterfaceController extends AbstractController {
             speedLimits.appendChild(this.createSpeedOptionLine(speed, true));
         }
 
+        // Imperial
         type = 'imperial';
         speedLimits.appendChild(this.createSpeedOptionLine('Default', false));
         typeKeys = Object.keys(this.mediator.getPreference(`speeds.${type}`)).map(Number).sort((a, b) => a - b);
@@ -831,9 +842,10 @@ export default class UserInterfaceController extends AbstractController {
         document.getElementById('svl_resetButton')?.addEventListener('click', this.handleResetPreferencesClick.bind(this));
         document.getElementById('svl_importButton')?.addEventListener('click', this.handleImportPreferencesClick.bind(this));
         document.getElementById('svl_exportButton')?.addEventListener('click', this.handleExportPreferencesClick.bind(this));
-        void this.updatePreferencesUI();
+        await this.updatePreferencesUI();
     }
-    private handleResetPreferencesClick() {
+
+    private handleResetPreferencesClick(): void {
         this.mediator.alertController.confirm(
             GM_info.script.name,
             `${this.mediator._('preferences_reset_question')}\n\n${this.mediator._('preferences_reset_question_2')}`,
@@ -847,26 +859,26 @@ export default class UserInterfaceController extends AbstractController {
         );
     }
 
-    private handleImportPreferencesClick() {
+    private handleImportPreferencesClick(): void {
         this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_IMPORT_REQUEST);
     }
 
-    private handleExportPreferencesClick() {
+    private handleExportPreferencesClick(): void {
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST);
     }
 
-    private handleSaveNewPrefClick() {
+    private handleSaveNewPrefClick(): void {
         this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST);
     }
 
-    private handleRollbackPreferencesClick() {
+    private handleRollbackPreferencesClick(): void {
         this.resetButtonState();
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST);
     }
 
-    private resetButtonState() {
+    private resetButtonState(): void {
         document.getElementById('svl_buttons')?.classList.remove('svl_unsaved');
         const saveNewButton = document.getElementById('svl_saveNewPref') as HTMLButtonElement | null;
         if (saveNewButton) {
@@ -881,7 +893,7 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private markDirtyButtonState() {
+    private markDirtyButtonState(): void {
         document.getElementById('svl_buttons')?.classList.add('svl_unsaved');
         const saveNewButton = document.getElementById('svl_saveNewPref') as HTMLButtonElement | null;
         if (saveNewButton) {
@@ -897,11 +909,28 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private handleUserUpdatedSVLPreferences(event: Event) {
-        console.debug(event);
+    private clampNumericInput(input: HTMLInputElement, fallback: number): number {
+        let val = parseFloat(input.value);
+        if (Number.isNaN(val)) {
+            val = fallback;
+            input.value = String(val);
+            return val;
+        }
+        if (input.min !== '' && val < parseFloat(input.min)) {
+            val = parseFloat(input.min);
+            input.value = String(val);
+        }
+        if (input.max !== '' && val > parseFloat(input.max)) {
+            val = parseFloat(input.max);
+            input.value = String(val);
+        }
+        return val;
+    }
+
+    private handleUserUpdatedSVLPreferences(event: Event): void {
         if (!event.target) return;
 
-        const t = <HTMLInputElement>event.target;
+        const t = event.target as HTMLInputElement;
         const uniqueID = t.dataset.uniqueId;
         if (uniqueID === 'presets' && !t.value) {
             return;
@@ -910,17 +939,18 @@ export default class UserInterfaceController extends AbstractController {
         this.markDirtyButtonState();
 
         if (uniqueID) {
-            console.debug(`Preference changed: ${uniqueID}`);
+            this.debugLog(`Preference changed: ${uniqueID}`);
             if (uniqueID === 'presets') {
                 this.preferencesController.loadPreset(t.value);
                 this.updateStreetsPreferenceValues();
+                t.value = '';
                 this.mediator.alert(AlertType.INFO, this.mediator._('preset_applied'));
             } else if (uniqueID.startsWith('streets.')) {
                 const parts = uniqueID.split('.');
                 const streetIndex = parseInt(parts[1], 10);
                 const property = parts[2];
                 if (isNaN(streetIndex)) {
-                    // This is probably a decorator
+                    // Decorator preference (e.g. red, lanes, toll, closure, etc.)
                     const decorator = parts[1];
                     const decPreference = this.mediator.getPreference(decorator);
                     if (!decPreference) {
@@ -929,10 +959,10 @@ export default class UserInterfaceController extends AbstractController {
                     }
                     switch (property) {
                         case 'strokeOpacity':
-                            decPreference[property] = parseFloat(t.value) / 100.0;
+                            decPreference[property] = this.clampNumericInput(t, (decPreference[property] ?? 1) * 100) / 100.0;
                             break;
                         case 'strokeWidth':
-                            decPreference[property] = parseFloat(t.value);
+                            decPreference[property] = this.clampNumericInput(t, decPreference[property] ?? 1);
                             break;
                         default:
                             decPreference[property] = t.value;
@@ -940,17 +970,16 @@ export default class UserInterfaceController extends AbstractController {
                     }
                     this.mediator.setPreference(decorator, decPreference);
                 } else {
-                    // this is a street preference
                     const streetsPreferences = this.mediator.getPreference('streets');
-
-
                     if (streetsPreferences[streetIndex]) {
                         switch (property) {
                             case 'strokeOpacity':
-                                streetsPreferences[streetIndex][property] = parseFloat(t.value) / 100.0;
+                                streetsPreferences[streetIndex][property] =
+                                    this.clampNumericInput(t, (streetsPreferences[streetIndex][property] ?? 1) * 100) / 100.0;
                                 break;
                             case 'strokeWidth':
-                                streetsPreferences[streetIndex][property] = parseFloat(t.value);
+                                streetsPreferences[streetIndex][property] =
+                                    this.clampNumericInput(t, streetsPreferences[streetIndex][property] ?? 1);
                                 break;
                             default:
                                 streetsPreferences[streetIndex][property] = t.value;
@@ -962,17 +991,15 @@ export default class UserInterfaceController extends AbstractController {
             } else {
                 let val: any = t.value;
                 if (t.type === 'checkbox') {
-                    val = (<HTMLInputElement>t).checked;
+                    val = t.checked;
                 } else if (t.type === 'number' || t.type === 'range') {
-                    val = parseFloat(t.value);
-                    if (t.min && val < parseFloat(t.min)) {
-                        val = parseFloat(t.min);
-                        t.value = val.toString();
-                    }
-                    if (t.max && val > parseFloat(t.max)) {
-                        val = parseFloat(t.max);
-                        t.value = val.toString();
-                    }
+                    const currentVal = this.mediator.getPreference(uniqueID);
+                    const fallback = uniqueID === 'layerOpacity'
+                        ? Number(currentVal ?? DEFAULT_PREFERENCES.layerOpacity) * 100
+                        : uniqueID === 'autoReload.interval'
+                            ? Number(currentVal ?? DEFAULT_PREFERENCES.autoReloadInterval) / 1000
+                            : Number(currentVal ?? (t.min !== '' ? parseFloat(t.min) : 0));
+                    val = this.clampNumericInput(t, fallback);
                 }
 
                 if (uniqueID === 'layerOpacity') {
@@ -991,7 +1018,7 @@ export default class UserInterfaceController extends AbstractController {
             }
 
             if (uniqueID === 'routingModeEnabled' || uniqueID === 'hideRoutingModeBlock') {
-                this.updateRoutingModePanel(); // Ensure panel visibility is updated immediately
+                void this.updateRoutingModePanel();
             }
         }
         this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
@@ -1011,7 +1038,7 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private updateStreetsPreferenceValues() {
+    private updateStreetsPreferenceValues(): void {
         const streetsPreferences = this.mediator.getPreference('streets');
         for (let i = 0; i < streetsPreferences.length; i += 1) {
             if (streetsPreferences[i]) {
@@ -1024,34 +1051,34 @@ export default class UserInterfaceController extends AbstractController {
 
     public async updatePreferencesUI(): Promise<void> {
         await this.updatePreferenceValues();
-        this.updateRoutingModePanel();
+        await this.updateRoutingModePanel();
     }
 
     /**
-     * This function updates the values shown on the preference panel with the one saved in the preferences object.
-     *
+     * Updates the values shown on the preference panel with those stored in PreferencesController.
      */
     private async updatePreferenceValues(): Promise<void> {
         this.resetButtonState();
         this.updateStreetsPreferenceValues();
+        this.setInputValue('svl_presets', '');
 
         const options = this.getOptions();
-        options['streets'].forEach((o) => {
+        options.streets.forEach((o) => {
             const streetPreference = this.mediator.getPreference(o);
             if (!streetPreference) return;
             this.setInputValue(`svl_streetColor_${o}`, streetPreference['strokeColor']);
             this.setInputValue(`svl_strokeDashstyle_${o}`, streetPreference['strokeDashstyle']);
         });
 
-        options['decorations'].forEach((o) => {
+        options.decorations.forEach((o) => {
             const decorationPreference = this.mediator.getPreference(o);
             if (!decorationPreference) return;
-            this.setInputValue(`svl_streetOpacity_${o}`, decorationPreference['strokeOpacity'] * 100.0);
+            this.setInputValue(`svl_streetOpacity_${o}`, Math.round(decorationPreference['strokeOpacity'] * 100.0));
             this.setInputValue(`svl_streetColor_${o}`, decorationPreference['strokeColor']);
             this.setInputValue(`svl_strokeDashstyle_${o}`, decorationPreference['strokeDashstyle']);
         });
 
-        this.setInputValue('svl_fakelock', this.mediator.getPreference('fakelock') ?? 6);
+        this.setInputValue('svl_fakelock', this.mediator.getPreference('fakelock') ?? DEFAULT_PREFERENCES.fakelock);
         this.setCheckboxChecked('svl_autoReload_enabled', this.mediator.getPreference('autoReload.enabled'));
         this.setInputValue('svl_labelOutlineWidth', this.mediator.getPreference('labelOutlineWidth'));
         this.setInputValue('svl_autoReload_interval', this.mediator.getPreference('autoReload.interval') / 1000);
@@ -1078,7 +1105,7 @@ export default class UserInterfaceController extends AbstractController {
         this.setCheckboxChecked('svl_hideRoutingModeBlock', this.mediator.getPreference('hideRoutingModeBlock'));
         this.setInputValue('svl_showANs', this.mediator.getPreference('showANs'));
 
-        this.setInputValue('svl_layerOpacity', this.mediator.getPreference('layerOpacity') * 100);
+        this.setInputValue('svl_layerOpacity', Math.round(this.mediator.getPreference('layerOpacity') * 100));
 
         // Speed limits
         this.setCheckboxChecked('svl_showSLtext', this.mediator.getPreference('showSLtext'));
@@ -1087,49 +1114,32 @@ export default class UserInterfaceController extends AbstractController {
         this.setInputValue('svl_SLColor', this.mediator.getPreference('SLColor'));
         this.setCheckboxChecked('svl_realsize', this.mediator.getPreference('realsize'));
 
-        const segmentWidths = <NodeListOf<HTMLInputElement>>(document.querySelectorAll('input.segmentsWidth'));
-        segmentWidths.forEach((el) => {
-            el.disabled = this.mediator.getPreference('realsize');
+        const isRealSize = Boolean(this.mediator.getPreference('realsize'));
+        document.querySelectorAll<HTMLInputElement>('input.segmentsWidth').forEach((el) => {
+            el.disabled = isRealSize;
         });
 
-        // Toggle metric/decimal
+        // Toggle metric / imperial speed rows
         const WMEUsesImperial = (await this.mediator.wmeSDK.Settings.getUserSettings()).isImperial;
         const type = WMEUsesImperial ? 'imperial' : 'metric';
         const otherType = WMEUsesImperial ? 'metric' : 'imperial';
         const speeds = Object.keys(this.mediator.getPreference(`speeds.${type}`));
 
-        const slLinesToHide = <NodeListOf<HTMLDivElement>>document.querySelectorAll(
-            `div.svl_${otherType}`
-        );
-        slLinesToHide.forEach((el) => {
+        document.querySelectorAll<HTMLDivElement>(`div.svl_${otherType}`).forEach((el) => {
             el.style.display = 'none';
         });
-        const slLinesToShow = <NodeListOf<HTMLDivElement>>document.querySelectorAll(`div.svl_${type}`);
-        slLinesToShow.forEach((el) => {
+        document.querySelectorAll<HTMLDivElement>(`div.svl_${type}`).forEach((el) => {
             el.style.display = 'block';
         });
         for (const speed of speeds) {
-            const valInput = <HTMLInputElement>document.getElementById(`svl_slValue_${type}_${speed}`);
-            if (valInput) {
-                valInput.value = speed;
-            }
-            const colorInput = <HTMLInputElement>document.getElementById(`svl_slColor_${type}_${speed}`);
-            if (colorInput) {
-                colorInput.value = this.mediator.getPreference(`speeds.${type}.${speed}`);
-            }
+            this.setInputValue(`svl_slValue_${type}_${speed}`, speed);
+            this.setInputValue(`svl_slColor_${type}_${speed}`, this.mediator.getPreference(`speeds.${type}.${speed}`));
         }
 
-        const defaultColorInput = (<HTMLInputElement>document.getElementById(`svl_slColor_${type}_Default`));
-        if (defaultColorInput) {
-            defaultColorInput.value = this.mediator.getPreference(`speeds.default`);
-        }
+        this.setInputValue(`svl_slColor_${type}_Default`, this.mediator.getPreference('speeds.default'));
     }
 
-    /**
-     *
-     * @param {{id:string,title:string,description:string,isNew:(string|undefined), uniqueId:(string|undefined)}} param0
-     */
-    private createCheckboxOption({ id, title, description, isNew, uniqueId }: { id: string; title: string; description: string; isNew?: (string | undefined); uniqueId?: string }) {
+    private createCheckboxOption({ id, title, description, isNew, uniqueId }: { id: string; title: string; description: string; isNew?: string; uniqueId?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineCheckbox';
         if (typeof isNew === 'string') {
@@ -1157,12 +1167,11 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-
     private createStreetOptionLine({
         i,
         showWidth = true,
         showOpacity = false,
-    }: { i: (string | number), showWidth?: boolean, showOpacity?: boolean }) {
+    }: { i: string | number, showWidth?: boolean, showOpacity?: boolean }) {
         const title = document.createElement('h6');
         title.innerText = this.getLocalisedString(i);
 
@@ -1173,7 +1182,7 @@ export default class UserInterfaceController extends AbstractController {
             type: 'color',
             uniqueId: `streets.${i}.strokeColor`,
         });
-        color.style['width'] = '55pt';
+        color.style.width = '55pt';
 
         const inputs = document.createElement('div');
 
@@ -1190,7 +1199,7 @@ export default class UserInterfaceController extends AbstractController {
                 step: 1,
                 uniqueId: `streets.${i}.strokeWidth`,
             });
-            width.style['width'] = '40pt';
+            width.style.width = '40pt';
             inputs.appendChild(width);
         }
 
@@ -1205,7 +1214,7 @@ export default class UserInterfaceController extends AbstractController {
                 step: 10,
                 uniqueId: `streets.${i}.strokeOpacity`,
             });
-            opacity.style['width'] = '45pt';
+            opacity.style.width = '45pt';
             inputs.appendChild(opacity);
         }
 
@@ -1224,22 +1233,33 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-    private createDashStyleDropdown({ id, uniqueID }: { id: string, uniqueID?: string }) {
-        const newSelect = <HTMLSelectElement>document.createElement('select');
+    private createDashStyleDropdown({ id, uniqueID }: { id: string, uniqueID?: string }): HTMLSelectElement {
+        const newSelect = document.createElement('select');
         newSelect.className = 'prefElement';
         newSelect.title = 'Stroke style';
         newSelect.id = `svl_${id}`;
         newSelect.dataset.uniqueId = uniqueID ?? id;
-        newSelect.innerHTML = `<option value="solid">${this.mediator._('line_solid')}</option>
-       <option value="dash">${this.mediator._('line_dash')}</option>
-       <option value="dashdot">${this.mediator._('line_dashdot')}</option>
-       <option value="longdash">${this.mediator._('line_longdash')}</option>
-       <option value="longdashdot">${this.mediator._('line_longdashdot')}</option>
-       <option value="dot">${this.mediator._('line_dot')}</option>`;
+
+        const dashOptions: ReadonlyArray<{ value: DashStyle; labelKey: string }> = [
+            { value: 'solid', labelKey: 'line_solid' },
+            { value: 'dash', labelKey: 'line_dash' },
+            { value: 'dashdot', labelKey: 'line_dashdot' },
+            { value: 'longdash', labelKey: 'line_longdash' },
+            { value: 'longdashdot', labelKey: 'line_longdashdot' },
+            { value: 'dot', labelKey: 'line_dot' },
+        ];
+
+        for (const item of dashOptions) {
+            const option = document.createElement('option');
+            option.value = item.value;
+            option.text = this.mediator._(item.labelKey);
+            newSelect.add(option);
+        }
+
         return newSelect;
     }
 
-    private getLocalisedString(i: (string | number)): string {
+    private getLocalisedString(i: string | number): string {
         switch (i) {
             case 'red':
                 return this.mediator._('dec_red');
@@ -1266,8 +1286,8 @@ export default class UserInterfaceController extends AbstractController {
 
     private getOptions() {
         return {
-            'streets': ['red'],
-            'decorations': [
+            streets: ['red'],
+            decorations: [
                 'lanes',
                 'toll',
                 'restriction',
@@ -1276,14 +1296,11 @@ export default class UserInterfaceController extends AbstractController {
                 'dirty',
                 'nearbyHOV',
             ],
-        };
+        } as const;
     }
 
-    private createSpeedOptionLine(i: (number | string), metric = true) {
+    private createSpeedOptionLine(i: number | string, metric = true) {
         const type = metric ? 'metric' : 'imperial';
-        // const title = document.createElement("h6");
-        // title.innerText = getLocalisedString("speed limit");
-        // title.inner
         const label = document.createElement('label');
         label.innerText = i !== -1 ? String(i) : 'Default';
 
@@ -1302,7 +1319,7 @@ export default class UserInterfaceController extends AbstractController {
             });
             slValue.value = String(i);
             slValue.disabled = true;
-            slValue.style['width'] = '50pt';
+            slValue.style.width = '50pt';
             inputs.appendChild(slValue);
 
             const span = document.createElement('span');
@@ -1310,29 +1327,22 @@ export default class UserInterfaceController extends AbstractController {
             inputs.appendChild(span);
         }
 
-        let uniqueId: string;
-        let val: string;
-        if (i === 'Default') {
-            uniqueId = 'speeds.default';
-            val = this.mediator.getPreference(uniqueId);
-        } else {
-            uniqueId = `speeds.${type}.${i}`;
-            val = this.mediator.getPreference(uniqueId);
-        }
+        const uniqueId = i === 'Default' ? 'speeds.default' : `speeds.${type}.${i}`;
+        const val: string = this.mediator.getPreference(uniqueId);
 
         const color = this.createInput({
             id: `slColor_${type}_${i}`,
             className: 'prefElement form-control',
             type: 'color',
             title: this.mediator._('color'),
-            uniqueId: uniqueId,
+            uniqueId,
         });
 
         if (val) {
             color.value = val;
         }
 
-        color.style['width'] = '55pt';
+        color.style.width = '55pt';
 
         inputs.className = 'expand';
         inputs.appendChild(color);
@@ -1344,10 +1354,6 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-    /**
-   *
-   * @param {{id:string,title:string,description:string,min:number,max:number,step:(number|undefined),isNew:(string|undefined),uniqueId:(string|undefined)}} param0
-   */
     private createIntegerOption({
         id,
         title,
@@ -1357,7 +1363,7 @@ export default class UserInterfaceController extends AbstractController {
         step,
         isNew,
         uniqueId,
-    }: { id: string; title: string; description: string; min: number; max: number; step: (number | undefined); isNew?: (string | undefined); uniqueId?: string }) {
+    }: { id: string; title: string; description: string; min: number; max: number; step?: number; isNew?: string; uniqueId?: string }) {
         const line = document.createElement('div');
         line.className = 'prefLineInteger';
         if (typeof isNew === 'string') {
@@ -1390,12 +1396,78 @@ export default class UserInterfaceController extends AbstractController {
         return line;
     }
 
-    private createBadge(): void {
+    private createStatusIconSvg(kind: StatusIconKind, color: string): SVGSVGElement {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.marginLeft = '5px';
+        svg.style.flexShrink = '0';
+
+        const circle = document.createElementNS(svgNS, 'circle');
+        circle.setAttribute('cx', '8');
+        circle.setAttribute('cy', '8');
+        circle.setAttribute('r', '7');
+        circle.setAttribute('fill', color);
+        svg.appendChild(circle);
+
+        if (kind === 'play') {
+            const polygon = document.createElementNS(svgNS, 'polygon');
+            polygon.setAttribute('points', '6.2,4.8 11.6,8 6.2,11.2');
+            polygon.setAttribute('fill', '#ffffff');
+            svg.appendChild(polygon);
+        } else if (kind === 'pause') {
+            const leftBar = document.createElementNS(svgNS, 'rect');
+            leftBar.setAttribute('x', '5.3');
+            leftBar.setAttribute('y', '4.8');
+            leftBar.setAttribute('width', '2');
+            leftBar.setAttribute('height', '6.4');
+            leftBar.setAttribute('rx', '0.5');
+            leftBar.setAttribute('fill', '#ffffff');
+
+            const rightBar = document.createElementNS(svgNS, 'rect');
+            rightBar.setAttribute('x', '8.7');
+            rightBar.setAttribute('y', '4.8');
+            rightBar.setAttribute('width', '2');
+            rightBar.setAttribute('height', '6.4');
+            rightBar.setAttribute('rx', '0.5');
+            rightBar.setAttribute('fill', '#ffffff');
+
+            svg.appendChild(leftBar);
+            svg.appendChild(rightBar);
+        } else {
+            const square = document.createElementNS(svgNS, 'rect');
+            square.setAttribute('x', '5.3');
+            square.setAttribute('y', '5.3');
+            square.setAttribute('width', '5.4');
+            square.setAttribute('height', '5.4');
+            square.setAttribute('rx', '0.6');
+            square.setAttribute('fill', '#ffffff');
+            svg.appendChild(square);
+        }
+
+        return svg;
+    }
+
+    private createBadge(attempt: number = 0): void {
         if (this.badgeElement) return;
+        if (this.badgeRetryTimeoutId !== undefined) {
+            clearTimeout(this.badgeRetryTimeoutId);
+            this.badgeRetryTimeoutId = undefined;
+        }
 
         const topbar = document.getElementById('topbar-container');
         if (!topbar) {
-            console.error('SVL: #topbar-container not found.');
+            if (attempt < 15) {
+                this.badgeRetryTimeoutId = window.setTimeout(() => {
+                    this.badgeRetryTimeoutId = undefined;
+                    this.createBadge(attempt + 1);
+                }, 300);
+            } else {
+                this.debugLog('#topbar-container not found.');
+            }
             return;
         }
 
@@ -1411,45 +1483,50 @@ export default class UserInterfaceController extends AbstractController {
         this.badgeElement.style.color = '#fff';
         this.badgeElement.style.textShadow = '1px 1px 2px black';
 
-        // Initial state
-        this.updateBadge(SVLLayerState.UNINITIALIZED);
-
+        this.updateBadge(this.mediator.getState());
         topbar.appendChild(this.badgeElement);
     }
 
     private updateBadge(state: SVLLayerState): void {
         if (!this.badgeElement) return;
 
-        let icon = '<i class="fa fa-stop-circle" style="color: red; margin-left: 5px;"></i>';
+        let iconKind: StatusIconKind = 'stop';
+        let iconColor = '#ef4444';
         let title = this.mediator._("svl_disabled");
 
         switch (state) {
             case SVLLayerState.VISIBLE:
+                iconKind = 'play';
                 if (this.mediator.isFarZoom()) {
-                    icon = '<i class="fa fa-play-circle" style="color: #4DB6AC; margin-left: 5px;"></i>';
+                    iconColor = '#4DB6AC';
                     title = this.mediator._("svl_active_far_zoom");
                 } else {
-                    icon = '<i class="fa fa-play-circle" style="color: #3FC91C; margin-left: 5px;"></i>';
+                    iconColor = '#3FC91C';
                     title = this.mediator._("svl_active");
                 }
                 break;
             case SVLLayerState.AUTOMATICALLY_DISABLED:
-                icon = '<i class="fa fa-pause-circle" style="color: orange; margin-left: 5px;"></i>';
+                iconKind = 'pause';
+                iconColor = '#f59e0b';
                 title = this.mediator._("svl_paused_auto");
                 break;
             case SVLLayerState.DRAWING_ABORTED:
-                icon = '<i class="fa fa-pause-circle" style="color: orange; margin-left: 5px;"></i>';
+                iconKind = 'pause';
+                iconColor = '#f59e0b';
                 title = this.mediator._("svl_paused_aborted");
                 break;
             case SVLLayerState.USER_DISABLED:
-                icon = '<i class="fa fa-stop-circle" style="color: red; margin-left: 5px;"></i>';
+                iconKind = 'stop';
+                iconColor = '#ef4444';
                 title = this.mediator._("svl_disabled_user");
                 break;
             default:
                 break;
         }
 
-        this.badgeElement.innerHTML = `SVL ${icon}`;
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'SVL';
+        this.badgeElement.replaceChildren(labelSpan, this.createStatusIconSvg(iconKind, iconColor));
         this.badgeElement.title = title;
     }
 
@@ -1471,6 +1548,10 @@ export default class UserInterfaceController extends AbstractController {
         });
 
         this.mediator.subscribe(SVLEvents.ZOOM_CHANGED, () => {
+            this.updateBadge(this.mediator.getState());
+        });
+
+        this.mediator.subscribe(SVLEvents.SVL_SETTINGS_CHANGED, () => {
             this.updateBadge(this.mediator.getState());
         });
     }

@@ -16,28 +16,36 @@ const RAD_TO_MERCATOR = ORIGIN_SHIFT / Math.PI;
 const MERCATOR_TO_RAD = Math.PI / ORIGIN_SHIFT;
 const DEG_TO_RAD_HALF = Math.PI / 360.0;
 const RAD_TO_DEG_DOUBLE = 360.0 / Math.PI;
+const MAX_LABEL_SVG_CACHE_SIZE = 2000;
 
 export default class Utils {
 
-    static PI_OVER_180 = Math.PI / 180.0;
-    static PI_OVER_2 = Math.PI / 2.0;
+    static readonly PI_OVER_180 = Math.PI / 180.0;
+    static readonly PI_OVER_2 = Math.PI / 2.0;
 
     private static labelSvgCache = new Map<string, LabelGraphicInfo>();
 
     private constructor() { }
 
-    public static debugLog(message: string, ...args: any[]): void {
+    public static debugLog(message: string, ...args: unknown[]): void {
         if (__DEBUG__) {
             console.debug(`[SVL DEBUG]: ${message}`, ...args);
         }
     }
 
-    public static bestBackground(color: string) {
-        const oppositeColor =
-            parseInt(color.substring(1, 3), 16) * 0.299 +
-            parseInt(color.substring(3, 5), 16) * 0.587 +
-            parseInt(color.substring(5, 7), 16) * 0.114;
-        if (oppositeColor < 127) {
+    public static bestBackground(color: string): '#FFF' | '#000' {
+        let hex = color.startsWith('#') ? color.slice(1) : color;
+        if (hex.length === 3) {
+            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+        if (hex.length < 6) {
+            return '#000';
+        }
+        const luminance =
+            parseInt(hex.substring(0, 2), 16) * 0.299 +
+            parseInt(hex.substring(2, 4), 16) * 0.587 +
+            parseInt(hex.substring(4, 6), 16) * 0.114;
+        if (Number.isNaN(luminance) || luminance < 127) {
             return '#FFF';
         }
         return '#000';
@@ -143,7 +151,7 @@ export default class Utils {
     }
 
     /**
-     * Generates and caches an inline SVG data URI and dimensions for a multi-line outlined text label.
+     * Generates and caches (LRU) an inline SVG data URI and dimensions for a multi-line outlined text label.
      */
     public static getLabelGraphicInfo(
         label: string,
@@ -155,6 +163,9 @@ export default class Utils {
         const key = `${label}|${fontSize}|${color}|${outlineColor}|${outlineWidth}`;
         const cached = Utils.labelSvgCache.get(key);
         if (cached) {
+            // Refresh LRU insertion order
+            Utils.labelSvgCache.delete(key);
+            Utils.labelSvgCache.set(key, cached);
             return cached;
         }
 
@@ -185,8 +196,11 @@ export default class Utils {
             height,
         };
 
-        if (Utils.labelSvgCache.size > 2000) {
-            Utils.labelSvgCache.clear();
+        if (Utils.labelSvgCache.size >= MAX_LABEL_SVG_CACHE_SIZE) {
+            const oldestKey = Utils.labelSvgCache.keys().next().value;
+            if (oldestKey !== undefined) {
+                Utils.labelSvgCache.delete(oldestKey);
+            }
         }
         Utils.labelSvgCache.set(key, info);
         return info;

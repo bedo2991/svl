@@ -18,7 +18,13 @@ declare const unsafeWindow: Omit<Window, "getWmeSdk"> & typeof globalThis & {
 //import averageSpeedCameraImg from './resources/averagespeed.png';
 
 // the sdk initScript function will be called after the SDK is initialized
-unsafeWindow.SDK_INITIALIZED.then(initScript);
+if (unsafeWindow.SDK_INITIALIZED) {
+  unsafeWindow.SDK_INITIALIZED.then(initScript).catch((error) => {
+    console.error("[SVL] Initialization failed:", error);
+  });
+} else {
+  console.error("[SVL] WME SDK_INITIALIZED is not available on unsafeWindow.");
+}
 
 
 
@@ -30,7 +36,7 @@ async function initScript() {
   // initialize the sdk, these should remain here at the top of the script
   if (!unsafeWindow.getWmeSdk) {
     // This block is required for type checking, but it is guaranteed that the function exists.
-    throw new Error("SDK not available");
+    throw new Error("SVL: SDK not available");
   }
   const wmeSDK: AsyncWmeSDK = unsafeWindow.getWmeSdk(
     {
@@ -38,9 +44,13 @@ async function initScript() {
       scriptName: "Street Vector Layer",
       mode: "async",
     }
-  )
+  );
 
-  console.debug(`SDK v. ${await wmeSDK.getSDKVersion()} on ${await wmeSDK.getWMEVersion()} initialized`)
+  const [sdkVersion, wmeVersion] = await Promise.all([
+    wmeSDK.getSDKVersion(),
+    wmeSDK.getWMEVersion(),
+  ]);
+  console.debug(`[SVL] SDK v. ${sdkVersion} on ${wmeVersion} initialized`);
 
   const mediator = await SVLMediator.initialize({ wmeSDK });
   mediator.alertDebug(AlertType2.SUCCESS, "Initialization completed");

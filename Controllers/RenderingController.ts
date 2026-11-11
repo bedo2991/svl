@@ -3,19 +3,35 @@ import SVLMediator from "../SVLMediator";
 import { Country, Node, SdkFeature, Segment, Street } from "wme-sdk-typings";
 import { LineString, Point } from "geojson";
 import { AlertType, SVLEvents } from "./AbstractMediator";
-import { AcceptedControllerEvents, SDK_LAYERS, SVLLayerState } from "../svlGlobals";
+import {
+    AcceptedControllerEvents,
+    DEFAULT_PREFERENCES,
+    DecorationStylePreference,
+    RedStylePreference,
+    SDK_LAYERS,
+    SVLLayerState,
+    SpeedsPreference,
+    StreetStylePreference,
+} from "../svlGlobals";
 import { lineOffset } from "@turf/line-offset";
 import Utils from "../Utils";
 
-interface MeterObject {
-    [key: string]: number
-}
+type MeterObject = Record<string, number>;
 
 type StreetStyle = {
     strokeColor: string;
     strokeWidth: number;
     strokeDashstyle: string;
     outlineColor: string;
+};
+
+type SegmentRenderResult = {
+    segmentId: Segment['id'];
+    hasClosures: boolean;
+    segments: SdkFeature<LineString>[];
+    arrows: SdkFeature<Point>[];
+    icons: SdkFeature<Point>[];
+    labels: SdkFeature<Point>[];
 };
 
 export default class RenderingController extends AbstractController {
@@ -36,6 +52,7 @@ export default class RenderingController extends AbstractController {
     private iconsStore = new Map<Segment['id'], Set<string>>();
     private labelsStore = new Map<Segment['id'], Set<string>>();
     private nodesStore = new Set<Node['id']>();
+    private closedSegmentIds = new Set<Segment['id']>();
 
     private readonly segmentLayerStores: ReadonlyArray<{
         queue: Set<SdkFeature<any>>;
@@ -54,54 +71,59 @@ export default class RenderingController extends AbstractController {
     private speedColorCache = new Map<number | null, string>();
     private superScriptCache = new Map<number, string>();
 
-    private superScript: Array<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+    private readonly superScript: ReadonlyArray<string> = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
     private streetStyles: StreetStyle[] = [];
 
-    private clutterConstant: number = 7;
-    private prefRealSize: boolean = true;
-    private prefShowSLColor: boolean = true;
-    private prefShowSLSingleColor: boolean = false;
-    private prefSLColor: string = '#ffffff';
-    private prefShowSLText: boolean = true;
-    private prefShowANs: number = 2;
-    private prefFakelock: number = 6;
-    private prefLabelOutlineWidth: number = 3;
-    private prefArrowDeclutter: number = 140;
-    private prefSegmentsThreshold: number = 2500;
-    private prefNodesThreshold: number = 2000;
-    private prefUseWMERoadLayerAtZoom: number = 15;
-    private prefRedStyle: { strokeColor: string; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeDashstyle: 'solid' };
-    private prefDirtyStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#8b4513', strokeOpacity: 0.9, strokeDashstyle: 'solid' };
-    private prefClosureStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ff0000', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
-    private prefTollStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#0000ff', strokeOpacity: 0.7, strokeDashstyle: 'dash' };
-    private prefRestrictionStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffff00', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
-    private prefHeadlightsStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#00ff00', strokeOpacity: 0.7, strokeDashstyle: 'dot' };
-    private prefNearbyHOVStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#b300ff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
-    private prefLanesStyle: { strokeColor: string; strokeOpacity: number; strokeDashstyle: string } = { strokeColor: '#ffffff', strokeOpacity: 0.8, strokeDashstyle: 'dash' };
-    private prefSpeeds: any = {};
+    private clutterConstant: number = DEFAULT_PREFERENCES.clutterConstant;
+    private prefRealSize: boolean = DEFAULT_PREFERENCES.realsize;
+    private prefShowSLColor: boolean = DEFAULT_PREFERENCES.showSLcolor;
+    private prefShowSLSingleColor: boolean = DEFAULT_PREFERENCES.showSLSinglecolor;
+    private prefSLColor: string = DEFAULT_PREFERENCES.SLColor;
+    private prefShowSLText: boolean = DEFAULT_PREFERENCES.showSLtext;
+    private prefShowANs: number = DEFAULT_PREFERENCES.showANs;
+    private prefFakelock: number = DEFAULT_PREFERENCES.fakelock;
+    private prefLabelOutlineWidth: number = DEFAULT_PREFERENCES.labelOutlineWidth;
+    private prefArrowDeclutter: number = DEFAULT_PREFERENCES.arrowDeclutter;
+    private prefSegmentsThreshold: number = DEFAULT_PREFERENCES.segmentsThreshold;
+    private prefNodesThreshold: number = DEFAULT_PREFERENCES.nodesThreshold;
+    private prefUseWMERoadLayerAtZoom: number = DEFAULT_PREFERENCES.useWMERoadLayerAtZoom;
+    private prefRedStyle: RedStylePreference = { strokeColor: '#FF0000', strokeDashstyle: 'solid' };
+    private prefDirtyStyle: DecorationStylePreference = { strokeColor: '#82614A', strokeOpacity: 0.6, strokeDashstyle: 'longdash' };
+    private prefClosureStyle: DecorationStylePreference = { strokeColor: '#FF00FF', strokeOpacity: 1.0, strokeDashstyle: 'dash' };
+    private prefTollStyle: DecorationStylePreference = { strokeColor: '#00E1FF', strokeOpacity: 1.0, strokeDashstyle: 'solid' };
+    private prefRestrictionStyle: DecorationStylePreference = { strokeColor: '#F2FF00', strokeOpacity: 1.0, strokeDashstyle: 'dash' };
+    private prefHeadlightsStyle: DecorationStylePreference = { strokeColor: '#bfff00', strokeOpacity: 0.9, strokeDashstyle: 'dot' };
+    private prefNearbyHOVStyle: DecorationStylePreference = { strokeColor: '#ff66ff', strokeOpacity: 1.0, strokeDashstyle: 'dash' };
+    private prefLanesStyle: DecorationStylePreference = { strokeColor: '#454443', strokeOpacity: 0.9, strokeDashstyle: 'dash' };
+    private prefSpeeds: SpeedsPreference = {
+        default: DEFAULT_PREFERENCES.defaultSpeedColor,
+        metric: {},
+        imperial: {},
+    };
 
-    private roundaboutStyle = {
+    private readonly roundaboutStyle = {
         strokeColor: '#111111',
         strokeWidth: 1,
         strokeDashstyle: 'dash',
         strokeOpacity: 0.6,
-    };
+    } as const;
 
-    private nonEditableStyle = {
-        'strokeColor': '#000',
-        // 'strokeWidth': 2, 20%
-        'strokeDashstyle': 'solid',
-    };
-    private tunnelFlagStyle2 = {
+    private readonly nonEditableStyle = {
+        strokeColor: '#000',
+        strokeDashstyle: 'solid',
+    } as const;
+
+    private readonly tunnelFlagStyle2 = {
         strokeColor: '#C90',
         strokeDashstyle: 'longdash',
-    };
-    private tunnelFlagStyle1 = {
+    } as const;
+
+    private readonly tunnelFlagStyle1 = {
         strokeColor: '#fff',
         strokeOpacity: 0.8,
         strokeDashstyle: 'longdash',
-    };
+    } as const;
 
     private defaultLaneWidthMeters: MeterObject = {
         '1': 3.1, // "Street",
@@ -121,8 +143,6 @@ export default class RenderingController extends AbstractController {
         '20': 3, // "Parking Lot Road",
         '22': 2.5, // "Alley"
     };
-
-
 
     private constructor({ mediator }: { mediator: SVLMediator }) {
         super(mediator);
@@ -157,6 +177,18 @@ export default class RenderingController extends AbstractController {
         }
     }
 
+    private async isObjectDeletedSafe(dataModelName: "segments" | "nodes", objectId: number | string): Promise<boolean> {
+        try {
+            return await this.mediator.wmeSDK.DataModel.isDeleted({
+                dataModelName,
+                objectId,
+            });
+        } catch {
+            // DataModelNotFoundError when an object was already purged from WME's local model
+            return true;
+        }
+    }
+
     private async handleLayerDisabledOrAborted(): Promise<void> {
         if (this.redrawTimeout !== null) {
             clearTimeout(this.redrawTimeout);
@@ -181,40 +213,41 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private handleSVLSettingsUpdated(shouldRedraw: boolean = true) {
+    private handleSVLSettingsUpdated(shouldRedraw: boolean = true): void {
         this.speedColorCache.clear();
-        this.clutterConstant = this.mediator.getPreference('clutterConstant');
-        this.prefRealSize = Boolean(this.mediator.getPreference('realsize'));
-        this.prefShowSLColor = Boolean(this.mediator.getPreference('showSLcolor'));
-        this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor'));
-        this.prefSLColor = this.mediator.getPreference('SLColor');
-        this.prefShowSLText = Boolean(this.mediator.getPreference('showSLtext'));
-        this.prefShowANs = Number(this.mediator.getPreference('showANs')) || 0;
-        this.prefFakelock = Number(this.mediator.getPreference('fakelock'));
-        this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth'));
-        this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || 140;
-        this.prefSegmentsThreshold = Number(this.mediator.getPreference('segmentsThreshold'));
-        this.prefNodesThreshold = Number(this.mediator.getPreference('nodesThreshold'));
-        this.prefUseWMERoadLayerAtZoom = Number(this.mediator.getPreference('useWMERoadLayerAtZoom'));
-        this.prefRedStyle = this.mediator.getPreference('red');
-        this.prefDirtyStyle = this.mediator.getPreference('dirty');
-        this.prefClosureStyle = this.mediator.getPreference('closure');
-        this.prefTollStyle = this.mediator.getPreference('toll');
-        this.prefRestrictionStyle = this.mediator.getPreference('restriction');
-        this.prefHeadlightsStyle = this.mediator.getPreference('headlights');
-        this.prefNearbyHOVStyle = this.mediator.getPreference('nearbyHOV');
-        this.prefLanesStyle = this.mediator.getPreference('lanes');
-        this.prefSpeeds = this.mediator.getPreference('speeds');
+        this.clutterConstant = Number(this.mediator.getPreference('clutterConstant') ?? DEFAULT_PREFERENCES.clutterConstant);
+        this.prefRealSize = Boolean(this.mediator.getPreference('realsize') ?? DEFAULT_PREFERENCES.realsize);
+        this.prefShowSLColor = Boolean(this.mediator.getPreference('showSLcolor') ?? DEFAULT_PREFERENCES.showSLcolor);
+        this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor') ?? DEFAULT_PREFERENCES.showSLSinglecolor);
+        this.prefSLColor = this.mediator.getPreference('SLColor') || DEFAULT_PREFERENCES.SLColor;
+        this.prefShowSLText = Boolean(this.mediator.getPreference('showSLtext') ?? DEFAULT_PREFERENCES.showSLtext);
+        this.prefShowANs = Number(this.mediator.getPreference('showANs') ?? DEFAULT_PREFERENCES.showANs) || 0;
+        this.prefFakelock = Number(this.mediator.getPreference('fakelock') ?? DEFAULT_PREFERENCES.fakelock);
+        this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth') ?? DEFAULT_PREFERENCES.labelOutlineWidth);
+        this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || DEFAULT_PREFERENCES.arrowDeclutter;
+        this.prefSegmentsThreshold = Number(this.mediator.getPreference('segmentsThreshold') ?? DEFAULT_PREFERENCES.segmentsThreshold);
+        this.prefNodesThreshold = Number(this.mediator.getPreference('nodesThreshold') ?? DEFAULT_PREFERENCES.nodesThreshold);
+        this.prefUseWMERoadLayerAtZoom = Number(this.mediator.getPreference('useWMERoadLayerAtZoom') ?? DEFAULT_PREFERENCES.useWMERoadLayerAtZoom);
+        this.prefRedStyle = this.mediator.getPreference('red') ?? this.prefRedStyle;
+        this.prefDirtyStyle = this.mediator.getPreference('dirty') ?? this.prefDirtyStyle;
+        this.prefClosureStyle = this.mediator.getPreference('closure') ?? this.prefClosureStyle;
+        this.prefTollStyle = this.mediator.getPreference('toll') ?? this.prefTollStyle;
+        this.prefRestrictionStyle = this.mediator.getPreference('restriction') ?? this.prefRestrictionStyle;
+        this.prefHeadlightsStyle = this.mediator.getPreference('headlights') ?? this.prefHeadlightsStyle;
+        this.prefNearbyHOVStyle = this.mediator.getPreference('nearbyHOV') ?? this.prefNearbyHOVStyle;
+        this.prefLanesStyle = this.mediator.getPreference('lanes') ?? this.prefLanesStyle;
+        this.prefSpeeds = this.mediator.getPreference('speeds') ?? this.prefSpeeds;
 
-        const streetStylesPref = this.mediator.getPreference('streets');
+        const streetStylesPref: Array<StreetStylePreference | undefined> = this.mediator.getPreference('streets') ?? [];
         this.streetStyles = [];
         for (let i = 0; i < streetStylesPref.length; i += 1) {
-            if (streetStylesPref[i]) {
+            const pref = streetStylesPref[i];
+            if (pref) {
                 this.streetStyles[i] = {
-                    'strokeColor': streetStylesPref[i]['strokeColor'],
-                    'strokeWidth': streetStylesPref[i]['strokeWidth'],
-                    'strokeDashstyle': streetStylesPref[i]['strokeDashstyle'],
-                    'outlineColor': Utils.bestBackground(streetStylesPref[i]['strokeColor']),
+                    strokeColor: pref.strokeColor,
+                    strokeWidth: pref.strokeWidth,
+                    strokeDashstyle: pref.strokeDashstyle,
+                    outlineColor: Utils.bestBackground(pref.strokeColor),
                 };
             }
         }
@@ -244,7 +277,7 @@ export default class RenderingController extends AbstractController {
                 'closeZoomOnly': 1,
                 'degrees': this.convertRadiansToDegrees(degreesInRadians)
             }
-        }
+        };
     }
 
     private async handleCountryChanged(data?: { newCountry?: Country }): Promise<void> {
@@ -285,35 +318,23 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    private queueFeatureForSegment<G extends Point | LineString>(
+    private registerRenderedFeaturesForSegment<G extends Point | LineString>(
         id: Segment['id'],
-        feature: SdkFeature<G>,
+        features: readonly SdkFeature<G>[],
         queue: Set<SdkFeature<G>>,
         store: Map<Segment['id'], Set<string>>
     ): void {
-        queue.add(feature);
+        if (features.length === 0) return;
         let idSet = store.get(id);
         if (!idSet) {
             idSet = new Set();
             store.set(id, idSet);
         }
-        idSet.add(String(feature.id));
-    }
-
-    private queueSegmentFeatureForDrawing(id: Segment['id'], feature: SdkFeature<LineString>): void {
-        this.queueFeatureForSegment(id, feature, this.queuedSegments, this.segmentsStore);
-    }
-
-    private queueArrowFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
-        this.queueFeatureForSegment(id, feature, this.queuedArrows, this.arrowsStore);
-    }
-
-    private queueIconFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
-        this.queueFeatureForSegment(id, feature, this.queuedIcons, this.iconsStore);
-    }
-
-    private queueLabelFeatureForDrawing(id: Segment['id'], feature: SdkFeature<Point>): void {
-        this.queueFeatureForSegment(id, feature, this.queuedLabels, this.labelsStore);
+        for (let i = 0; i < features.length; i++) {
+            const feature = features[i];
+            queue.add(feature);
+            idSet.add(String(feature.id));
+        }
     }
 
     private collectAndDeleteStoredFeatureIds(
@@ -339,27 +360,17 @@ export default class RenderingController extends AbstractController {
     }
 
     private getAngleDegreesSDK(isForward: boolean, p0: number[], p1: number[]): number {
-        // radians to degrees
         return this.convertRadiansToDegrees(this.getAngleRadiansSDK(isForward, p0, p1));
     }
 
     private getAngleRadiansSDK(isForward: boolean, p0: number[], p1: number[]): number {
-        let dx = 0;
-        let dy = 0;
-
-        // Determine the start and end points
         const startP = isForward ? p0 : p1;
         const endP = isForward ? p1 : p0;
 
-        // Longitude difference (dx) is scaled by cos(latitude)
-        // The latitude used for scaling is the average of p0 and p1, 
-        // or just the starting latitude (startP[1]) for small distances.
-        // NOTE: Math.cos expects the angle in RADIANS!
+        // Longitude difference (dx) is scaled by cos(latitude in radians)
         const latInRadians = startP[1] * Utils.PI_OVER_180;
-
-        // Calculate the difference in the direction of travel
-        dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
-        dy = endP[1] - startP[1];
+        const dx = (endP[0] - startP[0]) * Math.cos(latInRadians);
+        const dy = endP[1] - startP[1];
 
         // Math.atan2(dx, dy) returns the bearing from the Y-axis (North)
         return Math.atan2(dx, dy);
@@ -499,7 +510,7 @@ export default class RenderingController extends AbstractController {
         return filtered.length > 0 ? filtered : candidates;
     }
 
-    private getColorStringFromSpeed(metricspeed: number | null) {
+    private getColorStringFromSpeed(metricspeed: number | null): string {
         const cached = this.speedColorCache.get(metricspeed);
         if (cached !== undefined) {
             return cached;
@@ -510,13 +521,13 @@ export default class RenderingController extends AbstractController {
         } else {
             const speedsPref = this.prefSpeeds;
             if (metricspeed === null) {
-                color = speedsPref['default'];
+                color = speedsPref.default;
             } else {
                 const type = this.isImperial ? 'imperial' : 'metric';
                 const speed = this.isImperial
                     ? Math.round(metricspeed / 1.609344)
                     : metricspeed;
-                color = speedsPref[type]?.[speed] ?? speedsPref['default'];
+                color = speedsPref[type]?.[speed] ?? speedsPref.default;
             }
         }
         this.speedColorCache.set(metricspeed, color);
@@ -532,7 +543,6 @@ export default class RenderingController extends AbstractController {
     }
 
     public redrawAll(): void {
-        // Logic to redraw all SVL layers
         Utils.debugLog("Redrawing all SVL layers…");
         this.drawGeneration++;
         // Clear any pending redraw to avoid multiple rapid redraws
@@ -606,28 +616,52 @@ export default class RenderingController extends AbstractController {
             streetsMap.set(streets[i].id, streets[i]);
         }
 
-        const staleLabelIds = this.collectAndDeleteStoredFeatureIds(
-            segments.map(s => s.id),
-            this.labelsStore
-        );
-
-        await Promise.all(
-            segments.map(s => this.drawSegmentSDK(s, streetsMap))
+        const results = await Promise.all(
+            segments.map(s => this.buildSegmentRenderResult(s, streetsMap, this.cachedUserRank))
         );
         if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
-            this.clearAllSegmentQueues();
             return;
         }
 
-        if (staleLabelIds.length > 0) {
-            await this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-                layerName: SDK_LAYERS.LABELS,
-                featureIds: staleLabelIds,
-            });
+        const validResults = results.filter((r): r is SegmentRenderResult => r !== null);
+        if (validResults.length === 0) {
+            return;
+        }
+
+        const renderedSegmentIds = validResults.map(r => r.segmentId);
+
+        // Remove any previously rendered features across all segment layers before committing new ones
+        const staleRemovals: Promise<void>[] = [];
+        for (const { store, layerName } of this.segmentLayerStores) {
+            const staleIds = this.collectAndDeleteStoredFeatureIds(renderedSegmentIds, store);
+            if (staleIds.length > 0) {
+                staleRemovals.push(
+                    this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
+                        layerName,
+                        featureIds: staleIds,
+                    })
+                );
+            }
+        }
+        if (staleRemovals.length > 0) {
+            await Promise.all(staleRemovals);
             if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
-                this.clearAllSegmentQueues();
                 return;
             }
+        }
+
+        this.clearAllSegmentQueues();
+        for (let i = 0; i < validResults.length; i++) {
+            const res = validResults[i];
+            if (res.hasClosures) {
+                this.closedSegmentIds.add(res.segmentId);
+            } else {
+                this.closedSegmentIds.delete(res.segmentId);
+            }
+            this.registerRenderedFeaturesForSegment(res.segmentId, res.segments, this.queuedSegments, this.segmentsStore);
+            this.registerRenderedFeaturesForSegment(res.segmentId, res.arrows, this.queuedArrows, this.arrowsStore);
+            this.registerRenderedFeaturesForSegment(res.segmentId, res.icons, this.queuedIcons, this.iconsStore);
+            this.registerRenderedFeaturesForSegment(res.segmentId, res.labels, this.queuedLabels, this.labelsStore);
         }
 
         await this.drawAllQueues();
@@ -654,7 +688,6 @@ export default class RenderingController extends AbstractController {
             this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
             return;
         }
-        // TODO: this should not happen here. First the events in layerStateController should fire and manage that
         if ((await this.mediator.wmeSDK.Map.getZoomLevel()) <= this.prefUseWMERoadLayerAtZoom) {
             Utils.debugLog('Not adding nodes because of the zoom');
             return;
@@ -676,11 +709,9 @@ export default class RenderingController extends AbstractController {
 
         const nodeStatuses = await Promise.all(
             nodesToProcess.map(async (n) => {
-                const isDeleted = await this.mediator.wmeSDK.DataModel.isDeleted({
-                    dataModelName: "nodes",
-                    objectId: n.id
-                });
-                if (isDeleted) return null;
+                if (await this.isObjectDeletedSafe("nodes", n.id)) {
+                    return null;
+                }
                 try {
                     const isVirtual = await this.mediator.wmeSDK.DataModel.Nodes.isVirtual({ nodeId: n.id });
                     return isVirtual ? 1 : 0;
@@ -698,17 +729,15 @@ export default class RenderingController extends AbstractController {
             const isVirtualNode = nodeStatuses[i];
             if (isVirtualNode !== null && !this.nodesStore.has(n.id)) {
                 this.nodesStore.add(n.id);
-                sdkFeatures.push(
-                    {
-                        id: n.id,
-                        geometry: n.geometry,
-                        properties: {
-                            "conSegm": n.connectedSegmentIds.length,
-                            "isVirtualNode": isVirtualNode
-                        },
-                        type: "Feature",
-                    }
-                );
+                sdkFeatures.push({
+                    id: n.id,
+                    geometry: n.geometry,
+                    properties: {
+                        "conSegm": n.connectedSegmentIds.length,
+                        "isVirtualNode": isVirtualNode
+                    },
+                    type: "Feature",
+                });
             }
         }
 
@@ -725,6 +754,7 @@ export default class RenderingController extends AbstractController {
             queue.clear();
             store.clear();
         }
+        this.closedSegmentIds.clear();
 
         await Promise.all(
             this.segmentLayerStores.map(({ layerName }) =>
@@ -740,11 +770,11 @@ export default class RenderingController extends AbstractController {
         });
     }
 
-    public async addSegmentsByIds(objectIds: (number)[]): Promise<void> {
+    public async addSegmentsByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(() => this.addSegmentsByIdsInternal(objectIds));
     }
 
-    private async addSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
+    private async addSegmentsByIdsInternal(objectIds: number[]): Promise<void> {
         if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
         const idsToAdd = objectIds.filter(id => !this.segmentsStore.has(id));
         if (idsToAdd.length === 0) return;
@@ -770,11 +800,11 @@ export default class RenderingController extends AbstractController {
         await this.addSegmentsByModel(segments, generation);
     }
 
-    public async addNodesByIds(objectIds: (number)[]): Promise<void> {
+    public async addNodesByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(() => this.addNodesByIdsInternal(objectIds));
     }
 
-    private async addNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
+    private async addNodesByIdsInternal(objectIds: number[]): Promise<void> {
         if (this.redrawTimeout !== null || objectIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
         const idsToAdd = objectIds.filter(id => !this.nodesStore.has(id));
         if (idsToAdd.length === 0) return;
@@ -795,12 +825,16 @@ export default class RenderingController extends AbstractController {
         await this.addNodesByModel(nodes, generation);
     }
 
-    public async removeSegmentsByIds(objectIds: (number)[]): Promise<void> {
+    public async removeSegmentsByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(() => this.removeSegmentsByIdsInternal(objectIds));
     }
 
-    private async removeSegmentsByIdsInternal(objectIds: (number)[]): Promise<void> {
+    private async removeSegmentsByIdsInternal(objectIds: number[]): Promise<void> {
+        if (objectIds.length === 0) return;
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
+        for (let i = 0; i < objectIds.length; i++) {
+            this.closedSegmentIds.delete(objectIds[i]);
+        }
         const promises: Promise<void>[] = [];
         for (const { store, layerName } of this.segmentLayerStores) {
             const featureIds = this.collectAndDeleteStoredFeatureIds(objectIds, store);
@@ -818,32 +852,39 @@ export default class RenderingController extends AbstractController {
         }
     }
 
-    public async removeNodesByIds(objectIds: (number)[]): Promise<void> {
+    public async removeNodesByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(() => this.removeNodesByIdsInternal(objectIds));
     }
 
-    private async removeNodesByIdsInternal(objectIds: (number)[]): Promise<void> {
-        Utils.debugLog(`Removing ${objectIds.length} nodes: ${objectIds.join()}`);
+    private async removeNodesByIdsInternal(objectIds: number[]): Promise<void> {
+        if (objectIds.length === 0) return;
+        const removedIds: number[] = [];
         for (let i = 0; i < objectIds.length; i++) {
-            this.nodesStore.delete(objectIds[i]);
+            const nodeId = objectIds[i];
+            if (this.nodesStore.delete(nodeId)) {
+                removedIds.push(nodeId);
+            }
         }
-        if (objectIds.length > 0) {
+        if (removedIds.length > 0) {
+            Utils.debugLog(`Removing ${removedIds.length} nodes: ${removedIds.join()}`);
             await this.mediator.wmeSDK.Map.removeFeaturesFromLayer({
-                featureIds: objectIds,
+                featureIds: removedIds,
                 layerName: SDK_LAYERS.NODES
             });
         }
     }
 
-    public async updateSegmentsByIds(objectIds: (number)[]): Promise<void> {
-        return this.enqueueDataModelOp(async () => {
-            if (this.redrawTimeout !== null || objectIds.length === 0) return;
-            await this.removeSegmentsByIdsInternal(objectIds);
-            await this.addSegmentsByIdsInternal(objectIds);
-        });
+    public async updateSegmentsByIds(objectIds: number[]): Promise<void> {
+        return this.enqueueDataModelOp(() => this.updateSegmentsByIdsInternal(objectIds));
     }
 
-    public async updateNodesByIds(objectIds: (number)[]): Promise<void> {
+    private async updateSegmentsByIdsInternal(objectIds: number[]): Promise<void> {
+        if (this.redrawTimeout !== null || objectIds.length === 0) return;
+        await this.removeSegmentsByIdsInternal(objectIds);
+        await this.addSegmentsByIdsInternal(objectIds);
+    }
+
+    public async updateNodesByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(async () => {
             if (this.redrawTimeout !== null || objectIds.length === 0) return;
             await this.removeNodesByIdsInternal(objectIds);
@@ -851,272 +892,376 @@ export default class RenderingController extends AbstractController {
         });
     }
 
-    // TODO: refactor (Strategy pattern?)
-    private async drawSegmentSDK(
+    public async handleSegmentIdChanged(oldId: number, newId: number): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null) return;
+            await this.removeSegmentsByIdsInternal([oldId]);
+            await this.addSegmentsByIdsInternal([newId]);
+        });
+    }
+
+    public async handleNodeIdChanged(oldId: number, newId: number): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null) return;
+            await this.removeNodesByIdsInternal([oldId]);
+            await this.addNodesByIdsInternal([newId]);
+        });
+    }
+
+    public async refreshRoadClosureSegments(closureIds?: Array<string | number>): Promise<void> {
+        return this.enqueueDataModelOp(async () => {
+            if (this.redrawTimeout !== null || this.mediator.getState() !== SVLLayerState.VISIBLE) return;
+            const affectedSegmentIds = new Set<number>();
+
+            if (closureIds && closureIds.length > 0) {
+                const closures = await Promise.all(
+                    closureIds.map((id) =>
+                        this.mediator.wmeSDK.DataModel.RoadClosures.getById({ roadClosureId: String(id) }).catch(() => null)
+                    )
+                );
+                for (let i = 0; i < closures.length; i++) {
+                    const segId = closures[i]?.segmentId;
+                    if (typeof segId === 'number') {
+                        affectedSegmentIds.add(segId);
+                    }
+                }
+            }
+
+            // Check any segment we previously drew with a closure in case its closure was removed
+            if (this.closedSegmentIds.size > 0) {
+                const trackedClosedIds = Array.from(this.closedSegmentIds);
+                const segments = await Promise.all(
+                    trackedClosedIds.map((segmentId) =>
+                        this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId }).catch(() => null)
+                    )
+                );
+                for (let i = 0; i < trackedClosedIds.length; i++) {
+                    const seg = segments[i];
+                    if (!seg || !seg.hasClosures) {
+                        affectedSegmentIds.add(trackedClosedIds[i]);
+                    }
+                }
+            }
+
+            if (affectedSegmentIds.size > 0) {
+                await this.updateSegmentsByIdsInternal(Array.from(affectedSegmentIds));
+            }
+        });
+    }
+
+    private computeSegmentWidth(model: Segment, effectiveRoadType: number): number {
+        const { roadType: initialRoadType, isTwoWay, fromLanesInfo, toLanesInfo, isAtoB } = model;
+        if (!this.prefRealSize) {
+            return this.streetStyles[effectiveRoadType]?.strokeWidth ?? 0;
+        }
+
+        const defaultLaneWidth = this.defaultLaneWidthMeters[initialRoadType] ?? 3.5;
+        let segmentWidthFrom = defaultLaneWidth;
+        if (fromLanesInfo) {
+            segmentWidthFrom = fromLanesInfo.laneWidth
+                ? fromLanesInfo.numberOfLanes * (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth)
+                : fromLanesInfo.numberOfLanes * defaultLaneWidth;
+        }
+
+        let segmentWidthTo = defaultLaneWidth;
+        if (toLanesInfo) {
+            segmentWidthTo = toLanesInfo.laneWidth
+                ? toLanesInfo.numberOfLanes * (this.isImperial ? Utils.feetToMeters(toLanesInfo.laneWidth) : toLanesInfo.laneWidth)
+                : toLanesInfo.numberOfLanes * defaultLaneWidth;
+        }
+
+        if (!isTwoWay) {
+            return isAtoB ? segmentWidthFrom : segmentWidthTo;
+        }
+        if (segmentWidthTo !== segmentWidthFrom) {
+            return segmentWidthFrom + segmentWidthTo;
+        }
+        return segmentWidthFrom ? segmentWidthFrom * 2.0 : 0;
+    }
+
+    private buildSpeedLimitFeatures(
         model: Segment,
-        streetsMap: Map<number, Street>,
-    ): Promise<void> {
-        if (!model || await this.mediator.wmeSDK.DataModel.isDeleted({
-            dataModelName: "segments",
-            objectId: model.id
-        })) {
-            // Skip deleted segments (this happens when the user pans away and comes back on a deleted segment)
-            return;
-        }
-
-        const { id, roadType: initialRoadType, isTwoWay, elevationLevel, fwdSpeedLimit, revSpeedLimit, fromLanesInfo, toLanesInfo, isAtoB, isBtoA, lockRank, flagAttributes, hasClosures, hasRestrictions, toNodeLanesCount, fromNodeLanesCount, primaryStreetId } = model;
-        this.mediator.debugLog(`Drawing segment: ${id}`);
-        // TODO const hasToBeSk = hasToBeSkipped(attributes.roadType)
-
-        const geometryPointArray = model.geometry.coordinates;
-        const baselevel = (elevationLevel ?? 0) * 100;
-        const isInRoundabout = model.junctionId !== null;
-        let isBridge = false;
-        let hasSpeedLimitDrawn = false;
-        // eslint-disable-next-line prefer-destructuring
-        let roadType = initialRoadType;
-        //Compute the segment width
-        let segmentWidth: number = 0;
-        if (this.prefRealSize) {
-            const defaultLaneWidth = this.defaultLaneWidthMeters[initialRoadType] ?? 3.5;
-            let segmentWidthFrom = 0;
-            let segmentWidthTo = 0;
-            if (fromLanesInfo) {
-                if (fromLanesInfo.laneWidth) {
-                    segmentWidthFrom =
-                        (fromLanesInfo.numberOfLanes *
-                            (this.isImperial ? Utils.feetToMeters(fromLanesInfo.laneWidth) : fromLanesInfo.laneWidth));
-                } else {
-                    segmentWidthFrom =
-                        fromLanesInfo.numberOfLanes *
-                        defaultLaneWidth;
-                }
-            } else {
-                segmentWidthFrom = defaultLaneWidth;
-            }
-
-            if (toLanesInfo) {
-                if (toLanesInfo.laneWidth) {
-                    segmentWidthTo =
-                        (toLanesInfo.numberOfLanes *
-                            (this.isImperial ? Utils.feetToMeters(toLanesInfo.laneWidth) : toLanesInfo.laneWidth));
-                } else {
-                    segmentWidthTo =
-                        toLanesInfo.numberOfLanes *
-                        defaultLaneWidth;
-                }
-            } else {
-                segmentWidthTo = defaultLaneWidth;
-            }
-
-            if (!isTwoWay) {
-                segmentWidth = isAtoB
-                    ? segmentWidthFrom
-                    : segmentWidthTo;
-            } else if (segmentWidthTo != segmentWidthFrom) {
-                segmentWidth = segmentWidthFrom + segmentWidthTo;
-            } else if (segmentWidthFrom) {
-                //Segment has the same non-null width in both directions, just return one, twice
-                segmentWidth = segmentWidthFrom * 2.0;
-            }
-        } else {
-            //Use the static value from the preferences
-            segmentWidth = this.streetStyles[roadType]?.strokeWidth ?? 0;
-        }
-
-        const totalSegmentWidth = segmentWidth; // ?? getWidth(roadType, isTwoWay);
-        // roadWidth: the width of the "inner" segment, without decorations around it. It will be modified later
-        let roadWidth = totalSegmentWidth;
-        if (primaryStreetId === null) {
-            // consoleDebug("RED segment", model);
-            const redSegment: SdkFeature<LineString> = {
-                type: 'Feature',
-                id: `${model.id}_red`,
-                geometry: model.geometry,
-                properties: {
-                    "color": this.prefRedStyle.strokeColor,
-                    "width": totalSegmentWidth,
-                    "dash": this.prefRedStyle.strokeDashstyle,
-                },
-            };
-            this.queueSegmentFeatureForDrawing(model.id, redSegment);
-            return;
-        }
+        totalSegmentWidth: number,
+        isBridge: boolean,
+        baselevel: number
+    ): SdkFeature<LineString>[] {
+        const { id, fwdSpeedLimit, revSpeedLimit, isTwoWay, isBtoA } = model;
+        const features: SdkFeature<LineString>[] = [];
 
         if (
+            !this.prefShowSLSingleColor &&
+            (fwdSpeedLimit || revSpeedLimit) &&
+            fwdSpeedLimit !== revSpeedLimit &&
+            isTwoWay
+        ) {
+            if (this.prefRealSize) {
+                const offset = (isBridge
+                    ? (totalSegmentWidth * 0.17)
+                    : (totalSegmentWidth * 0.1915)) / 0.44799999999906703;
+
+                // Positive offset shifts left of travel direction; negative shifts right
+                const fwdSpeedFeature = lineOffset(model.geometry, offset, { units: 'meters' });
+                const revSpeedFeature = lineOffset(model.geometry, -offset, { units: 'meters' });
+
+                features.push({
+                    type: 'Feature',
+                    id: `${id}_sl_l`,
+                    geometry: fwdSpeedFeature.geometry,
+                    properties: {
+                        'color': this.getColorStringFromSpeed(fwdSpeedLimit),
+                        'width': isBridge ? totalSegmentWidth * 0.1 : totalSegmentWidth * 0.2,
+                        'dash': 'solid',
+                        'closeZoomOnly': 1,
+                        'zIndex': baselevel + 115,
+                    },
+                });
+
+                features.push({
+                    type: 'Feature',
+                    id: `${id}_sl_r`,
+                    geometry: revSpeedFeature.geometry,
+                    properties: {
+                        'color': this.getColorStringFromSpeed(revSpeedLimit),
+                        'width': isBridge ? totalSegmentWidth * 0.1 : totalSegmentWidth * 0.2,
+                        'dash': 'solid',
+                        'closeZoomOnly': 1,
+                        'zIndex': baselevel + 115,
+                    },
+                });
+            } else {
+                if (fwdSpeedLimit) {
+                    features.push({
+                        type: 'Feature',
+                        id: `${id}_sl_f`,
+                        geometry: model.geometry,
+                        properties: {
+                            'color': this.getColorStringFromSpeed(fwdSpeedLimit),
+                            'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
+                            'dash': 'solid',
+                            'closeZoomOnly': 1,
+                            'zIndex': baselevel + 115,
+                        },
+                    });
+                }
+                if (revSpeedLimit) {
+                    features.push({
+                        type: 'Feature',
+                        id: `${id}_sl_rv`,
+                        geometry: model.geometry,
+                        properties: {
+                            'color': this.getColorStringFromSpeed(revSpeedLimit),
+                            'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
+                            'dash': 'dash',
+                            'closeZoomOnly': 1,
+                            'zIndex': baselevel + 116,
+                        },
+                    });
+                }
+            }
+        } else {
+            const speedValue = !isTwoWay && isBtoA ? revSpeedLimit : fwdSpeedLimit;
+            if (speedValue) {
+                features.push({
+                    type: 'Feature',
+                    id: `${id}_sl`,
+                    geometry: model.geometry,
+                    properties: {
+                        'color': this.getColorStringFromSpeed(speedValue),
+                        'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
+                        'dash': 'solid',
+                        'closeZoomOnly': 1,
+                        'zIndex': baselevel + 115,
+                    },
+                });
+            }
+        }
+
+        return features;
+    }
+
+    private buildArrowFeatures(
+        model: Segment,
+        isInRoundabout: boolean,
+        baselevel: number,
+        labels: SdkFeature<Point>[]
+    ): SdkFeature<Point>[] {
+        const arrows: SdkFeature<Point>[] = [];
+        if (model.isTwoWay) {
+            return arrows;
+        }
+
+        const arrowSamples = this.sampleArrowPointsAlongSegment(
+            model.geometry.coordinates,
+            isInRoundabout,
+            labels
+        );
+
+        if (!model.isAtoB && !model.isBtoA && model.isDrivable) {
+            for (let i = 0; i < arrowSamples.length; i++) {
+                const sample = arrowSamples[i];
+                arrows.push({
+                    type: 'Feature',
+                    id: `${model.id}_a_${i}`,
+                    geometry: {
+                        type: 'Point',
+                        coordinates: sample.coordinates,
+                    },
+                    properties: {
+                        'closeZoomOnly': 1,
+                        'isUnknownDirection': 1,
+                        'minZoom': sample.minZoom,
+                        'zIndex': baselevel + 180,
+                    },
+                });
+            }
+        } else {
+            for (let i = 0; i < arrowSamples.length; i++) {
+                const sample = arrowSamples[i];
+                const degrees = this.getAngleDegreesSDK(
+                    model.isAtoB,
+                    sample.p0,
+                    sample.p1
+                );
+
+                arrows.push({
+                    type: 'Feature',
+                    id: `${model.id}_a_${i}`,
+                    geometry: {
+                        type: 'Point',
+                        coordinates: sample.coordinates,
+                    },
+                    properties: {
+                        'degrees': degrees,
+                        'minZoom': sample.minZoom,
+                        'zIndex': baselevel + 180,
+                    },
+                });
+            }
+        }
+
+        return arrows;
+    }
+
+    private async buildSegmentRenderResult(
+        model: Segment,
+        streetsMap: Map<number, Street>,
+        userRank: number | undefined,
+    ): Promise<SegmentRenderResult | null> {
+        if (!model || await this.isObjectDeletedSafe("segments", model.id)) {
+            // Skip deleted segments (e.g. when panning away and returning on an unsaved deleted segment)
+            return null;
+        }
+
+        const {
+            id,
+            roadType: initialRoadType,
+            elevationLevel,
+            fwdSpeedLimit,
+            revSpeedLimit,
+            isTwoWay,
+            isAtoB,
+            isBtoA,
+            lockRank,
+            flagAttributes,
+            hasClosures,
+            hasRestrictions,
+            toNodeLanesCount,
+            fromNodeLanesCount,
+            primaryStreetId,
+        } = model;
+
+        this.mediator.debugLog(`Drawing segment: ${id}`);
+
+        let roadType = initialRoadType;
+        if (
+            primaryStreetId !== null &&
             this.mediator.isRoutingModeActive() &&
             model.routingRoadType !== null
         ) {
             roadType = model.routingRoadType;
         }
 
-        // Compute labels first so one-way arrow placement can avoid colliding with them
-        const labels = this.drawLabels(model, streetsMap, roadType);
-        for (let i = 0; i < labels.length; i++) {
-            this.queueLabelFeatureForDrawing(model.id, labels[i]);
+        const totalSegmentWidth = this.computeSegmentWidth(model, roadType);
+
+        if (primaryStreetId === null) {
+            return {
+                segmentId: id,
+                hasClosures: false,
+                segments: [{
+                    type: 'Feature',
+                    id: `${id}_red`,
+                    geometry: model.geometry,
+                    properties: {
+                        'color': this.prefRedStyle.strokeColor,
+                        'width': totalSegmentWidth,
+                        'dash': this.prefRedStyle.strokeDashstyle,
+                    },
+                }],
+                arrows: [],
+                icons: [],
+                labels: [],
+            };
         }
 
+        const segmentFeatures: SdkFeature<LineString>[] = [];
+        const iconFeatures: SdkFeature<Point>[] = [];
+
+        // Compute labels first so one-way arrow placement can avoid colliding with them
+        const labelFeatures = this.drawLabels(model, streetsMap, roadType);
+        let arrowFeatures: SdkFeature<Point>[] = [];
+
         if (this.streetStyles[roadType] !== undefined) {
-            const speed = fwdSpeedLimit ?? revSpeedLimit; // If it remains null it does not have a speed limit
-            // consoleDebug("Road Type: ", roadType);
+            const geometryPointArray = model.geometry.coordinates;
+            const baselevel = (elevationLevel ?? 0) * 100;
+            const isInRoundabout = model.junctionId !== null;
+            const speed = fwdSpeedLimit ?? revSpeedLimit;
+            let isBridge = false;
+            let roadWidth = totalSegmentWidth;
+
             if (elevationLevel && elevationLevel > 0) {
-                // it is a bridge
-                // consoleDebug("Bridge");
                 isBridge = true;
-                const bridge: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_br`,
+                    id: `${id}_br`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
                         'zIndex': baselevel + 100,
                         'width': totalSegmentWidth,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, bridge);
+                });
             }
 
-            hasSpeedLimitDrawn = Boolean(speed) && this.prefShowSLColor;
-            // roadWidth: the width of the "inner" segment, without decorations around it
+            const hasSpeedLimitDrawn = Boolean(speed) && this.prefShowSLColor;
             if (hasSpeedLimitDrawn && isBridge) {
-                // A bridge with speed limit
                 roadWidth = totalSegmentWidth * 0.56;
             } else if (isBridge || hasSpeedLimitDrawn) {
-                // A bridge without speed limit or a non-bridge with SL
                 roadWidth = totalSegmentWidth * 0.68;
             }
 
             if (hasSpeedLimitDrawn) {
-                // it has a speed limit
-                // consoleDebug("SpeedLimit");
-
-                if (
-                    !this.prefShowSLSingleColor &&
-                    (fwdSpeedLimit || revSpeedLimit) &&
-                    fwdSpeedLimit !== revSpeedLimit &&
-                    isTwoWay
-                ) {
-                    if (this.prefRealSize) {
-                        // consoleDebug("The segment has 2 different speed limits");
-                        // It has 2 different speeds:
-                        const offset = (isBridge
-                            ? (totalSegmentWidth * 0.17) // 0,14
-                            : (totalSegmentWidth * 0.1915)) / 0.44799999999906703; // 0,22
-
-                        // 'Left' geometry: A positive offset shifts the line to the left of its travel direction.
-                        const fwdSpeedFeature = lineOffset(model.geometry, offset, { units: 'meters' });
-
-                        // 'Right' geometry: A negative offset shifts the line to the right of its travel direction.
-                        const revSpeedFeature = lineOffset(model.geometry, -offset, { units: 'meters' });
-
-
-                        const leftSpeedLimit: SdkFeature<LineString> = {
-                            type: 'Feature',
-                            id: `${model.id}_sl_l`,
-                            geometry: fwdSpeedFeature.geometry,
-                            properties: {
-                                'color': this.getColorStringFromSpeed(fwdSpeedLimit),
-                                'width': isBridge ? totalSegmentWidth * 0.1 : totalSegmentWidth * 0.2, // 0,8
-                                'dash': 'solid',
-                                'closeZoomOnly': 1,
-                                'zIndex': baselevel + 115,
-                            },
-                        };
-                        this.queueSegmentFeatureForDrawing(model.id, leftSpeedLimit);
-
-                        const rightSpeedLimit: SdkFeature<LineString> = {
-                            type: 'Feature',
-                            id: `${model.id}_sl_r`,
-                            geometry: revSpeedFeature.geometry,
-                            properties: {
-                                'color': this.getColorStringFromSpeed(revSpeedLimit),
-                                'width': isBridge ? totalSegmentWidth * 0.1 : totalSegmentWidth * 0.2, // 0,8
-                                'dash': 'solid',
-                                'closeZoomOnly': 1,
-                                'zIndex': baselevel + 115,
-                            },
-                        };
-                        this.queueSegmentFeatureForDrawing(model.id, rightSpeedLimit);
-                    } else {
-                        // realsize is disabled, we cannot draw 2 separate lines.
-                        let speedValue = fwdSpeedLimit; // If the segment is two way, take any speed, they are equal.
-                        if (speedValue) {
-                            const speedLimit: SdkFeature<LineString> = {
-                                type: 'Feature',
-                                id: `${model.id}_sl_f`,
-                                geometry: model.geometry,
-                                properties: {
-                                    'color': this.getColorStringFromSpeed(speedValue),
-                                    'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
-                                    'dash': 'solid',
-                                    'closeZoomOnly': 1,
-                                    'zIndex': baselevel + 115,
-                                },
-                            };
-                            this.queueSegmentFeatureForDrawing(model.id, speedLimit);
-                        }
-                        speedValue = revSpeedLimit; // If the segment is two way, take any speed, they are equal.
-                        if (speedValue) {
-                            const speedLimit: SdkFeature<LineString> = {
-                                type: 'Feature',
-                                id: `${model.id}_sl_rv`,
-                                geometry: model.geometry,
-                                properties: {
-                                    'color': this.getColorStringFromSpeed(speedValue),
-                                    'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
-                                    'dash': 'dash',
-                                    'closeZoomOnly': 1,
-                                    'zIndex': baselevel + 116,
-                                },
-                            };
-                            this.queueSegmentFeatureForDrawing(model.id, speedLimit);
-                        }
-                    }
-                } else {
-                    // The segment is two way street with the same speed limit on both sides or one way street
-                    let speedValue = fwdSpeedLimit; // If the segment is two way, take any speed, they are equal.
-
-                    // If it is one way and the direction is the reverse one, take the other speed
-                    if (!isTwoWay && isBtoA) {
-                        speedValue = revSpeedLimit;
-                    }
-                    if (speedValue) {
-                        const speedLimit: SdkFeature<LineString> = {
-                            type: 'Feature',
-                            id: `${model.id}_sl`,
-                            geometry: model.geometry,
-                            properties: {
-                                'color': this.getColorStringFromSpeed(speedValue),
-                                'width': isBridge ? totalSegmentWidth * 0.8 : totalSegmentWidth,
-                                'dash': 'solid',
-                                'closeZoomOnly': 1,
-                                'zIndex': baselevel + 115,
-                            },
-                        };
-                        this.queueSegmentFeatureForDrawing(model.id, speedLimit);
-                    }
-                }
+                segmentFeatures.push(
+                    ...this.buildSpeedLimitFeatures(model, totalSegmentWidth, isBridge, baselevel)
+                );
             }
 
-            // Draw the road
-            const roadFeature: SdkFeature<LineString> = {
+            // Base road stroke
+            segmentFeatures.push({
                 type: 'Feature',
-                id: `${model.id}_rd`,
+                id: `${id}_rd`,
                 geometry: model.geometry,
                 properties: {
-                    'color': this.streetStyles[roadType]['strokeColor'],
+                    'color': this.streetStyles[roadType].strokeColor,
                     'width': roadWidth,
-                    'dash': this.streetStyles[roadType]['strokeDashstyle'],
+                    'dash': this.streetStyles[roadType].strokeDashstyle,
                     'zIndex': baselevel + 120,
                 },
-            };
-            this.queueSegmentFeatureForDrawing(model.id, roadFeature);
+            });
 
             if (elevationLevel && elevationLevel < 0) {
-                // Tunnel
-                const tunnel: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_tun`,
+                    id: `${id}_tun`,
                     geometry: model.geometry,
                     properties: {
                         'color': '#000000',
@@ -1124,19 +1269,17 @@ export default class RenderingController extends AbstractController {
                         'opacity': 0.3,
                         'zIndex': baselevel + 125,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, tunnel);
+                });
             }
 
-            const currentLock = lockRank + 1;
-            const userRank = this.cachedUserRank ?? (await this.mediator.wmeSDK.State.getUserInfo())?.rank;
+            const currentLock = (lockRank ?? 0) + 1;
             if (
                 currentLock > this.prefFakelock ||
-                (typeof userRank !== "undefined" && currentLock > (userRank + 1))
+                (typeof userRank === 'number' && currentLock > userRank + 1)
             ) {
-                const fakelock: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_lk`,
+                    id: `${id}_lk`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.nonEditableStyle.strokeColor,
@@ -1144,16 +1287,13 @@ export default class RenderingController extends AbstractController {
                         'dash': this.nonEditableStyle.strokeDashstyle,
                         'zIndex': baselevel + 147,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, fakelock);
+                });
             }
 
-            const flags = flagAttributes;
-
-            if (flags.unpaved) {
-                const unpaved: SdkFeature<LineString> = {
+            if (flagAttributes.unpaved) {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_unp`,
+                    id: `${id}_unp`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.prefDirtyStyle.strokeColor,
@@ -1162,17 +1302,13 @@ export default class RenderingController extends AbstractController {
                         'dash': this.prefDirtyStyle.strokeDashstyle,
                         'zIndex': baselevel + 135,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, unpaved);
+                });
             }
 
-            // Check segment properties
-
-            // CLOSE Zoom properties
             if (hasClosures) {
-                const closureLine: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_cl`,
+                    id: `${id}_cl`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.prefClosureStyle.strokeColor,
@@ -1182,36 +1318,34 @@ export default class RenderingController extends AbstractController {
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 140,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, closureLine);
+                });
             }
 
-            try {
-                if (await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: model.id })) {
-                    // It is a toll road
-                    // consoleDebug("Segment is toll");
-                    const tollLine: SdkFeature<LineString> = {
-                        type: 'Feature',
-                        id: `${model.id}_tl`,
-                        geometry: model.geometry,
-                        properties: {
-                            'color': this.prefTollStyle.strokeColor,
-                            'width': roadWidth * 0.3, // TODO preferences['toll']['strokeWidth'],
-                            'dash': this.prefTollStyle.strokeDashstyle,
-                            'opacity': this.prefTollStyle.strokeOpacity,
-                            'zIndex': baselevel + 145,
-                        },
-                    };
-                    this.queueSegmentFeatureForDrawing(model.id, tollLine);
+            if (model.isDrivable) {
+                try {
+                    if (await this.mediator.wmeSDK.DataModel.Segments.isTollSegment({ segmentId: id })) {
+                        segmentFeatures.push({
+                            type: 'Feature',
+                            id: `${id}_tl`,
+                            geometry: model.geometry,
+                            properties: {
+                                'color': this.prefTollStyle.strokeColor,
+                                'width': roadWidth * 0.3,
+                                'dash': this.prefTollStyle.strokeDashstyle,
+                                'opacity': this.prefTollStyle.strokeOpacity,
+                                'zIndex': baselevel + 145,
+                            },
+                        });
+                    }
+                } catch {
+                    // Ignore DataModelNotFoundError if segment disappeared mid-render
                 }
-            } catch (ignore) { }
+            }
 
             if (isInRoundabout) {
-                // It is a roundabout
-                // consoleDebug("Segment is a roundabout");
-                const roundaboutLine: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_ra`,
+                    id: `${id}_ra`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.roundaboutStyle.strokeColor,
@@ -1221,49 +1355,45 @@ export default class RenderingController extends AbstractController {
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 150,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, roundaboutLine);
+                });
             }
 
             if (hasRestrictions) {
-                // It has restrictions
-                // consoleDebug("Segment has restrictions");
-                const restrictionLine: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_res`,
+                    id: `${id}_res`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.prefRestrictionStyle.strokeColor,
-                        'width': roadWidth * 0.4, // this.mediator.getPreference('restriction.strokeWidth'),
+                        'width': roadWidth * 0.4,
                         'dash': this.prefRestrictionStyle.strokeDashstyle,
                         'opacity': this.prefRestrictionStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 155,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, restrictionLine);
+                });
             }
 
-            if (flags.headlights) {
-                const headlights: SdkFeature<LineString> = {
+            if (flagAttributes.headlights) {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_hl`,
+                    id: `${id}_hl`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.prefHeadlightsStyle.strokeColor,
-                        'width': roadWidth * 0.2, // this.mediator.getPreference('headlights.strokeWidth'),
+                        'width': roadWidth * 0.2,
                         'dash': this.prefHeadlightsStyle.strokeDashstyle,
                         'opacity': this.prefHeadlightsStyle.strokeOpacity,
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 165,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, headlights);
+                });
             }
-            if (flags.nearbyHOV) {
-                const nearbyHOVLine: SdkFeature<LineString> = {
+
+            if (flagAttributes.nearbyHOV) {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_hov`,
+                    id: `${id}_hov`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.prefNearbyHOVStyle.strokeColor,
@@ -1273,143 +1403,82 @@ export default class RenderingController extends AbstractController {
                         'closeZoomOnly': 1,
                         'zIndex': baselevel + 166,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, nearbyHOVLine);
+                });
             }
 
-            if (toNodeLanesCount > 0) {
-                // console.log("LANE fwd");
-                const res = [
-                    geometryPointArray[0],
-                    this.getCentroid(geometryPointArray[0], geometryPointArray[1]),
-                ];
-
-                const letToNodeLanes: SdkFeature<LineString> = {
-                    type: 'Feature',
-                    id: `${model.id}_ln_to`,
-                    geometry: { type: 'LineString', coordinates: res },
-                    properties: {
-                        'color': this.prefLanesStyle.strokeColor,
-                        'width': roadWidth * 0.3,
-                        'dash': this.prefLanesStyle.strokeDashstyle,
-                        'opacity': this.prefLanesStyle.strokeOpacity,
-                        'closeZoomOnly': 1,
-                        'zIndex': baselevel + 170,
-                    },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, letToNodeLanes);
-            }
-            if (fromNodeLanesCount > 0) {
-                // was: revLaneCount
-                // console.log("LANE rev");
+            // In WME SDK, `fromNodeLanesCount` is traffic originating from `fromNode` (A -> B, approaching `coordinates[len - 1]`),
+            // while `toNodeLanesCount` is traffic originating from `toNode` (B -> A, approaching `coordinates[0]`).
+            if (geometryPointArray.length >= 2) {
                 const len = geometryPointArray.length;
-                const res = [
-                    this.getCentroid(geometryPointArray[len - 2], geometryPointArray[len - 1]),
-                    geometryPointArray[len - 1],
-                ];
+                if (toNodeLanesCount > 0) {
+                    const res = [
+                        geometryPointArray[0],
+                        this.getCentroid(geometryPointArray[0], geometryPointArray[1]),
+                    ];
+                    segmentFeatures.push({
+                        type: 'Feature',
+                        id: `${id}_ln_to`,
+                        geometry: { type: 'LineString', coordinates: res },
+                        properties: {
+                            'color': this.prefLanesStyle.strokeColor,
+                            'width': roadWidth * 0.3,
+                            'dash': this.prefLanesStyle.strokeDashstyle,
+                            'opacity': this.prefLanesStyle.strokeOpacity,
+                            'closeZoomOnly': 1,
+                            'zIndex': baselevel + 170,
+                        },
+                    });
+                }
 
-                const fromNodeLanes: SdkFeature<LineString> = {
-                    type: 'Feature',
-                    id: `${model.id}_ln_fr`,
-                    geometry: { type: 'LineString', coordinates: res },
-                    properties: {
-                        'color': this.prefLanesStyle.strokeColor,
-                        'width': roadWidth * 0.3,
-                        'dash': this.prefLanesStyle.strokeDashstyle,
-                        'opacity': this.prefLanesStyle.strokeOpacity,
-                        'closeZoomOnly': 1,
-                        'zIndex': baselevel + 175,
-                    },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, fromNodeLanes);
-            }
+                if (fromNodeLanesCount > 0) {
+                    const res = [
+                        this.getCentroid(geometryPointArray[len - 2], geometryPointArray[len - 1]),
+                        geometryPointArray[len - 1],
+                    ];
+                    segmentFeatures.push({
+                        type: 'Feature',
+                        id: `${id}_ln_fr`,
+                        geometry: { type: 'LineString', coordinates: res },
+                        properties: {
+                            'color': this.prefLanesStyle.strokeColor,
+                            'width': roadWidth * 0.3,
+                            'dash': this.prefLanesStyle.strokeDashstyle,
+                            'opacity': this.prefLanesStyle.strokeOpacity,
+                            'closeZoomOnly': 1,
+                            'zIndex': baselevel + 175,
+                        },
+                    });
+                }
 
-            if (
-                !isTwoWay
-            ) {
-                const arrowSamples = this.sampleArrowPointsAlongSegment(
-                    model.geometry.coordinates,
-                    isInRoundabout,
-                    labels
-                );
+                if (flagAttributes.fwdSpeedCamera && (isAtoB || isTwoWay)) {
+                    iconFeatures.push(
+                        this.createAverageSpeedCameraSDK({
+                            id,
+                            rev: false,
+                            p0: geometryPointArray[0],
+                            p1: geometryPointArray[1],
+                        })
+                    );
+                }
 
-                if (
-                    (isAtoB || isBtoA) === false &&
-                    model.isDrivable
-                ) {
-                    // Unknown direction
-                    for (let i = 0; i < arrowSamples.length; i++) {
-                        const sample = arrowSamples[i];
-                        const unknownDir: SdkFeature<Point> = {
-                            type: 'Feature',
-                            id: `${model.id}_a_${i}`,
-                            geometry: {
-                                type: 'Point',
-                                coordinates: sample.coordinates,
-                            },
-                            properties: {
-                                'closeZoomOnly': 1,
-                                'isUnknownDirection': 1,
-                                'minZoom': sample.minZoom,
-                                'zIndex': baselevel + 180,
-                            },
-                        };
-                        this.queueArrowFeatureForDrawing(model.id, unknownDir);
-                    }
-                } else {
-                    // It is one way, draw normal arrows
-                    for (let i = 0; i < arrowSamples.length; i++) {
-                        const sample = arrowSamples[i];
-                        const degrees = this.getAngleDegreesSDK(
-                            isAtoB,
-                            sample.p0,
-                            sample.p1
-                        );
-
-                        const arrow: SdkFeature<Point> = {
-                            type: 'Feature',
-                            id: `${model.id}_a_${i}`,
-                            geometry: {
-                                type: 'Point',
-                                coordinates: sample.coordinates,
-                            },
-                            properties: {
-                                'degrees': degrees,
-                                'minZoom': sample.minZoom,
-                                'zIndex': baselevel + 180,
-                            },
-                        };
-                        this.queueArrowFeatureForDrawing(model.id, arrow);
-                    }
+                if (flagAttributes.revSpeedCamera && (isBtoA || isTwoWay)) {
+                    iconFeatures.push(
+                        this.createAverageSpeedCameraSDK({
+                            id,
+                            rev: true,
+                            p0: geometryPointArray[len - 1],
+                            p1: geometryPointArray[len - 2],
+                        })
+                    );
                 }
             }
 
-            if (flags.fwdSpeedCamera && (isAtoB || isTwoWay)) {
-                const avg = this.createAverageSpeedCameraSDK({
-                    id: model.id,
-                    rev: false,
-                    p0: model.geometry.coordinates[0],
-                    p1: model.geometry.coordinates[1],
-                });
-                this.queueIconFeatureForDrawing(model.id, avg);
-            }
+            arrowFeatures = this.buildArrowFeatures(model, isInRoundabout, baselevel, labelFeatures);
 
-            if (flags.revSpeedCamera && (isBtoA || isTwoWay)) {
-                const avg = this.createAverageSpeedCameraSDK({
-                    id: model.id,
-                    rev: true,
-                    p0: model.geometry.coordinates[model.geometry.coordinates.length - 1],
-                    p1: model.geometry.coordinates[model.geometry.coordinates.length - 2],
-                });
-                this.queueIconFeatureForDrawing(model.id, avg);
-            }
-            // 'End': Close Zoom
-
-            // In any 'Zoom':
-            if (flags.tunnel) {
-                const tunnelFlag: SdkFeature<LineString> = {
+            if (flagAttributes.tunnel) {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_tf1`,
+                    id: `${id}_tf1`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle1.strokeColor,
@@ -1418,12 +1487,11 @@ export default class RenderingController extends AbstractController {
                         'dash': this.tunnelFlagStyle1.strokeDashstyle,
                         'zIndex': baselevel + 177,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, tunnelFlag);
+                });
 
-                const tunnelFlag2: SdkFeature<LineString> = {
+                segmentFeatures.push({
                     type: 'Feature',
-                    id: `${model.id}_tf2`,
+                    id: `${id}_tf2`,
                     geometry: model.geometry,
                     properties: {
                         'color': this.tunnelFlagStyle2.strokeColor,
@@ -1431,10 +1499,18 @@ export default class RenderingController extends AbstractController {
                         'dash': this.tunnelFlagStyle2.strokeDashstyle,
                         'zIndex': baselevel + 177,
                     },
-                };
-                this.queueSegmentFeatureForDrawing(model.id, tunnelFlag2);
-            } // 'else': road type is not supported, just add the label
+                });
+            }
         }
+
+        return {
+            segmentId: id,
+            hasClosures: Boolean(hasClosures),
+            segments: segmentFeatures,
+            arrows: arrowFeatures,
+            icons: iconFeatures,
+            labels: labelFeatures,
+        };
     }
 
     private drawLabels(
@@ -1456,7 +1532,7 @@ export default class RenderingController extends AbstractController {
             streetPart = '⚑';
         }
 
-        // add alt street names
+        // Add alternative street names
         let altStreetPart = '';
         if (this.prefShowANs > 0 && sdkSegment.alternateStreetIds?.length > 0) {
             let ANsShown = 0;
@@ -1498,15 +1574,6 @@ export default class RenderingController extends AbstractController {
                 }
             } else if (revMaxSpeed) {
                 speedPart = this.getSuperScript(revMaxSpeed);
-                if (fwdMaxSpeed) {
-                    speedPart += `'${this.getSuperScript(fwdMaxSpeed)}`;
-                }
-            }
-            if (
-                !sdkSegment.isFwdSpeedLimitVerified ||
-                !sdkSegment.isRevSpeedLimitVerified
-            ) {
-                speedPart += '?';
             }
         }
         const labelText = `${streetPart} ${speedPart}`;
@@ -1520,8 +1587,8 @@ export default class RenderingController extends AbstractController {
         }
 
         const roadTypeStyle = this.streetStyles[roadType];
-        const color = roadTypeStyle ? roadTypeStyle['strokeColor'] : '#f00';
-        const outlinecolor = roadTypeStyle ? roadTypeStyle['outlineColor'] : '#fff';
+        const color = roadTypeStyle ? roadTypeStyle.strokeColor : '#f00';
+        const outlinecolor = roadTypeStyle ? roadTypeStyle.outlineColor : '#fff';
 
         const distances: { index: number, distance: number }[] = [];
         for (let p = 0; p < simplified.length - 1; p += 1) {
@@ -1530,7 +1597,7 @@ export default class RenderingController extends AbstractController {
             const distance = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
             distances.push({ index: p, distance });
         }
-        // sort them by distance, descending
+        // Sort segments by length, descending
         distances.sort((a, b) =>
             a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
         );
@@ -1556,10 +1623,9 @@ export default class RenderingController extends AbstractController {
             let degrees = 90 + (angle * 180) / Math.PI;
             let directionArrow: string;
             if (streetPart !== '') {
-                directionArrow = ' ▶ '; // for debugging, ▷ is an alternative.
+                directionArrow = ' ▶ ';
                 if (degrees > 90 && degrees < 270) {
                     degrees -= 180;
-                    // directionArrow = " ▶ ";
                 } else {
                     directionArrow = ' ◀ ';
                 }
@@ -1567,7 +1633,7 @@ export default class RenderingController extends AbstractController {
                 directionArrow = '';
             }
             if (!isOneWay) {
-                directionArrow = ''; // The degree has to be computed anyway
+                directionArrow = ''; // The degree still has to be computed so text stays upright
             }
 
             labels.push({
@@ -1604,10 +1670,9 @@ export default class RenderingController extends AbstractController {
         const numberString = (this.isImperial ? Math.round(number / 1.609344) : number).toString();
         let res = '';
         for (let i = 0; i < numberString.length; i += 1) {
-            res += this.superScript[Number(numberString.charAt(i))];
+            res += this.superScript[Number(numberString.charAt(i))] ?? '';
         }
         this.superScriptCache.set(number, res);
         return res;
     }
-
 }

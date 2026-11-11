@@ -1,10 +1,12 @@
+import { AcceptedControllerEvents } from "../svlGlobals";
+
 export enum AlertType {
     INFO = 'info',
     ERROR = 'error',
     SUCCESS = 'success',
     WARNING = 'warning',
     DEBUG = 'debug',
-};
+}
 
 // These events are fired by the mediator!
 export enum SVLEvents {
@@ -21,19 +23,23 @@ export enum SVLEvents {
 }
 
 export default abstract class AbstractMediator {
-    private subscribers: Map<string, ((data?: any) => void)[]> = new Map();
+    private subscribers: Map<SVLEvents, Array<(data?: any) => void>> = new Map();
 
-    public abstract notify(sender: any, event: any): void;
+    public abstract notify(sender: unknown, event: AcceptedControllerEvents, data?: unknown): void;
 
     public abstract alert(type: AlertType, message: string): void;
 
-    public abstract _(key: string, ...args: any[]): string;
+    public abstract _(key: string, ...args: unknown[]): string;
 
     public subscribe(event: SVLEvents, callback: (data?: any) => void): void {
-        if (!this.subscribers.has(event)) {
-            this.subscribers.set(event, []);
+        let eventSubscribers = this.subscribers.get(event);
+        if (!eventSubscribers) {
+            eventSubscribers = [];
+            this.subscribers.set(event, eventSubscribers);
         }
-        this.subscribers.get(event)!.push(callback);
+        if (!eventSubscribers.includes(callback)) {
+            eventSubscribers.push(callback);
+        }
     }
 
     public unsubscribe(event: SVLEvents, callback: (data?: any) => void): void {
@@ -48,8 +54,10 @@ export default abstract class AbstractMediator {
 
     protected emit(event: SVLEvents, data?: any): void {
         const eventSubscribers = this.subscribers.get(event);
-        if (eventSubscribers) {
-            eventSubscribers.forEach(callback => callback(data));
+        if (eventSubscribers && eventSubscribers.length > 0) {
+            for (const callback of [...eventSubscribers]) {
+                callback(data);
+            }
         }
     }
 }

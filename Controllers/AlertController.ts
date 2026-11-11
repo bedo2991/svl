@@ -4,42 +4,44 @@ import 'toastr/build/toastr.css';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import Utils from '../Utils';
 
-// Custom styles for WME environment
-const style = document.createElement('style');
-style.innerHTML = `
-    .toast-top-center-wide {
-        top: 100px;
-        left: 50%;
-        margin-left: -500px;
-    }
-    #toast-container > div {
-        width: 1000px;
-        opacity: 0.95;
-    }
-`;
-document.head.appendChild(style);
-
-toastr.options = {
-    target: 'body', // WME map might cover body, but usually toasts are z-indexed high. WazeWrap used #map.
-    // target: '#map', // If we use #map, we need to ensure it exists when we init, or lazy load?
-    // Using body is safer for initial load.
-    timeOut: 6000,
-    positionClass: 'toast-top-center', // Standard center top
-    closeOnHover: false,
-    closeDuration: 0,
-    showDuration: 0,
-    closeButton: true,
-    progressBar: true,
-    escapeHtml: true
-};
-
 /**
  * Controller for handling alerts and notifications.
  * Decoupled from WazeWrap, using toastr and sweetalert2.
  */
 export default class AlertController {
+    private static stylesInjected = false;
+
+    private static ensureStylesInjected(): void {
+        if (AlertController.stylesInjected) {
+            return;
+        }
+        AlertController.stylesInjected = true;
+
+        const style = document.createElement('style');
+        style.id = 'svl-alert-styles';
+        style.textContent = `
+            #toast-container > div {
+                width: min(650px, 90vw);
+                opacity: 0.95;
+            }
+        `;
+        document.head?.appendChild(style);
+
+        toastr.options = {
+            target: 'body',
+            timeOut: 6000,
+            positionClass: 'toast-top-center',
+            closeOnHover: false,
+            closeDuration: 0,
+            showDuration: 0,
+            closeButton: true,
+            progressBar: true,
+            escapeHtml: true
+        };
+    }
+
     public constructor() {
-        // Initialize if anything needed
+        AlertController.ensureStylesInjected();
     }
 
     public info(title: string, message: string, timeOut?: number): void {
