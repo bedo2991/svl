@@ -16,6 +16,7 @@ export const enum SVLLayerState {
 // These events are accepted by the mediator from controllers. Then the mediator decides what to do (probably, firing a SVLEvent)
 export const enum AcceptedControllerEvents {
     PREFERENCES_EXPORT_REQUEST = 'PREFERENCES_EXPORT_REQUEST',
+    PREFERENCES_DOWNLOAD_REQUEST = 'PREFERENCES_DOWNLOAD_REQUEST',
     PREFERENCES_IMPORT_REQUEST = 'PREFERENCES_IMPORT_REQUEST',
     PREFERENCES_SAVE_REQUEST = 'PREFERENCES_SAVE_REQUEST',
     PREFERENCES_RESET_REQUEST = 'PREFERENCES_RESET_REQUEST',

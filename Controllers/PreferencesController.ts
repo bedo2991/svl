@@ -291,14 +291,51 @@ export default class PreferencesController extends AbstractController {
     }
 
     public exportPreferences(): void {
-        GM_setClipboard(JSON.stringify(this.preferences));
+        GM_setClipboard(JSON.stringify(this.preferences, null, 2));
         this.mediator.alert(AlertType.INFO, this.mediator._('export_preferences_message'));
+    }
+
+    public downloadPreferencesFile(): void {
+        try {
+            const json = JSON.stringify(this.preferences, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `svl-preferences-v${this.mediator.SVL_VERSION}.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_downloaded'));
+        } catch (e) {
+            console.error(e);
+            this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_saving_error'));
+        }
+    }
+
+    public importPreferencesFromJson(input: string): boolean {
+        try {
+            const importedPreferences = JSON.parse(input);
+            if (!importedPreferences || typeof importedPreferences !== 'object' || Array.isArray(importedPreferences)) {
+                throw new Error('Invalid preferences object');
+            }
+            this.loadPreferences(false, importedPreferences);
+            this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
+            this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
+            this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+            return true;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
     }
 
     public rollbackPreferences(): void {
         this.loadPreferences(false);
         this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
         this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
+        this.mediator.alert(AlertType.INFO, this.mediator._('preferences_rollback'));
     }
 
     public resetPreferences(): void {
@@ -317,17 +354,7 @@ export default class PreferencesController extends AbstractController {
             )}`,
             '',
             (_: unknown, input: string) => {
-                try {
-                    const importedPreferences = JSON.parse(input);
-                    if (!importedPreferences || typeof importedPreferences !== 'object' || Array.isArray(importedPreferences)) {
-                        throw new Error('Invalid preferences object');
-                    }
-                    this.loadPreferences(false, importedPreferences);
-                    this.mediator.alert(AlertType.SUCCESS, this.mediator._('preferences_imported'));
-                    this.mediator.notify(this, AcceptedControllerEvents.PREFERENCES_UI_REQUIRE_REFRESH);
-                    this.mediator.notify(this, AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES);
-                } catch (e) {
-                    console.error(e);
+                if (!this.importPreferencesFromJson(input)) {
                     this.mediator.alert(AlertType.ERROR, this.mediator._('preferences_importing_error'));
                 }
             }

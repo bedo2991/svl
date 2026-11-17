@@ -314,6 +314,9 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.PREFERENCES_EXPORT_REQUEST:
                 this.preferencesController.exportPreferences();
                 return;
+            case AcceptedControllerEvents.PREFERENCES_DOWNLOAD_REQUEST:
+                this.preferencesController.downloadPreferencesFile();
+                return;
             case AcceptedControllerEvents.USER_UPDATED_SVL_PREFERENCES:
             case AcceptedControllerEvents.PREFERENCES_UPDATED_REQUIRES_REDRAW:
                 this.updateRefreshStatus();
@@ -388,6 +391,13 @@ export default class SVLMediator extends AbstractMediator {
             throw new Error("PreferencesController is not initialized yet.");
         }
         this.preferencesController.setPreference(key, value);
+    }
+
+    public importPreferencesFromJson(rawJson: string): boolean {
+        if (!this.preferencesController) {
+            throw new Error("PreferencesController is not initialized yet.");
+        }
+        return this.preferencesController.importPreferencesFromJson(rawJson);
     }
 
     public _(key: string, ...args: unknown[]): string {
