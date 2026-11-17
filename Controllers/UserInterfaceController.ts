@@ -54,6 +54,7 @@ export default class UserInterfaceController extends AbstractController {
                 'Street Vector Layer',
                 this.mediator.SVL_VERSION,
                 `<b>${this.mediator._('whats_new')}</b>
+                <br>- 8.3.0 - New: Option to display more labels, even between different segments.
                 <br>- 8.1.1 - Support displaying more than 2 alternative street names (this value can be set in the settings).
                 <br>- 8.0.0 - Improved arrows placement, virtual nodes, and overall visual quality. Various bug fixes and performance improvements.
                 <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
@@ -623,6 +624,15 @@ export default class UserInterfaceController extends AbstractController {
             })
         );
 
+        renderingParameters.appendChild(
+            this.createCheckboxOption({
+                id: 'mergeConnectedLabels',
+                title: this.mediator._('merge_connected_labels'),
+                description: this.mediator._('merge_connected_labels_descr'),
+                isNew: '8.3.0',
+            })
+        );
+
         const closeZoomTitle = document.createElement('h5');
         closeZoomTitle.innerText = this.mediator._('close_zoom_only');
 
@@ -1100,6 +1110,7 @@ export default class UserInterfaceController extends AbstractController {
 
         this.setCheckboxChecked('svl_disableRoadLayers', this.mediator.getPreference('disableRoadLayers'));
         this.setCheckboxChecked('svl_startDisabled', this.mediator.getPreference('startDisabled'));
+        this.setCheckboxChecked('svl_mergeConnectedLabels', this.mediator.getPreference('mergeConnectedLabels') ?? DEFAULT_PREFERENCES.mergeConnectedLabels);
         this.setCheckboxChecked('svl_showUnderGPSPoints', this.mediator.getPreference('showUnderGPSPoints'));
         this.setCheckboxChecked('svl_routingModeEnabled', this.mediator.getPreference('routingModeEnabled'));
         this.setCheckboxChecked('svl_hideRoutingModeBlock', this.mediator.getPreference('hideRoutingModeBlock'));

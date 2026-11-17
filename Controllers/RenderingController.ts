@@ -14,7 +14,7 @@ import {
     StreetStylePreference,
 } from "../svlGlobals";
 import { lineOffset } from "@turf/line-offset";
-import Utils from "../Utils";
+import Utils, { MercatorPoint } from "../Utils";
 
 type MeterObject = Record<string, number>;
 
@@ -32,6 +32,43 @@ type SegmentRenderResult = {
     arrows: SdkFeature<Point>[];
     icons: SdkFeature<Point>[];
     labels: SdkFeature<Point>[];
+};
+
+type SegmentLabelDescriptor = {
+    segment: Segment;
+    roadType: number;
+    streetPart: string;
+    altStreetPart: string;
+    labelText: string;
+    hasDirectionArrow: boolean;
+    groupKey: string;
+};
+
+type ChainEdge = {
+    segment: Segment;
+    roadType: number;
+    startNodeKey: string;
+    endNodeKey: string;
+    mercatorPoints: MercatorPoint[];
+    lengthMeters: number;
+    startTangent: MercatorPoint;
+    endTangent: MercatorPoint;
+};
+
+type OrientedChainItem = {
+    edgeIdx: number;
+    reversed: boolean;
+};
+
+type PlacedLabelBox = {
+    x: number;
+    y: number;
+    ux: number;
+    uy: number;
+    halfLen: number;
+    halfHeight: number;
+    groupKey: string;
+    lastQueryId: number;
 };
 
 export default class RenderingController extends AbstractController {
@@ -53,6 +90,8 @@ export default class RenderingController extends AbstractController {
     private labelsStore = new Map<Segment['id'], Set<string>>();
     private nodesStore = new Set<Node['id']>();
     private closedSegmentIds = new Set<Segment['id']>();
+    private labelChainPeers = new Map<Segment['id'], number[]>();
+    private placedLabelBoxesBySegment = new Map<Segment['id'], PlacedLabelBox[]>();
 
     private readonly segmentLayerStores: ReadonlyArray<{
         queue: Set<SdkFeature<any>>;
@@ -76,6 +115,7 @@ export default class RenderingController extends AbstractController {
     private streetStyles: StreetStyle[] = [];
 
     private clutterConstant: number = DEFAULT_PREFERENCES.clutterConstant;
+    private prefMergeConnectedLabels: boolean = DEFAULT_PREFERENCES.mergeConnectedLabels;
     private prefRealSize: boolean = DEFAULT_PREFERENCES.realsize;
     private prefShowSLColor: boolean = DEFAULT_PREFERENCES.showSLcolor;
     private prefShowSLSingleColor: boolean = DEFAULT_PREFERENCES.showSLSinglecolor;
@@ -84,6 +124,7 @@ export default class RenderingController extends AbstractController {
     private prefShowANs: number = DEFAULT_PREFERENCES.showANs;
     private prefFakelock: number = DEFAULT_PREFERENCES.fakelock;
     private prefLabelOutlineWidth: number = DEFAULT_PREFERENCES.labelOutlineWidth;
+    private prefCloseZoomLabelSize: number = DEFAULT_PREFERENCES.closeZoomLabelSize;
     private prefArrowDeclutter: number = DEFAULT_PREFERENCES.arrowDeclutter;
     private prefSegmentsThreshold: number = DEFAULT_PREFERENCES.segmentsThreshold;
     private prefNodesThreshold: number = DEFAULT_PREFERENCES.nodesThreshold;
@@ -216,6 +257,7 @@ export default class RenderingController extends AbstractController {
     private handleSVLSettingsUpdated(shouldRedraw: boolean = true): void {
         this.speedColorCache.clear();
         this.clutterConstant = Number(this.mediator.getPreference('clutterConstant') ?? DEFAULT_PREFERENCES.clutterConstant);
+        this.prefMergeConnectedLabels = Boolean(this.mediator.getPreference('mergeConnectedLabels') ?? DEFAULT_PREFERENCES.mergeConnectedLabels);
         this.prefRealSize = Boolean(this.mediator.getPreference('realsize') ?? DEFAULT_PREFERENCES.realsize);
         this.prefShowSLColor = Boolean(this.mediator.getPreference('showSLcolor') ?? DEFAULT_PREFERENCES.showSLcolor);
         this.prefShowSLSingleColor = Boolean(this.mediator.getPreference('showSLSinglecolor') ?? DEFAULT_PREFERENCES.showSLSinglecolor);
@@ -224,6 +266,7 @@ export default class RenderingController extends AbstractController {
         this.prefShowANs = Number(this.mediator.getPreference('showANs') ?? DEFAULT_PREFERENCES.showANs) || 0;
         this.prefFakelock = Number(this.mediator.getPreference('fakelock') ?? DEFAULT_PREFERENCES.fakelock);
         this.prefLabelOutlineWidth = Number(this.mediator.getPreference('labelOutlineWidth') ?? DEFAULT_PREFERENCES.labelOutlineWidth);
+        this.prefCloseZoomLabelSize = Number(this.mediator.getPreference('closeZoomLabelSize') ?? DEFAULT_PREFERENCES.closeZoomLabelSize);
         this.prefArrowDeclutter = Number(this.mediator.getPreference('arrowDeclutter')) || DEFAULT_PREFERENCES.arrowDeclutter;
         this.prefSegmentsThreshold = Number(this.mediator.getPreference('segmentsThreshold') ?? DEFAULT_PREFERENCES.segmentsThreshold);
         this.prefNodesThreshold = Number(this.mediator.getPreference('nodesThreshold') ?? DEFAULT_PREFERENCES.nodesThreshold);
@@ -399,9 +442,19 @@ export default class RenderingController extends AbstractController {
         const metersPerDegLon = 111412.84 * cosLat;
 
         const cumDist: number[] = [0];
+        let minLon = coords[0][0];
+        let maxLon = coords[0][0];
+        let minLat = coords[0][1];
+        let maxLat = coords[0][1];
         for (let i = 0; i < coords.length - 1; i++) {
-            const dx = (coords[i + 1][0] - coords[i][0]) * metersPerDegLon;
-            const dy = (coords[i + 1][1] - coords[i][1]) * metersPerDegLat;
+            const nextLon = coords[i + 1][0];
+            const nextLat = coords[i + 1][1];
+            if (nextLon < minLon) minLon = nextLon;
+            if (nextLon > maxLon) maxLon = nextLon;
+            if (nextLat < minLat) minLat = nextLat;
+            if (nextLat > maxLat) maxLat = nextLat;
+            const dx = (nextLon - coords[i][0]) * metersPerDegLon;
+            const dy = (nextLat - coords[i][1]) * metersPerDegLat;
             cumDist.push(cumDist[i] + Math.hypot(dx, dy));
         }
 
@@ -432,7 +485,16 @@ export default class RenderingController extends AbstractController {
                         totalLength * 0.15,
                         Math.max(4, Math.min(20, maxLineChars * 1.1))
                     );
-                    labelZones.push({ lon, lat, radiusMeters });
+                    const padLon = metersPerDegLon > 0 ? radiusMeters / metersPerDegLon : 0.001;
+                    const padLat = radiusMeters / metersPerDegLat;
+                    if (
+                        lon >= minLon - padLon &&
+                        lon <= maxLon + padLon &&
+                        lat >= minLat - padLat &&
+                        lat <= maxLat + padLat
+                    ) {
+                        labelZones.push({ lon, lat, radiusMeters });
+                    }
                 }
             }
         }
@@ -616,15 +678,55 @@ export default class RenderingController extends AbstractController {
             streetsMap.set(streets[i].id, streets[i]);
         }
 
-        const results = await Promise.all(
-            segments.map(s => this.buildSegmentRenderResult(s, streetsMap, this.cachedUserRank))
+        await this.renderSegmentBatch(segments, streetsMap, this.cachedUserRank, generation);
+    }
+
+    private async renderSegmentBatch(
+        segments: Segment[],
+        streetsMap: Map<number, Street>,
+        userRank: number | undefined,
+        generation: number,
+        allContextSegments?: Segment[]
+    ): Promise<void> {
+        if (segments.length === 0 || generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+            return;
+        }
+
+        const deletedFlags = await Promise.all(
+            segments.map(s => !s ? Promise.resolve(true) : this.isObjectDeletedSafe("segments", s.id))
         );
         if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
             return;
         }
 
-        const validResults = results.filter((r): r is SegmentRenderResult => r !== null);
-        if (validResults.length === 0) {
+        const validSegments: Segment[] = [];
+        for (let i = 0; i < segments.length; i++) {
+            if (!deletedFlags[i]) {
+                validSegments.push(segments[i]);
+            }
+        }
+        if (validSegments.length === 0) {
+            return;
+        }
+
+        const {
+            ownedLabelsBySegment,
+            chainLabelsBySegment,
+            placedBoxesBySegment,
+            chainPeersBySegment,
+        } = this.drawLabels(validSegments, streetsMap, allContextSegments ?? validSegments);
+
+        const validResults = await Promise.all(
+            validSegments.map(s =>
+                this.buildSegmentRenderResult(
+                    s,
+                    userRank,
+                    ownedLabelsBySegment.get(s.id) ?? [],
+                    chainLabelsBySegment.get(s.id) ?? []
+                )
+            )
+        );
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
             return;
         }
 
@@ -653,15 +755,28 @@ export default class RenderingController extends AbstractController {
         this.clearAllSegmentQueues();
         for (let i = 0; i < validResults.length; i++) {
             const res = validResults[i];
+            const segId = res.segmentId;
             if (res.hasClosures) {
-                this.closedSegmentIds.add(res.segmentId);
+                this.closedSegmentIds.add(segId);
             } else {
-                this.closedSegmentIds.delete(res.segmentId);
+                this.closedSegmentIds.delete(segId);
             }
-            this.registerRenderedFeaturesForSegment(res.segmentId, res.segments, this.queuedSegments, this.segmentsStore);
-            this.registerRenderedFeaturesForSegment(res.segmentId, res.arrows, this.queuedArrows, this.arrowsStore);
-            this.registerRenderedFeaturesForSegment(res.segmentId, res.icons, this.queuedIcons, this.iconsStore);
-            this.registerRenderedFeaturesForSegment(res.segmentId, res.labels, this.queuedLabels, this.labelsStore);
+            const peers = chainPeersBySegment.get(segId);
+            if (peers) {
+                this.labelChainPeers.set(segId, peers);
+            } else {
+                this.labelChainPeers.delete(segId);
+            }
+            const boxes = placedBoxesBySegment.get(segId);
+            if (boxes && boxes.length > 0) {
+                this.placedLabelBoxesBySegment.set(segId, boxes);
+            } else {
+                this.placedLabelBoxesBySegment.delete(segId);
+            }
+            this.registerRenderedFeaturesForSegment(segId, res.segments, this.queuedSegments, this.segmentsStore);
+            this.registerRenderedFeaturesForSegment(segId, res.arrows, this.queuedArrows, this.arrowsStore);
+            this.registerRenderedFeaturesForSegment(segId, res.icons, this.queuedIcons, this.iconsStore);
+            this.registerRenderedFeaturesForSegment(segId, res.labels, this.queuedLabels, this.labelsStore);
         }
 
         await this.drawAllQueues();
@@ -755,6 +870,8 @@ export default class RenderingController extends AbstractController {
             store.clear();
         }
         this.closedSegmentIds.clear();
+        this.labelChainPeers.clear();
+        this.placedLabelBoxesBySegment.clear();
 
         await Promise.all(
             this.segmentLayerStores.map(({ layerName }) =>
@@ -770,6 +887,163 @@ export default class RenderingController extends AbstractController {
         });
     }
 
+    private collectTrackedLabelPeers(segmentIds: Iterable<number>): number[] {
+        const exclude = new Set<number>(segmentIds);
+        const peers = new Set<number>();
+        for (const id of exclude) {
+            const chainIds = this.labelChainPeers.get(id);
+            if (!chainIds) continue;
+            for (let i = 0; i < chainIds.length; i++) {
+                const peerId = chainIds[i];
+                if (!exclude.has(peerId) && this.segmentsStore.has(peerId)) {
+                    peers.add(peerId);
+                }
+            }
+        }
+        return Array.from(peers);
+    }
+
+    private async renderSegmentsWithConnectedPeers(seedSegmentIds: number[]): Promise<void> {
+        if (this.redrawTimeout !== null || seedSegmentIds.length === 0 || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+            return;
+        }
+        if (seedSegmentIds.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${seedSegmentIds.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
+            return;
+        }
+
+        const generation = this.drawGeneration;
+        const [allSegments, userInfo, streets] = await Promise.all([
+            this.mediator.wmeSDK.DataModel.Segments.getAll(),
+            this.mediator.wmeSDK.State.getUserInfo(),
+            this.mediator.wmeSDK.DataModel.Streets.getAll(),
+        ]);
+        if (generation !== this.drawGeneration || this.mediator.getState() !== SVLLayerState.VISIBLE) {
+            return;
+        }
+
+        this.cachedUserRank = userInfo?.rank;
+        const streetsMap = new Map<number, Street>();
+        for (let i = 0; i < streets.length; i++) {
+            streetsMap.set(streets[i].id, streets[i]);
+        }
+
+        const expandedSegments = this.expandConnectedLabelPeers(seedSegmentIds, allSegments, streetsMap);
+        if (expandedSegments.length === 0) {
+            return;
+        }
+        if (expandedSegments.length > this.prefSegmentsThreshold) {
+            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${expandedSegments.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
+            this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
+            return;
+        }
+
+        await this.renderSegmentBatch(expandedSegments, streetsMap, this.cachedUserRank, generation, allSegments);
+    }
+
+    private expandConnectedLabelPeers(
+        seedSegmentIds: number[],
+        allSegments: Segment[],
+        streetsMap: Map<number, Street>
+    ): Segment[] {
+        const seedSet = new Set<number>(seedSegmentIds);
+        if (!this.prefMergeConnectedLabels) {
+            const direct: Segment[] = [];
+            for (let i = 0; i < allSegments.length; i++) {
+                if (seedSet.has(allSegments[i].id)) {
+                    direct.push(allSegments[i]);
+                }
+            }
+            return direct;
+        }
+        const byId = new Map<number, Segment>();
+        const targetGroupKeys = new Set<string>();
+        const descriptors: SegmentLabelDescriptor[] = [];
+
+        for (let i = 0; i < allSegments.length; i++) {
+            const seg = allSegments[i];
+            const isSeed = seedSet.has(seg.id);
+            if (!isSeed && !this.segmentsStore.has(seg.id)) {
+                continue;
+            }
+            byId.set(seg.id, seg);
+            const desc = this.computeSegmentLabelDescriptor(seg, streetsMap, this.getEffectiveRoadType(seg));
+            if (desc) {
+                descriptors.push(desc);
+                if (isSeed) {
+                    targetGroupKeys.add(desc.groupKey);
+                }
+            }
+        }
+
+        if (targetGroupKeys.size > 0) {
+            // Build node adjacency per target groupKey and BFS from seed segments across shared endpoints
+            const nodeToSegmentIds = new Map<string, number[]>();
+            const segEndpoints = new Map<number, [string, string]>();
+
+            for (let i = 0; i < descriptors.length; i++) {
+                const desc = descriptors[i];
+                if (!targetGroupKeys.has(desc.groupKey)) continue;
+                const seg = desc.segment;
+                const [rawStart, rawEnd] = this.getRawSegmentNodeKeys(seg);
+                const n0 = `${desc.groupKey}\0${rawStart}`;
+                const n1 = `${desc.groupKey}\0${rawEnd}`;
+
+                segEndpoints.set(seg.id, [n0, n1]);
+                let list0 = nodeToSegmentIds.get(n0);
+                if (!list0) {
+                    list0 = [];
+                    nodeToSegmentIds.set(n0, list0);
+                }
+                list0.push(seg.id);
+
+                if (n1 !== n0) {
+                    let list1 = nodeToSegmentIds.get(n1);
+                    if (!list1) {
+                        list1 = [];
+                        nodeToSegmentIds.set(n1, list1);
+                    }
+                    list1.push(seg.id);
+                }
+            }
+
+            const queue: number[] = [];
+            for (const id of seedSet) {
+                if (segEndpoints.has(id)) {
+                    queue.push(id);
+                }
+            }
+
+            let head = 0;
+            while (head < queue.length) {
+                const currentId = queue[head++];
+                const endpoints = segEndpoints.get(currentId);
+                if (!endpoints) continue;
+                for (let e = 0; e < 2; e++) {
+                    const neighbors = nodeToSegmentIds.get(endpoints[e]);
+                    if (!neighbors) continue;
+                    for (let j = 0; j < neighbors.length; j++) {
+                        const neighborId = neighbors[j];
+                        if (!seedSet.has(neighborId)) {
+                            seedSet.add(neighborId);
+                            queue.push(neighborId);
+                        }
+                    }
+                }
+            }
+        }
+
+        const result: Segment[] = [];
+        for (const id of seedSet) {
+            const seg = byId.get(id);
+            if (seg) {
+                result.push(seg);
+            }
+        }
+        return result;
+    }
+
     public async addSegmentsByIds(objectIds: number[]): Promise<void> {
         return this.enqueueDataModelOp(() => this.addSegmentsByIdsInternal(objectIds));
     }
@@ -780,24 +1054,7 @@ export default class RenderingController extends AbstractController {
         if (idsToAdd.length === 0) return;
 
         Utils.debugLog(`addSegmentsSDK - Adding ${idsToAdd.length} segments`);
-        if (idsToAdd.length > this.prefSegmentsThreshold) {
-            this.mediator.alert(AlertType.INFO, `Drawing aborted while adding all ${idsToAdd.length} segments. The current limit is set to ${this.prefSegmentsThreshold}.\nYou can change this in the SVL preferences panel.`);
-            this.mediator.notify(this, AcceptedControllerEvents.SVL_DRAWING_WAS_ABORTED);
-            return;
-        }
-        const generation = this.drawGeneration;
-        let segments: Segment[];
-        if (idsToAdd.length > 50) {
-            const idSet = new Set(idsToAdd);
-            const allSegments = await this.mediator.wmeSDK.DataModel.Segments.getAll();
-            segments = allSegments.filter((s: Segment) => idSet.has(s.id));
-        } else {
-            segments = (await Promise.all(
-                idsToAdd.map(id => this.mediator.wmeSDK.DataModel.Segments.getById({ segmentId: id }))
-            )).filter((s: Segment | null): s is Segment => s !== null);
-        }
-        if (generation !== this.drawGeneration) return;
-        await this.addSegmentsByModel(segments, generation);
+        await this.renderSegmentsWithConnectedPeers(idsToAdd);
     }
 
     public async addNodesByIds(objectIds: number[]): Promise<void> {
@@ -826,14 +1083,17 @@ export default class RenderingController extends AbstractController {
     }
 
     public async removeSegmentsByIds(objectIds: number[]): Promise<void> {
-        return this.enqueueDataModelOp(() => this.removeSegmentsByIdsInternal(objectIds));
+        return this.enqueueDataModelOp(() => this.removeSegmentsByIdsInternal(objectIds, true));
     }
 
-    private async removeSegmentsByIdsInternal(objectIds: number[]): Promise<void> {
+    private async removeSegmentsByIdsInternal(objectIds: number[], refreshSurvivingPeers: boolean = true): Promise<void> {
         if (objectIds.length === 0) return;
         Utils.debugLog(`Removing ${objectIds.length} segments: ${objectIds.join()}`);
+        const survivingPeers = refreshSurvivingPeers ? this.collectTrackedLabelPeers(objectIds) : [];
         for (let i = 0; i < objectIds.length; i++) {
             this.closedSegmentIds.delete(objectIds[i]);
+            this.labelChainPeers.delete(objectIds[i]);
+            this.placedLabelBoxesBySegment.delete(objectIds[i]);
         }
         const promises: Promise<void>[] = [];
         for (const { store, layerName } of this.segmentLayerStores) {
@@ -849,6 +1109,9 @@ export default class RenderingController extends AbstractController {
         }
         if (promises.length > 0) {
             await Promise.all(promises);
+        }
+        if (survivingPeers.length > 0 && this.redrawTimeout === null && this.mediator.getState() === SVLLayerState.VISIBLE) {
+            await this.renderSegmentsWithConnectedPeers(survivingPeers);
         }
     }
 
@@ -880,8 +1143,12 @@ export default class RenderingController extends AbstractController {
 
     private async updateSegmentsByIdsInternal(objectIds: number[]): Promise<void> {
         if (this.redrawTimeout !== null || objectIds.length === 0) return;
-        await this.removeSegmentsByIdsInternal(objectIds);
-        await this.addSegmentsByIdsInternal(objectIds);
+        const oldPeers = this.collectTrackedLabelPeers(objectIds);
+        await this.removeSegmentsByIdsInternal(objectIds, false);
+        const idsToRender = oldPeers.length > 0
+            ? Array.from(new Set([...objectIds, ...oldPeers]))
+            : objectIds;
+        await this.renderSegmentsWithConnectedPeers(idsToRender);
     }
 
     public async updateNodesByIds(objectIds: number[]): Promise<void> {
@@ -895,8 +1162,9 @@ export default class RenderingController extends AbstractController {
     public async handleSegmentIdChanged(oldId: number, newId: number): Promise<void> {
         return this.enqueueDataModelOp(async () => {
             if (this.redrawTimeout !== null) return;
-            await this.removeSegmentsByIdsInternal([oldId]);
-            await this.addSegmentsByIdsInternal([newId]);
+            const oldPeers = this.collectTrackedLabelPeers([oldId]);
+            await this.removeSegmentsByIdsInternal([oldId], false);
+            await this.renderSegmentsWithConnectedPeers([newId, ...oldPeers]);
         });
     }
 
@@ -1142,19 +1410,25 @@ export default class RenderingController extends AbstractController {
         return arrows;
     }
 
+    private getEffectiveRoadType(model: Segment): number {
+        if (
+            model.primaryStreetId !== null &&
+            this.mediator.isRoutingModeActive() &&
+            model.routingRoadType !== null
+        ) {
+            return model.routingRoadType;
+        }
+        return model.roadType;
+    }
+
     private async buildSegmentRenderResult(
         model: Segment,
-        streetsMap: Map<number, Street>,
         userRank: number | undefined,
-    ): Promise<SegmentRenderResult | null> {
-        if (!model || await this.isObjectDeletedSafe("segments", model.id)) {
-            // Skip deleted segments (e.g. when panning away and returning on an unsaved deleted segment)
-            return null;
-        }
-
+        ownedLabels: SdkFeature<Point>[],
+        chainLabelsForArrowAvoidance: SdkFeature<Point>[],
+    ): Promise<SegmentRenderResult> {
         const {
             id,
-            roadType: initialRoadType,
             elevationLevel,
             fwdSpeedLimit,
             revSpeedLimit,
@@ -1172,15 +1446,7 @@ export default class RenderingController extends AbstractController {
 
         this.mediator.debugLog(`Drawing segment: ${id}`);
 
-        let roadType = initialRoadType;
-        if (
-            primaryStreetId !== null &&
-            this.mediator.isRoutingModeActive() &&
-            model.routingRoadType !== null
-        ) {
-            roadType = model.routingRoadType;
-        }
-
+        const roadType = this.getEffectiveRoadType(model);
         const totalSegmentWidth = this.computeSegmentWidth(model, roadType);
 
         if (primaryStreetId === null) {
@@ -1205,9 +1471,6 @@ export default class RenderingController extends AbstractController {
 
         const segmentFeatures: SdkFeature<LineString>[] = [];
         const iconFeatures: SdkFeature<Point>[] = [];
-
-        // Compute labels first so one-way arrow placement can avoid colliding with them
-        const labelFeatures = this.drawLabels(model, streetsMap, roadType);
         let arrowFeatures: SdkFeature<Point>[] = [];
 
         if (this.streetStyles[roadType] !== undefined) {
@@ -1473,7 +1736,7 @@ export default class RenderingController extends AbstractController {
                 }
             }
 
-            arrowFeatures = this.buildArrowFeatures(model, isInRoundabout, baselevel, labelFeatures);
+            arrowFeatures = this.buildArrowFeatures(model, isInRoundabout, baselevel, chainLabelsForArrowAvoidance);
 
             if (flagAttributes.tunnel) {
                 segmentFeatures.push({
@@ -1509,16 +1772,20 @@ export default class RenderingController extends AbstractController {
             segments: segmentFeatures,
             arrows: arrowFeatures,
             icons: iconFeatures,
-            labels: labelFeatures,
+            labels: ownedLabels,
         };
     }
 
-    private drawLabels(
+    private computeSegmentLabelDescriptor(
         sdkSegment: Segment,
         streetsMap: Map<number, Street>,
         roadType: number = sdkSegment.roadType
-    ): SdkFeature<Point>[] {
-        const primaryStreet = sdkSegment.primaryStreetId !== null ? streetsMap.get(sdkSegment.primaryStreetId) : undefined;
+    ): SegmentLabelDescriptor | null {
+        if (sdkSegment.primaryStreetId === null || sdkSegment.geometry.coordinates.length < 2) {
+            return null;
+        }
+
+        const primaryStreet = streetsMap.get(sdkSegment.primaryStreetId);
         const hasStreetName = Boolean(
             primaryStreet &&
             !primaryStreet.isEmpty &&
@@ -1576,49 +1843,964 @@ export default class RenderingController extends AbstractController {
                 speedPart = this.getSuperScript(revMaxSpeed);
             }
         }
+
         const labelText = `${streetPart} ${speedPart}`;
         if (labelText === ' ') {
-            return [];
+            return null;
         }
-
-        const simplified = Utils.simplifyLonLatAsMercator(sdkSegment.geometry.coordinates, 7);
-        if (simplified.length < 2) {
-            return [];
-        }
-
-        const roadTypeStyle = this.streetStyles[roadType];
-        const color = roadTypeStyle ? roadTypeStyle.strokeColor : '#f00';
-        const outlinecolor = roadTypeStyle ? roadTypeStyle.outlineColor : '#fff';
-
-        const distances: { index: number, distance: number }[] = [];
-        for (let p = 0; p < simplified.length - 1; p += 1) {
-            const ptA = simplified[p];
-            const ptB = simplified[p + 1];
-            const distance = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
-            distances.push({ index: p, distance });
-        }
-        // Sort segments by length, descending
-        distances.sort((a, b) =>
-            a.distance > b.distance ? -1 : a.distance < b.distance ? 1 : 0
-        );
-        let labelsToInsert = streetPart === '' ? 1 : distances.length;
-        const requiredSpace = this.clutterConstant * Math.max(labelText.length, altStreetPart.length);
 
         const isOneWay = !sdkSegment.isTwoWay && (sdkSegment.isAtoB || sdkSegment.isBtoA);
-        const labels: SdkFeature<Point>[] = [];
-        for (let i = 0; i < distances.length && labelsToInsert > 0; i += 1) {
-            if (
-                distances[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30)
-            ) {
-                break;
+        const hasDirectionArrow = isOneWay && streetPart !== '';
+        const groupKey = `${hasDirectionArrow ? 1 : 0}\0${labelText}\0${altStreetPart}`;
+
+        return {
+            segment: sdkSegment,
+            roadType,
+            streetPart,
+            altStreetPart,
+            labelText,
+            hasDirectionArrow,
+            groupKey,
+        };
+    }
+
+    private computeUnitTangent(from: MercatorPoint, to: MercatorPoint): MercatorPoint {
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const len = Math.hypot(dx, dy);
+        if (len <= 0) {
+            return { x: 1, y: 0 };
+        }
+        return { x: dx / len, y: dy / len };
+    }
+
+    private buildChainEdge(desc: SegmentLabelDescriptor): ChainEdge {
+        const { segment, roadType, hasDirectionArrow } = desc;
+        const coords = segment.geometry.coordinates;
+        const n = coords.length;
+        const reverseForOneWayFlow = hasDirectionArrow && segment.isBtoA && !segment.isAtoB;
+
+        const mercatorPoints: MercatorPoint[] = new Array(n);
+        if (reverseForOneWayFlow) {
+            for (let i = 0; i < n; i++) {
+                const c = coords[n - 1 - i];
+                mercatorPoints[i] = Utils.lonLatToMercator(c[0], c[1]);
             }
-            const p = distances[i].index;
-            const p0 = simplified[p];
-            const pNext = simplified[p + 1];
-            const midX = (p0.x + pNext.x) * 0.5;
-            const midY = (p0.y + pNext.y) * 0.5;
-            const dx = sdkSegment.isAtoB ? midX - p0.x : p0.x - midX;
-            const dy = sdkSegment.isAtoB ? midY - p0.y : p0.y - midY;
+        } else {
+            for (let i = 0; i < n; i++) {
+                const c = coords[i];
+                mercatorPoints[i] = Utils.lonLatToMercator(c[0], c[1]);
+            }
+        }
+
+        let lengthMeters = 0;
+        for (let i = 0; i < n - 1; i++) {
+            lengthMeters += Math.hypot(
+                mercatorPoints[i + 1].x - mercatorPoints[i].x,
+                mercatorPoints[i + 1].y - mercatorPoints[i].y
+            );
+        }
+
+        let startRefIdx = 1;
+        while (
+            startRefIdx < n - 1 &&
+            Math.hypot(
+                mercatorPoints[startRefIdx].x - mercatorPoints[0].x,
+                mercatorPoints[startRefIdx].y - mercatorPoints[0].y
+            ) < 1e-3
+        ) {
+            startRefIdx++;
+        }
+        const startTangent = this.computeUnitTangent(mercatorPoints[0], mercatorPoints[startRefIdx]);
+
+        let endRefIdx = n - 2;
+        while (
+            endRefIdx > 0 &&
+            Math.hypot(
+                mercatorPoints[n - 1].x - mercatorPoints[endRefIdx].x,
+                mercatorPoints[n - 1].y - mercatorPoints[endRefIdx].y
+            ) < 1e-3
+        ) {
+            endRefIdx--;
+        }
+        const endTangent = this.computeUnitTangent(mercatorPoints[endRefIdx], mercatorPoints[n - 1]);
+
+        const [rawStartNodeKey, rawEndNodeKey] = this.getRawSegmentNodeKeys(segment);
+
+        return {
+            segment,
+            roadType,
+            startNodeKey: reverseForOneWayFlow ? rawEndNodeKey : rawStartNodeKey,
+            endNodeKey: reverseForOneWayFlow ? rawStartNodeKey : rawEndNodeKey,
+            mercatorPoints,
+            lengthMeters,
+            startTangent,
+            endTangent,
+        };
+    }
+
+    private buildLabelChains(edges: ChainEdge[], directedFlow: boolean): OrientedChainItem[][] {
+        const m = edges.length;
+        if (m === 0) return [];
+        if (m === 1) return [[{ edgeIdx: 0, reversed: false }]];
+
+        const edgesByStartNode = new Map<string, number[]>();
+        const edgesByEndNode = new Map<string, number[]>();
+
+        for (let i = 0; i < m; i++) {
+            const e = edges[i];
+            let sList = edgesByStartNode.get(e.startNodeKey);
+            if (!sList) {
+                sList = [];
+                edgesByStartNode.set(e.startNodeKey, sList);
+            }
+            sList.push(i);
+
+            let eList = edgesByEndNode.get(e.endNodeKey);
+            if (!eList) {
+                eList = [];
+                edgesByEndNode.set(e.endNodeKey, eList);
+            }
+            eList.push(i);
+        }
+
+        const getStartNode = (item: OrientedChainItem): string =>
+            item.reversed ? edges[item.edgeIdx].endNodeKey : edges[item.edgeIdx].startNodeKey;
+        const getEndNode = (item: OrientedChainItem): string =>
+            item.reversed ? edges[item.edgeIdx].startNodeKey : edges[item.edgeIdx].endNodeKey;
+        const getStartTangent = (edgeIdx: number, reversed: boolean): MercatorPoint => {
+            const e = edges[edgeIdx];
+            return reversed
+                ? { x: -e.endTangent.x, y: -e.endTangent.y }
+                : e.startTangent;
+        };
+        const getEndTangent = (edgeIdx: number, reversed: boolean): MercatorPoint => {
+            const e = edges[edgeIdx];
+            return reversed
+                ? { x: -e.startTangent.x, y: -e.startTangent.y }
+                : e.endTangent;
+        };
+
+        // Seed chains from longest segments first so main road trunks assemble cleanly across branches
+        const seedOrder = Array.from({ length: m }, (_, i) => i).sort(
+            (a, b) => edges[b].lengthMeters - edges[a].lengthMeters
+        );
+
+        const visited = new Uint8Array(m);
+        const chains: OrientedChainItem[][] = [];
+        // Minimum dot product (-0.5 = 120° max turn) avoids folding a label across opposite dual-carriageways at a U-turn node
+        const MIN_CONTINUATION_COS = -0.5;
+
+        for (let s = 0; s < m; s++) {
+            const seedIdx = seedOrder[s];
+            if (visited[seedIdx]) continue;
+            visited[seedIdx] = 1;
+
+            const chain: OrientedChainItem[] = [{ edgeIdx: seedIdx, reversed: false }];
+
+            // Extend forward from tail
+            while (true) {
+                const tailItem = chain[chain.length - 1];
+                const tailNode = getEndNode(tailItem);
+                const inDir = getEndTangent(tailItem.edgeIdx, tailItem.reversed);
+                const tailRoadType = edges[tailItem.edgeIdx].roadType;
+
+                let bestCandidate: OrientedChainItem | null = null;
+                let bestCos = MIN_CONTINUATION_COS;
+                let bestSameRoadType = false;
+                let bestLen = -1;
+
+                const considerForward = (candIdx: number, reversed: boolean) => {
+                    if (visited[candIdx]) return;
+                    const outDir = getStartTangent(candIdx, reversed);
+                    const cos = inDir.x * outDir.x + inDir.y * outDir.y;
+                    if (cos < MIN_CONTINUATION_COS) return;
+                    const sameRoadType = edges[candIdx].roadType === tailRoadType;
+                    const candLen = edges[candIdx].lengthMeters;
+                    if (
+                        bestCandidate === null ||
+                        cos > bestCos + 1e-4 ||
+                        (Math.abs(cos - bestCos) <= 1e-4 &&
+                            ((sameRoadType && !bestSameRoadType) ||
+                                (sameRoadType === bestSameRoadType && candLen > bestLen)))
+                    ) {
+                        bestCandidate = { edgeIdx: candIdx, reversed };
+                        bestCos = cos;
+                        bestSameRoadType = sameRoadType;
+                        bestLen = candLen;
+                    }
+                };
+
+                const forwardStarts = edgesByStartNode.get(tailNode);
+                if (forwardStarts) {
+                    for (let i = 0; i < forwardStarts.length; i++) {
+                        considerForward(forwardStarts[i], false);
+                    }
+                }
+                if (!directedFlow) {
+                    const reverseEnds = edgesByEndNode.get(tailNode);
+                    if (reverseEnds) {
+                        for (let i = 0; i < reverseEnds.length; i++) {
+                            const idx = reverseEnds[i];
+                            if (edges[idx].startNodeKey !== edges[idx].endNodeKey) {
+                                considerForward(idx, true);
+                            }
+                        }
+                    }
+                }
+
+                if (!bestCandidate) break;
+                const chosen: OrientedChainItem = bestCandidate;
+                visited[chosen.edgeIdx] = 1;
+                chain.push(chosen);
+            }
+
+            // Extend backward from head
+            while (true) {
+                const headItem = chain[0];
+                const headNode = getStartNode(headItem);
+                const outDir = getStartTangent(headItem.edgeIdx, headItem.reversed);
+                const headRoadType = edges[headItem.edgeIdx].roadType;
+
+                let bestCandidate: OrientedChainItem | null = null;
+                let bestCos = MIN_CONTINUATION_COS;
+                let bestSameRoadType = false;
+                let bestLen = -1;
+
+                const considerBackward = (candIdx: number, reversed: boolean) => {
+                    if (visited[candIdx]) return;
+                    const inDir = getEndTangent(candIdx, reversed);
+                    const cos = inDir.x * outDir.x + inDir.y * outDir.y;
+                    if (cos < MIN_CONTINUATION_COS) return;
+                    const sameRoadType = edges[candIdx].roadType === headRoadType;
+                    const candLen = edges[candIdx].lengthMeters;
+                    if (
+                        bestCandidate === null ||
+                        cos > bestCos + 1e-4 ||
+                        (Math.abs(cos - bestCos) <= 1e-4 &&
+                            ((sameRoadType && !bestSameRoadType) ||
+                                (sameRoadType === bestSameRoadType && candLen > bestLen)))
+                    ) {
+                        bestCandidate = { edgeIdx: candIdx, reversed };
+                        bestCos = cos;
+                        bestSameRoadType = sameRoadType;
+                        bestLen = candLen;
+                    }
+                };
+
+                const backwardEnds = edgesByEndNode.get(headNode);
+                if (backwardEnds) {
+                    for (let i = 0; i < backwardEnds.length; i++) {
+                        considerBackward(backwardEnds[i], false);
+                    }
+                }
+                if (!directedFlow) {
+                    const reverseStarts = edgesByStartNode.get(headNode);
+                    if (reverseStarts) {
+                        for (let i = 0; i < reverseStarts.length; i++) {
+                            const idx = reverseStarts[i];
+                            if (edges[idx].startNodeKey !== edges[idx].endNodeKey) {
+                                considerBackward(idx, true);
+                            }
+                        }
+                    }
+                }
+
+                if (!bestCandidate) break;
+                const chosen: OrientedChainItem = bestCandidate;
+                visited[chosen.edgeIdx] = 1;
+                chain.unshift(chosen);
+            }
+
+            chains.push(chain);
+        }
+
+        return chains;
+    }
+
+    private pointToPolylineSqDist(px: number, py: number, pts: MercatorPoint[]): number {
+        let minSqDist = Infinity;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const ax = pts[i].x;
+            const ay = pts[i].y;
+            const bx = pts[i + 1].x;
+            const by = pts[i + 1].y;
+            const dx = bx - ax;
+            const dy = by - ay;
+            const lenSq = dx * dx + dy * dy;
+            let cx = ax;
+            let cy = ay;
+            if (lenSq > 0) {
+                const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+                cx += dx * t;
+                cy += dy * t;
+            }
+            const ddx = px - cx;
+            const ddy = py - cy;
+            const sqDist = ddx * ddx + ddy * ddy;
+            if (sqDist < minSqDist) {
+                minSqDist = sqDist;
+            }
+        }
+        return minSqDist;
+    }
+
+    private getRawSegmentNodeKeys(segment: Segment): [string, string] {
+        const coords = segment.geometry.coordinates;
+        const n = coords.length;
+        const startKey = segment.fromNodeId !== null
+            ? `n:${segment.fromNodeId}`
+            : `c:${coords[0][0].toFixed(6)},${coords[0][1].toFixed(6)}`;
+        const endKey = segment.toNodeId !== null
+            ? `n:${segment.toNodeId}`
+            : `c:${coords[n - 1][0].toFixed(6)},${coords[n - 1][1].toFixed(6)}`;
+        return [startKey, endKey];
+    }
+
+    /**
+     * 2D Separating Axis Theorem (SAT) overlap score between two oriented label boxes in EPSG:3857 units.
+     * Returns 0 when disjoint, or the geometric-mean penetration depth (> 0) when overlapping.
+     */
+    private computeLabelObbPenetration(a: PlacedLabelBox, b: PlacedLabelBox): number {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const maxR = a.halfLen + a.halfHeight + b.halfLen + b.halfHeight;
+        if (Math.abs(dx) > maxR || Math.abs(dy) > maxR) {
+            return 0;
+        }
+
+        const dotUU = Math.abs(a.ux * b.ux + a.uy * b.uy);
+        const dotUV = Math.abs(a.ux * b.uy - a.uy * b.ux);
+
+        const ov1 = a.halfLen + b.halfLen * dotUU + b.halfHeight * dotUV - Math.abs(dx * a.ux + dy * a.uy);
+        if (ov1 <= 0) return 0;
+
+        const ov2 = a.halfHeight + b.halfLen * dotUV + b.halfHeight * dotUU - Math.abs(-dx * a.uy + dy * a.ux);
+        if (ov2 <= 0) return 0;
+
+        const ov3 = b.halfLen + a.halfLen * dotUU + a.halfHeight * dotUV - Math.abs(dx * b.ux + dy * b.uy);
+        if (ov3 <= 0) return 0;
+
+        const ov4 = b.halfHeight + a.halfLen * dotUV + a.halfHeight * dotUU - Math.abs(-dx * b.uy + dy * b.ux);
+        if (ov4 <= 0) return 0;
+
+        return Math.sqrt(Math.min(ov1 * ov2, ov3 * ov4));
+    }
+
+    /**
+     * Computes street & speed labels across `segments` by merging connected segments
+     * (regardless of turn permissions) that share the same label text into continuous
+     * geometric polylines, then resolving multi-segment crossing overlaps via
+     * intersection-aware sliding and 2D Oriented Bounding Box (OBB) de-confliction.
+     */
+    private drawLabels(
+        segments: Segment[],
+        streetsMap: Map<number, Street>,
+        allContextSegments: Segment[] = segments
+    ): {
+        ownedLabelsBySegment: Map<number, SdkFeature<Point>[]>;
+        chainLabelsBySegment: Map<number, SdkFeature<Point>[]>;
+        placedBoxesBySegment: Map<number, PlacedLabelBox[]>;
+        chainPeersBySegment: Map<number, number[]>;
+    } {
+        const ownedLabelsBySegment = new Map<number, SdkFeature<Point>[]>();
+        const chainLabelsBySegment = new Map<number, SdkFeature<Point>[]>();
+        const placedBoxesBySegment = new Map<number, PlacedLabelBox[]>();
+        const chainPeersBySegment = new Map<number, number[]>();
+        const groups = new Map<string, SegmentLabelDescriptor[]>();
+
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            const desc = this.computeSegmentLabelDescriptor(seg, streetsMap, this.getEffectiveRoadType(seg));
+            if (!desc) continue;
+
+            let group = groups.get(desc.groupKey);
+            if (!group) {
+                group = [];
+                groups.set(desc.groupKey, group);
+            }
+            group.push(desc);
+        }
+
+        const mergeConnected = this.prefMergeConnectedLabels;
+        const nodeDegree = new Map<string, number>();
+        if (mergeConnected) {
+            for (let i = 0; i < allContextSegments.length; i++) {
+                const seg = allContextSegments[i];
+                if (!seg || seg.geometry.coordinates.length < 2) continue;
+                const [k0, k1] = this.getRawSegmentNodeKeys(seg);
+                nodeDegree.set(k0, (nodeDegree.get(k0) ?? 0) + 1);
+                nodeDegree.set(k1, (nodeDegree.get(k1) ?? 0) + 1);
+            }
+        }
+
+        type ChainContext = {
+            edges: ChainEdge[];
+            chain: OrientedChainItem[];
+            groupKey: string;
+            streetPart: string;
+            altStreetPart: string;
+            labelText: string;
+            hasDirectionArrow: boolean;
+            maxLabels: number;
+            maxZoomRank: number;
+            acceptedCount: number;
+            singleEdge: ChainEdge | null;
+            singleFlowForward: boolean;
+            chainLabels: SdkFeature<Point>[];
+        };
+
+        type PendingLabelSpan = {
+            chainCtx: ChainContext;
+            rankInChain: number;
+            p0: MercatorPoint;
+            pNext: MercatorPoint;
+            distance: number;
+            ux: number;
+            uy: number;
+            seqIndex: number;
+            visualHalfLen: number;
+            visualHalfHeight: number;
+            closeHalfLen: number;
+            slack: number;
+            crossings: { offset: number; nodeKey: string }[];
+            isUnnamed: boolean;
+        };
+
+        const pendingSpans: PendingLabelSpan[] = [];
+        const joinNodeSpanCount = new Map<string, number>();
+        const fontSize = this.prefCloseZoomLabelSize;
+        const outlineWidth = this.prefLabelOutlineWidth;
+        const lineHeightPx = Math.ceil(fontSize * 1.2);
+        // EPSG:3857 Mercator units per pixel at zoom ~18.4 (0.45) and zoom 19 (0.30)
+        const OBB_MERCATOR_PER_PX = 0.45;
+        const CLOSE_MERCATOR_PER_PX = 0.30;
+
+        for (const groupDescriptors of groups.values()) {
+            const { groupKey, streetPart, altStreetPart, labelText, hasDirectionArrow } = groupDescriptors[0];
+            const isUnnamed = streetPart === '' || streetPart === '⚑';
+            const edges = groupDescriptors.map(d => this.buildChainEdge(d));
+            const chains: OrientedChainItem[][] = mergeConnected
+                ? this.buildLabelChains(edges, hasDirectionArrow)
+                : edges.map((_, idx) => [{ edgeIdx: idx, reversed: false }]);
+            const requiredSpace = this.clutterConstant * Math.max(labelText.length, altStreetPart.length);
+            const minSubSpan = Math.max(requiredSpace * 1.25, 220);
+
+            // Compute exact SVG pixel dimensions for this group's label text
+            const sampleText = (hasDirectionArrow ? ` ▶ ${labelText} ▶ ` : labelText) + altStreetPart;
+            const textLines = sampleText.split('\n');
+            let maxLineChars = 0;
+            for (let l = 0; l < textLines.length; l++) {
+                if (textLines[l].length > maxLineChars) {
+                    maxLineChars = textLines[l].length;
+                }
+            }
+            const widthPx = Math.ceil(maxLineChars * fontSize * 0.8 + outlineWidth * 2 + 12);
+            const heightPx = Math.ceil(textLines.length * lineHeightPx + outlineWidth * 2 + 8);
+            const rawHalfLen = widthPx * 0.5 * OBB_MERCATOR_PER_PX;
+            const closeHalfLen = widthPx * 0.5 * CLOSE_MERCATOR_PER_PX;
+            const visualHalfHeight = heightPx * 0.5 * OBB_MERCATOR_PER_PX + 2.5;
+
+            for (let c = 0; c < chains.length; c++) {
+                const chain = chains[c];
+                if (chain.length > 1) {
+                    const chainSegmentIds = chain.map(item => edges[item.edgeIdx].segment.id);
+                    for (let j = 0; j < chainSegmentIds.length; j++) {
+                        chainPeersBySegment.set(chainSegmentIds[j], chainSegmentIds);
+                    }
+                }
+
+                const mergedMercator: MercatorPoint[] = [];
+                const chainCrossings: { nodeKey: string; pt: MercatorPoint }[] = [];
+
+                for (let j = 0; j < chain.length; j++) {
+                    const { edgeIdx, reversed } = chain[j];
+                    const edge = edges[edgeIdx];
+                    const pts = edge.mercatorPoints;
+                    if (!reversed) {
+                        for (let k = 0; k < pts.length; k++) {
+                            const pt = pts[k];
+                            const prev = mergedMercator[mergedMercator.length - 1];
+                            if (!prev || Math.abs(pt.x - prev.x) > 1e-3 || Math.abs(pt.y - prev.y) > 1e-3) {
+                                mergedMercator.push(pt);
+                            }
+                        }
+                    } else {
+                        for (let k = pts.length - 1; k >= 0; k--) {
+                            const pt = pts[k];
+                            const prev = mergedMercator[mergedMercator.length - 1];
+                            if (!prev || Math.abs(pt.x - prev.x) > 1e-3 || Math.abs(pt.y - prev.y) > 1e-3) {
+                                mergedMercator.push(pt);
+                            }
+                        }
+                    }
+
+                    if (mergeConnected && j < chain.length - 1) {
+                        const joinNodeKey = reversed ? edge.startNodeKey : edge.endNodeKey;
+                        if ((nodeDegree.get(joinNodeKey) ?? 0) >= 3) {
+                            const joinPt = reversed ? pts[0] : pts[pts.length - 1];
+                            chainCrossings.push({ nodeKey: joinNodeKey, pt: joinPt });
+                        }
+                    }
+                }
+
+                const simplified = Utils.simplifyMercatorPoints(mergedMercator, 7);
+                if (simplified.length < 2) {
+                    continue;
+                }
+
+                let totalSimplifiedLen = 0;
+                const rawSpanLengths = new Array<number>(simplified.length - 1);
+                for (let p = 0; p < simplified.length - 1; p++) {
+                    const ptA = simplified[p];
+                    const ptB = simplified[p + 1];
+                    const d = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
+                    rawSpanLengths[p] = d;
+                    totalSimplifiedLen += d;
+                }
+                const halfChainLen = totalSimplifiedLen * 0.5;
+
+                const spans: {
+                    p0: MercatorPoint;
+                    pNext: MercatorPoint;
+                    distance: number;
+                    seqIndex: number;
+                    distFromCenter: number;
+                }[] = [];
+
+                let seqIndex = 0;
+                let cumLen = 0;
+                for (let p = 0; p < simplified.length - 1; p++) {
+                    const ptA = simplified[p];
+                    const ptB = simplified[p + 1];
+                    const segDist = rawSpanLengths[p];
+                    const chunks = (!mergeConnected || streetPart === '')
+                        ? 1
+                        : Math.max(1, Math.floor(segDist / minSubSpan));
+                    if (chunks === 1) {
+                        spans.push({
+                            p0: ptA,
+                            pNext: ptB,
+                            distance: segDist,
+                            seqIndex: seqIndex++,
+                            distFromCenter: Math.abs(cumLen + segDist * 0.5 - halfChainLen),
+                        });
+                    } else {
+                        const subDist = segDist / chunks;
+                        for (let k = 0; k < chunks; k++) {
+                            const t0 = k / chunks;
+                            const t1 = (k + 1) / chunks;
+                            spans.push({
+                                p0: {
+                                    x: ptA.x + (ptB.x - ptA.x) * t0,
+                                    y: ptA.y + (ptB.y - ptA.y) * t0,
+                                },
+                                pNext: {
+                                    x: ptA.x + (ptB.x - ptA.x) * t1,
+                                    y: ptA.y + (ptB.y - ptA.y) * t1,
+                                },
+                                distance: subDist,
+                                seqIndex: seqIndex++,
+                                distFromCenter: Math.abs(cumLen + (k + 0.5) * subDist - halfChainLen),
+                            });
+                        }
+                    }
+                    cumLen += segDist;
+                }
+
+                // Sort spans by length descending, breaking equal-length ties from the chain's center outward
+                spans.sort((a, b) => {
+                    if (Math.abs(a.distance - b.distance) > 1e-6) {
+                        return b.distance - a.distance;
+                    }
+                    return a.distFromCenter - b.distFromCenter;
+                });
+
+                const maxLabels = streetPart === '' ? 1 : spans.length;
+                const acceptedSpans: typeof spans = [];
+                for (let i = 0; i < spans.length && acceptedSpans.length < maxLabels; i++) {
+                    if (spans[i].distance < (i > 0 ? requiredSpace : requiredSpace - 30) || spans[i].distance < 1) {
+                        break;
+                    }
+                    acceptedSpans.push(spans[i]);
+                }
+
+                if (acceptedSpans.length === 0) {
+                    continue;
+                }
+
+                const maxZoomRank = streetPart === ''
+                    ? 1
+                    : Math.min(4, Math.max(spans.length, Math.floor(totalSimplifiedLen / 150)));
+                const chainLabels: SdkFeature<Point>[] = [];
+                const singleEdge = chain.length === 1 ? edges[chain[0].edgeIdx] : null;
+                const singleFlowForward = singleEdge
+                    ? (hasDirectionArrow ? true : singleEdge.segment.isAtoB)
+                    : true;
+
+                const chainCtx: ChainContext = {
+                    edges,
+                    chain,
+                    groupKey,
+                    streetPart,
+                    altStreetPart,
+                    labelText,
+                    hasDirectionArrow,
+                    maxLabels,
+                    maxZoomRank,
+                    acceptedCount: acceptedSpans.length,
+                    singleEdge,
+                    singleFlowForward,
+                    chainLabels,
+                };
+
+                for (let j = 0; j < chain.length; j++) {
+                    chainLabelsBySegment.set(edges[chain[j].edgeIdx].segment.id, chainLabels);
+                }
+
+                for (let i = 0; i < acceptedSpans.length; i++) {
+                    const { p0, pNext, distance, seqIndex: spanSeqIdx } = acceptedSpans[i];
+                    const ux = (pNext.x - p0.x) / distance;
+                    const uy = (pNext.y - p0.y) / distance;
+                    const visualHalfLen = Math.min(distance * 0.46, Math.max(10, rawHalfLen));
+
+                    const crossings: { offset: number; nodeKey: string }[] = [];
+                    if (chainCrossings.length > 0) {
+                        for (let k = 0; k < chainCrossings.length; k++) {
+                            const { nodeKey, pt } = chainCrossings[k];
+                            const proj = (pt.x - p0.x) * ux + (pt.y - p0.y) * uy;
+                            if (proj <= 1 || proj >= distance - 1) continue;
+                            const perp = Math.abs(-(pt.x - p0.x) * uy + (pt.y - p0.y) * ux);
+                            if (perp <= 12) {
+                                crossings.push({ offset: proj, nodeKey });
+                            }
+                        }
+                        if (crossings.length > 1) {
+                            crossings.sort((a, b) => a.offset - b.offset);
+                        }
+                        for (let k = 0; k < crossings.length; k++) {
+                            const key = crossings[k].nodeKey;
+                            joinNodeSpanCount.set(key, (joinNodeSpanCount.get(key) ?? 0) + 1);
+                        }
+                    }
+
+                    pendingSpans.push({
+                        chainCtx,
+                        rankInChain: i,
+                        p0,
+                        pNext,
+                        distance,
+                        ux,
+                        uy,
+                        seqIndex: spanSeqIdx,
+                        visualHalfLen,
+                        visualHalfHeight,
+                        closeHalfLen,
+                        slack: distance - 2 * visualHalfLen,
+                        crossings,
+                        isUnnamed,
+                    });
+                }
+            }
+        }
+
+        if (mergeConnected && pendingSpans.length > 1) {
+            pendingSpans.sort((a, b) => {
+                if (a.isUnnamed !== b.isUnnamed) {
+                    return a.isUnnamed ? 1 : -1;
+                }
+                const aPrimary = a.rankInChain === 0 ? 0 : 1;
+                const bPrimary = b.rankInChain === 0 ? 0 : 1;
+                if (aPrimary !== bPrimary) {
+                    return aPrimary - bPrimary;
+                }
+                if (Math.abs(a.slack - b.slack) > 1) {
+                    return a.slack - b.slack;
+                }
+                return b.distance - a.distance;
+            });
+        }
+
+        // 160m Web Mercator spatial hash grid for O(1) 2D OBB label queries
+        const GRID_CELL_SIZE = 160;
+        const GRID_OFFSET = 262144;
+        const GRID_STRIDE = 1048576;
+        const spatialGrid = new Map<number, PlacedLabelBox[]>();
+        let queryId = 0;
+
+        const insertBoxIntoGrid = (box: PlacedLabelBox): void => {
+            const rx = Math.abs(box.ux) * box.halfLen + Math.abs(box.uy) * box.halfHeight;
+            const ry = Math.abs(box.uy) * box.halfLen + Math.abs(box.ux) * box.halfHeight;
+            const minCX = Math.floor((box.x - rx) / GRID_CELL_SIZE);
+            const maxCX = Math.floor((box.x + rx) / GRID_CELL_SIZE);
+            const minCY = Math.floor((box.y - ry) / GRID_CELL_SIZE);
+            const maxCY = Math.floor((box.y + ry) / GRID_CELL_SIZE);
+            for (let cx = minCX; cx <= maxCX; cx++) {
+                const rowBase = (cx + GRID_OFFSET) * GRID_STRIDE;
+                for (let cy = minCY; cy <= maxCY; cy++) {
+                    const cellKey = rowBase + (cy + GRID_OFFSET);
+                    let bucket = spatialGrid.get(cellKey);
+                    if (!bucket) {
+                        bucket = [];
+                        spatialGrid.set(cellKey, bucket);
+                    }
+                    bucket.push(box);
+                }
+            }
+        };
+
+        if (mergeConnected && this.placedLabelBoxesBySegment.size > 0) {
+            const batchIds = new Set<number>();
+            for (let i = 0; i < segments.length; i++) {
+                batchIds.add(segments[i].id);
+            }
+            for (const [segId, boxes] of this.placedLabelBoxesBySegment.entries()) {
+                if (batchIds.has(segId)) continue;
+                for (let i = 0; i < boxes.length; i++) {
+                    const b = boxes[i];
+                    b.lastQueryId = 0;
+                    insertBoxIntoGrid(b);
+                }
+            }
+        }
+
+        const scratchBox: PlacedLabelBox = {
+            x: 0,
+            y: 0,
+            ux: 1,
+            uy: 0,
+            halfLen: 0,
+            halfHeight: 0,
+            groupKey: '',
+            lastQueryId: 0,
+        };
+
+        for (let idx = 0; idx < pendingSpans.length; idx++) {
+            const span = pendingSpans[idx];
+            const {
+                chainCtx,
+                rankInChain,
+                p0,
+                pNext,
+                distance,
+                ux,
+                uy,
+                seqIndex: spanSeqIdx,
+                visualHalfLen,
+                visualHalfHeight,
+                closeHalfLen,
+                crossings,
+            } = span;
+            const {
+                edges,
+                chain,
+                groupKey,
+                streetPart,
+                altStreetPart,
+                labelText,
+                hasDirectionArrow,
+                maxLabels,
+                maxZoomRank,
+                acceptedCount,
+                singleEdge,
+                singleFlowForward,
+                chainLabels,
+            } = chainCtx;
+
+            const midS = distance * 0.5;
+            let bestS = midS;
+            let forceCloseZoomOnly = false;
+
+            if (mergeConnected) {
+                const endMargin = Math.min(distance * 0.40, Math.max(distance * 0.14, closeHalfLen));
+                const sMin = endMargin;
+                const sMax = distance - endMargin;
+
+                let hasRoomySubArm = false;
+                if (crossings.length > 0) {
+                    let prev = 0;
+                    for (let k = 0; k <= crossings.length; k++) {
+                        const next = k < crossings.length ? crossings[k].offset : distance;
+                        if (next - prev >= visualHalfLen * 2 + 4) {
+                            hasRoomySubArm = true;
+                            break;
+                        }
+                        prev = next;
+                    }
+                }
+
+                const candidateOffsets: number[] = [];
+                const addCandidate = (rawS: number): void => {
+                    const clamped = Math.max(sMin, Math.min(sMax, rawS));
+                    for (let k = 0; k < candidateOffsets.length; k++) {
+                        if (Math.abs(candidateOffsets[k] - clamped) < 0.5) {
+                            return;
+                        }
+                    }
+                    candidateOffsets.push(clamped);
+                };
+
+                addCandidate(midS);
+                if (crossings.length > 0) {
+                    let prevOffset = 0;
+                    for (let k = 0; k <= crossings.length; k++) {
+                        const nextOffset = k < crossings.length ? crossings[k].offset : distance;
+                        addCandidate((prevOffset + nextOffset) * 0.5);
+                        prevOffset = nextOffset;
+                    }
+                    const corridorClear = visualHalfLen + visualHalfHeight + 3;
+                    const nodeClear = visualHalfLen + 3;
+                    const closeClear = closeHalfLen + 4;
+                    for (let k = 0; k < crossings.length; k++) {
+                        const cOff = crossings[k].offset;
+                        addCandidate(cOff - corridorClear);
+                        addCandidate(cOff + corridorClear);
+                        addCandidate(cOff - nodeClear);
+                        addCandidate(cOff + nodeClear);
+                        addCandidate(cOff - closeClear);
+                        addCandidate(cOff + closeClear);
+                    }
+                }
+                if (sMax - sMin > 1) {
+                    for (let step = 0; step <= 8; step++) {
+                        addCandidate(sMin + (step / 8) * (sMax - sMin));
+                    }
+                }
+
+                let bestMaxPen = Infinity;
+                let bestTotalPen = Infinity;
+                let bestSameGroupPen = Infinity;
+                let bestNodePen = Infinity;
+                let bestDistFromMid = Infinity;
+
+                scratchBox.ux = ux;
+                scratchBox.uy = uy;
+                scratchBox.halfLen = visualHalfLen;
+                scratchBox.halfHeight = visualHalfHeight;
+                scratchBox.groupKey = groupKey;
+
+                const rx = Math.abs(ux) * visualHalfLen + Math.abs(uy) * visualHalfHeight;
+                const ry = Math.abs(uy) * visualHalfLen + Math.abs(ux) * visualHalfHeight;
+
+                for (let cIdx = 0; cIdx < candidateOffsets.length; cIdx++) {
+                    const candS = candidateOffsets[cIdx];
+                    const cx = p0.x + ux * candS;
+                    const cy = p0.y + uy * candS;
+                    scratchBox.x = cx;
+                    scratchBox.y = cy;
+
+                    let maxPen = 0;
+                    let totalPen = 0;
+                    let sameGroupPen = 0;
+
+                    if (spatialGrid.size > 0) {
+                        const qid = ++queryId;
+                        const minCX = Math.floor((cx - rx) / GRID_CELL_SIZE);
+                        const maxCX = Math.floor((cx + rx) / GRID_CELL_SIZE);
+                        const minCY = Math.floor((cy - ry) / GRID_CELL_SIZE);
+                        const maxCY = Math.floor((cy + ry) / GRID_CELL_SIZE);
+
+                        for (let gx = minCX; gx <= maxCX; gx++) {
+                            const rowBase = (gx + GRID_OFFSET) * GRID_STRIDE;
+                            for (let gy = minCY; gy <= maxCY; gy++) {
+                                const bucket = spatialGrid.get(rowBase + (gy + GRID_OFFSET));
+                                if (!bucket) continue;
+                                for (let bIdx = 0; bIdx < bucket.length; bIdx++) {
+                                    const other = bucket[bIdx];
+                                    if (other.lastQueryId === qid) continue;
+                                    other.lastQueryId = qid;
+                                    const pen = this.computeLabelObbPenetration(scratchBox, other);
+                                    if (pen > 0) {
+                                        totalPen += pen;
+                                        if (pen > maxPen) {
+                                            maxPen = pen;
+                                        }
+                                        if (other.groupKey === groupKey && pen > sameGroupPen) {
+                                            sameGroupPen = pen;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    let nodePen = 0;
+                    if (crossings.length > 0) {
+                        if (hasRoomySubArm) {
+                            for (let k = 0; k < crossings.length; k++) {
+                                nodePen += Math.max(0, (visualHalfLen + 2) - Math.abs(candS - crossings[k].offset));
+                            }
+                            nodePen += Math.max(0, visualHalfLen - candS) + Math.max(0, candS - (distance - visualHalfLen));
+                        } else {
+                            for (let k = 0; k < crossings.length; k++) {
+                                const cr = crossings[k];
+                                if ((joinNodeSpanCount.get(cr.nodeKey) ?? 0) >= 2) {
+                                    nodePen += Math.max(0, (closeHalfLen + 4) - Math.abs(candS - cr.offset));
+                                }
+                            }
+                        }
+                    }
+
+                    const distFromMid = Math.abs(candS - midS);
+                    const candIsFree = maxPen <= 0.01;
+                    const bestIsFree = bestMaxPen <= 0.01;
+
+                    let isBetter = false;
+                    if (bestMaxPen === Infinity) {
+                        isBetter = true;
+                    } else if (candIsFree !== bestIsFree) {
+                        isBetter = candIsFree;
+                    } else if (Math.abs(maxPen - bestMaxPen) > 0.5) {
+                        isBetter = maxPen < bestMaxPen;
+                    } else if (Math.abs(totalPen - bestTotalPen) > 0.5) {
+                        isBetter = totalPen < bestTotalPen;
+                    } else if (Math.abs(nodePen - bestNodePen) > 0.5) {
+                        isBetter = nodePen < bestNodePen;
+                    } else if (distFromMid < bestDistFromMid) {
+                        isBetter = true;
+                    }
+
+                    if (isBetter) {
+                        bestS = candS;
+                        bestMaxPen = maxPen;
+                        bestTotalPen = totalPen;
+                        bestSameGroupPen = sameGroupPen;
+                        bestNodePen = nodePen;
+                        bestDistFromMid = distFromMid;
+                    }
+                }
+
+                if (bestMaxPen > visualHalfHeight * 1.4) {
+                    if (bestSameGroupPen > visualHalfHeight * 1.1 || chainLabels.length > 0) {
+                        // Suppress redundant colliding duplicate of the same label or secondary repeat span
+                        continue;
+                    }
+                    forceCloseZoomOnly = true;
+                }
+            }
+
+            const labelX = p0.x + ux * bestS;
+            const labelY = p0.y + uy * bestS;
+
+            let ownerEdge: ChainEdge;
+            if (singleEdge) {
+                ownerEdge = singleEdge;
+            } else {
+                ownerEdge = edges[chain[0].edgeIdx];
+                let bestSqDist = Infinity;
+                for (let j = 0; j < chain.length; j++) {
+                    const candEdge = edges[chain[j].edgeIdx];
+                    const sqDist = this.pointToPolylineSqDist(labelX, labelY, candEdge.mercatorPoints);
+                    if (sqDist < bestSqDist) {
+                        bestSqDist = sqDist;
+                        ownerEdge = candEdge;
+                    }
+                }
+            }
+
+            const flowForward = hasDirectionArrow ? true : singleFlowForward;
+            const dx = flowForward ? pNext.x - p0.x : p0.x - pNext.x;
+            const dy = flowForward ? pNext.y - p0.y : p0.y - pNext.y;
             const angle = Math.atan2(dx, dy);
             let degrees = 90 + (angle * 180) / Math.PI;
             let directionArrow: string;
@@ -1632,33 +2814,80 @@ export default class RenderingController extends AbstractController {
             } else {
                 directionArrow = '';
             }
-            if (!isOneWay) {
+            if (!hasDirectionArrow) {
                 directionArrow = ''; // The degree still has to be computed so text stays upright
             }
 
-            labels.push({
+            const roadTypeStyle = this.streetStyles[ownerEdge.roadType];
+            const color = roadTypeStyle ? roadTypeStyle.strokeColor : '#f00';
+            const outlinecolor = roadTypeStyle ? roadTypeStyle.outlineColor : '#fff';
+
+            const ownerId = ownerEdge.segment.id;
+            let ownerLabels = ownedLabelsBySegment.get(ownerId);
+            if (!ownerLabels) {
+                ownerLabels = [];
+                ownedLabelsBySegment.set(ownerId, ownerLabels);
+            }
+
+            const showAtZoom = forceCloseZoomOnly
+                ? 1
+                : mergeConnected
+                    ? Math.max(
+                        1,
+                        Math.ceil(((acceptedCount - rankInChain) / acceptedCount) * maxZoomRank)
+                    )
+                    : maxLabels - rankInChain;
+
+            const labelFeature: SdkFeature<Point> = {
                 type: 'Feature',
-                id: `${sdkSegment.id}_lbl_${i}`,
+                id: `${ownerId}_lbl_${ownerLabels.length}`,
                 geometry: {
                     type: 'Point',
-                    coordinates: Utils.mercatorToLonLat(midX, midY),
+                    coordinates: Utils.mercatorToLonLat(labelX, labelY),
                 },
                 properties: {
-                    'sID': sdkSegment.id,
+                    'sID': ownerId,
                     'label': directionArrow + labelText + directionArrow + altStreetPart,
                     'degrees': degrees,
                     'color': color,
                     'outlinecolor': outlinecolor,
                     'outlinewidth': this.prefLabelOutlineWidth,
-                    'closeZoomOnly': p % 2 === 1 ? 1 : 0,
-                    'showAtzoom': labelsToInsert,
+                    'closeZoomOnly': (forceCloseZoomOnly || spanSeqIdx % 2 === 1) ? 1 : 0,
+                    'showAtzoom': showAtZoom,
                     'zIndex': 650,
                 },
-            });
-            labelsToInsert -= 1;
+            };
+
+            ownerLabels.push(labelFeature);
+            chainLabels.push(labelFeature);
+
+            const placedBox: PlacedLabelBox = {
+                x: labelX,
+                y: labelY,
+                ux,
+                uy,
+                halfLen: visualHalfLen,
+                halfHeight: visualHalfHeight,
+                groupKey,
+                lastQueryId: 0,
+            };
+            let segBoxes = placedBoxesBySegment.get(ownerId);
+            if (!segBoxes) {
+                segBoxes = [];
+                placedBoxesBySegment.set(ownerId, segBoxes);
+            }
+            segBoxes.push(placedBox);
+            if (mergeConnected) {
+                insertBoxIntoGrid(placedBox);
+            }
         }
 
-        return labels;
+        return {
+            ownedLabelsBySegment,
+            chainLabelsBySegment,
+            placedBoxesBySegment,
+            chainPeersBySegment,
+        };
     }
 
     private getSuperScript(number: number): string {

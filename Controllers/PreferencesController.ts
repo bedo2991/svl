@@ -197,6 +197,7 @@ export default class PreferencesController extends AbstractController {
             disableRoadLayers: loadedPreferences?.['disableRoadLayers'] ?? DEFAULT_PREFERENCES.disableRoadLayers,
             startDisabled: loadedPreferences?.['startDisabled'] ?? DEFAULT_PREFERENCES.startDisabled,
             clutterConstant: loadedPreferences?.['clutterConstant'] ?? DEFAULT_PREFERENCES.clutterConstant,
+            mergeConnectedLabels: Boolean(loadedPreferences?.['mergeConnectedLabels'] ?? DEFAULT_PREFERENCES.mergeConnectedLabels),
             labelOutlineWidth: loadedPreferences?.['labelOutlineWidth'] ?? DEFAULT_PREFERENCES.labelOutlineWidth,
             closeZoomLabelSize: loadedPreferences?.['closeZoomLabelSize'] ?? DEFAULT_PREFERENCES.closeZoomLabelSize,
             farZoomLabelSize: loadedPreferences?.['farZoomLabelSize'] ?? DEFAULT_PREFERENCES.farZoomLabelSize,

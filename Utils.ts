@@ -92,6 +92,14 @@ export default class Utils {
         for (let i = 0; i < n; i++) {
             points[i] = Utils.lonLatToMercator(coords[i][0], coords[i][1]);
         }
+        return Utils.simplifyMercatorPoints(points, tolerance);
+    }
+
+    public static simplifyMercatorPoints(
+        points: MercatorPoint[],
+        tolerance: number
+    ): MercatorPoint[] {
+        const n = points.length;
         if (n <= 2 || tolerance <= 0) {
             return points;
         }

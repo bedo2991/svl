@@ -89,6 +89,7 @@ export interface SVLPreferences {
     disableRoadLayers: boolean;
     startDisabled: boolean;
     clutterConstant: number;
+    mergeConnectedLabels: boolean;
     labelOutlineWidth: number;
     closeZoomLabelSize: number;
     farZoomLabelSize: number;
@@ -358,6 +359,7 @@ export const DEFAULT_PREFERENCES = {
     disableRoadLayers: true,
     startDisabled: false,
     clutterConstant: 7,
+    mergeConnectedLabels: true,
     labelOutlineWidth: 3,
     closeZoomLabelSize: 14,
     farZoomLabelSize: 12,
