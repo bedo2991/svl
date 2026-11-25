@@ -213,4 +213,69 @@ export default class Utils {
         Utils.labelSvgCache.set(key, info);
         return info;
     }
+
+    /**
+     * Normalizes a WME shortcut representation (raw `<modifierMask>,<keyCode>` or SDK combo string)
+     * into canonical WME SDK `shortcutKeys` combo format, or `null` if unassigned/invalid.
+     */
+    public static normalizeShortcutKeys(input: unknown): string | null {
+        if (typeof input !== 'string') {
+            return null;
+        }
+        const trimmed = input.trim();
+        if (!trimmed || trimmed === 'None') {
+            return null;
+        }
+
+        const rawMatch = /^\s*(\d+)\s*,\s*(\d+)\s*$/.exec(trimmed);
+        if (rawMatch) {
+            const modMask = Number.parseInt(rawMatch[1], 10);
+            const keyCode = Number.parseInt(rawMatch[2], 10);
+            if (Number.isNaN(modMask) || Number.isNaN(keyCode) || keyCode < 12) {
+                return null;
+            }
+            const modPrefix =
+                (modMask & 4 ? 'A' : '') +
+                (modMask & 1 ? 'C' : '') +
+                (modMask & 2 ? 'S' : '');
+            let keyPart: string;
+            if (keyCode >= 65 && keyCode <= 90) {
+                keyPart = String.fromCharCode(keyCode).toLowerCase();
+            } else if (keyCode >= 48 && keyCode <= 57) {
+                keyPart = String.fromCharCode(keyCode);
+            } else {
+                keyPart = String(keyCode);
+            }
+            return modPrefix ? `${modPrefix}+${keyPart}` : keyPart;
+        }
+
+        const comboMatch = /^(?:([ACSacs]{1,3})\+)?([a-zA-Z0-9]|\d{2,3})$/.exec(trimmed);
+        if (comboMatch) {
+            const upper = (comboMatch[1] ?? '').toUpperCase();
+            const modPrefix =
+                (upper.includes('A') ? 'A' : '') +
+                (upper.includes('C') ? 'C' : '') +
+                (upper.includes('S') ? 'S' : '');
+            const rawKey = comboMatch[2];
+            let keyPart: string;
+            if (rawKey.length === 1) {
+                keyPart = rawKey.toLowerCase();
+            } else {
+                const code = Number.parseInt(rawKey, 10);
+                if (code < 12) {
+                    return null;
+                }
+                if (code >= 65 && code <= 90) {
+                    keyPart = String.fromCharCode(code).toLowerCase();
+                } else if (code >= 48 && code <= 57) {
+                    keyPart = String.fromCharCode(code);
+                } else {
+                    keyPart = String(code);
+                }
+            }
+            return modPrefix ? `${modPrefix}+${keyPart}` : keyPart;
+        }
+
+        return null;
+    }
 }

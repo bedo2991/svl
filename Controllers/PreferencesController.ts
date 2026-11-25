@@ -1,6 +1,7 @@
 import AbstractController from "./AbstractController";
 import SVLMediator from "../SVLMediator";
 import { AlertType } from "./AbstractMediator";
+import Utils from "../Utils";
 import {
     AcceptedControllerEvents,
     DEFAULT_IMPERIAL_SPEEDS,
@@ -184,7 +185,14 @@ export default class PreferencesController extends AbstractController {
             ...(loadedImperial && typeof loadedImperial === 'object' ? loadedImperial : {}),
         };
 
+        let shortcutKeys: string | null = DEFAULT_PREFERENCES.shortcutKeys;
+        if (loadedPreferences !== null && Object.prototype.hasOwnProperty.call(loadedPreferences, 'shortcutKeys')) {
+            const rawShortcut = loadedPreferences['shortcutKeys'];
+            shortcutKeys = rawShortcut === null ? null : Utils.normalizeShortcutKeys(rawShortcut);
+        }
+
         const builtPreferences: SVLPreferences = {
+            shortcutKeys,
             autoReload: {
                 interval: loadedPreferences?.['autoReload']?.['interval'] ?? DEFAULT_PREFERENCES.autoReloadInterval,
                 enabled: loadedPreferences?.['autoReload']?.['enabled'] ?? DEFAULT_PREFERENCES.autoReloadEnabled,
@@ -271,6 +279,32 @@ export default class PreferencesController extends AbstractController {
 
     public savePreferences(silent = false): void {
         this.storePreferences(this.preferences, silent);
+    }
+
+    public saveShortcutKeys(shortcutKeys: string | null): void {
+        const normalized = shortcutKeys === null ? null : Utils.normalizeShortcutKeys(shortcutKeys);
+        this.preferences['shortcutKeys'] = normalized;
+
+        try {
+            const storage = unsafeWindow?.localStorage ?? localStorage;
+            const raw = storage.getItem('svl');
+            if (raw) {
+                const stored = JSON.parse(raw);
+                if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+                    if (stored.shortcutKeys === normalized) {
+                        return;
+                    }
+                    stored.shortcutKeys = normalized;
+                    stored.version = this.mediator.SVL_VERSION;
+                    storage.setItem('svl', JSON.stringify(stored));
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error('SVL: Failed to patch shortcutKeys in stored preferences.', e);
+        }
+
+        this.storePreferences(this.preferences, true);
     }
 
     private storePreferences(pref: PreferenceObject, silent = true): void {

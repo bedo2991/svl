@@ -33,7 +33,8 @@ export const enum AcceptedControllerEvents {
     SVL_LAYER_DISABLED_BY_USER = 'SVL_LAYER_DISABLED_BY_USER',
 
     FIRST_RUN = 'FIRST_RUN',
-    KEYBOARD_SHORTCUT_TRIGGERED = 'KEYBOARD_SHORTCUT_TRIGGERED'
+    KEYBOARD_SHORTCUT_TRIGGERED = 'KEYBOARD_SHORTCUT_TRIGGERED',
+    KEYBOARD_SHORTCUT_CHANGED = 'KEYBOARD_SHORTCUT_CHANGED'
 }
 
 export const SDK_LAYERS = {
@@ -81,6 +82,7 @@ export interface SpeedsPreference {
 
 export interface SVLPreferences {
     version?: string;
+    shortcutKeys: string | null;
     autoReload: AutoReloadPreference;
     showSLSinglecolor: boolean;
     SLColor: string;
@@ -380,4 +382,5 @@ export const DEFAULT_PREFERENCES = {
     showANs: 2,
     layerOpacity: 0.8,
     defaultSpeedColor: '#cc0000',
+    shortcutKeys: 'S+s',
 } as const;

@@ -4,6 +4,7 @@ import SVLMediator from "../SVLMediator";
 import AbstractController from "./AbstractController";
 import { AlertType, SVLEvents } from "./AbstractMediator";
 import PreferencesController from "./PreferencesController";
+import Utils from "../Utils";
 
 type StatusIconKind = 'play' | 'pause' | 'stop';
 
@@ -14,10 +15,14 @@ const CHEVRON_SVG_DATA_URI = `data:image/svg+xml;utf8,${encodeURIComponent(
 export default class UserInterfaceController extends AbstractController {
     // Singleton pattern
     private static instance: UserInterfaceController;
+    private static readonly SHORTCUT_ID = 'svl';
 
     private preferencesController!: PreferencesController;
     private badgeElement: HTMLElement | null = null;
     private badgeRetryTimeoutId: number | undefined;
+    private shortcutSyncTimeoutId: number | undefined;
+    private dialogObserver: MutationObserver | null = null;
+    private shortcutListenersRegistered = false;
     private roadTypeNames: Map<number, string> = new Map();
     private preSearchOpenState: Map<HTMLDetailsElement, boolean> | null = null;
 
@@ -59,7 +64,7 @@ export default class UserInterfaceController extends AbstractController {
                 'Street Vector Layer',
                 this.mediator.SVL_VERSION,
                 `<b>${this.mediator._('whats_new')}</b>
-                <br>- 8.3.0 - New: Option to display more labels, even between different segments. Brand new settings panel.
+                <br>- 8.3.1 - New: Option to display more labels, even between different segments. Brand new settings panel. Fixed: layer shortcut not being preserved.
                 <br>- 8.1.1 - Support displaying more than 2 alternative street names (this value can be set in the settings).
                 <br>- 8.0.0 - Improved arrows placement, virtual nodes, and overall visual quality. Various bug fixes and performance improvements.
                 <br>- 7.0.2 - New: Reduced flickering when deselecting segments.
@@ -71,8 +76,19 @@ export default class UserInterfaceController extends AbstractController {
         }
     }
 
-    private async initShortcut(): Promise<void> {
-        const defaultShortcut = "S+s";
+    private getDesiredShortcutKeys(): string | null {
+        const raw = this.mediator.getPreference('shortcutKeys');
+        if (raw === undefined) {
+            return DEFAULT_PREFERENCES.shortcutKeys;
+        }
+        if (raw === null) {
+            return null;
+        }
+        return Utils.normalizeShortcutKeys(raw);
+    }
+
+    private async registerShortcutFromPreferences(): Promise<void> {
+        const desiredShortcut = this.getDesiredShortcutKeys();
 
         const toggleShortcut: KeyboardShortcut = {
             callback: () => {
@@ -82,12 +98,22 @@ export default class UserInterfaceController extends AbstractController {
                 );
             },
             description: "Toggle SVL",
-            shortcutId: "svl",
-            shortcutKeys: defaultShortcut,
+            shortcutId: UserInterfaceController.SHORTCUT_ID,
+            shortcutKeys: desiredShortcut,
         };
 
+        if (desiredShortcut === null) {
+            try {
+                await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                this.debugLog('Empty keyboard shortcut successfully added.');
+            } catch (e) {
+                console.error('SVL: Error while adding the empty keyboard shortcut:', e);
+            }
+            return;
+        }
+
         if (!(await this.mediator.wmeSDK.Shortcuts.areShortcutKeysInUse({
-            shortcutKeys: defaultShortcut
+            shortcutKeys: desiredShortcut
         }))) {
             try {
                 await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
@@ -95,18 +121,141 @@ export default class UserInterfaceController extends AbstractController {
             } catch (e) {
                 this.mediator.alert(AlertType.ERROR, 'Street Vector Layer could not add its default shortcut.');
                 console.error('SVL: Error while adding the keyboard shortcut:', e);
+                try {
+                    toggleShortcut.shortcutKeys = null;
+                    await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                    this.mediator.notify(this, AcceptedControllerEvents.KEYBOARD_SHORTCUT_CHANGED, null);
+                } catch (e2) {
+                    console.error('SVL: Error while adding the empty keyboard shortcut:', e2);
+                }
             }
         } else {
+            const conflictMessage = desiredShortcut === DEFAULT_PREFERENCES.shortcutKeys
+                ? this.mediator._('shortcut_cannot_be_set')
+                : this.mediator._('shortcut_cannot_be_set').replace(/\(Shift\s*\+\s*s\)/i, `(${desiredShortcut})`);
             setTimeout(() => {
-                this.mediator.alert(AlertType.WARNING, this.mediator._('shortcut_cannot_be_set'));
+                this.mediator.alert(AlertType.WARNING, conflictMessage);
             }, 3000);
             try {
                 toggleShortcut.shortcutKeys = null;
                 await this.mediator.wmeSDK.Shortcuts.createShortcut(toggleShortcut);
+                this.mediator.notify(this, AcceptedControllerEvents.KEYBOARD_SHORTCUT_CHANGED, null);
                 this.debugLog('Empty keyboard shortcut successfully added.');
             } catch (e) {
                 console.error('SVL: Error while adding the empty keyboard shortcut:', e);
             }
+        }
+    }
+
+    private async initShortcut(): Promise<void> {
+        await this.registerShortcutFromPreferences();
+        this.registerShortcutPersistenceListeners();
+    }
+
+    public async syncShortcutFromSDK(): Promise<void> {
+        if (this.shortcutSyncTimeoutId !== undefined) {
+            clearTimeout(this.shortcutSyncTimeoutId);
+            this.shortcutSyncTimeoutId = undefined;
+        }
+
+        try {
+            const allShortcuts = await this.mediator.wmeSDK.Shortcuts.getAllShortcuts();
+            const svlShortcut = allShortcuts.find((s: KeyboardShortcut) => s.shortcutId === UserInterfaceController.SHORTCUT_ID);
+            if (!svlShortcut) {
+                return;
+            }
+
+            const normalizedKeys = Utils.normalizeShortcutKeys(svlShortcut.shortcutKeys);
+            const storedKeys = this.getDesiredShortcutKeys();
+            if (normalizedKeys !== storedKeys) {
+                this.debugLog(`Keyboard shortcut updated: ${String(storedKeys)} -> ${String(normalizedKeys)}`);
+                this.mediator.notify(this, AcceptedControllerEvents.KEYBOARD_SHORTCUT_CHANGED, normalizedKeys);
+            }
+        } catch (e) {
+            this.debugLog('Failed to synchronize shortcut from SDK:', e);
+        }
+    }
+
+    private scheduleShortcutSync(delayMs = 150): void {
+        if (this.shortcutSyncTimeoutId !== undefined) {
+            clearTimeout(this.shortcutSyncTimeoutId);
+        }
+        this.shortcutSyncTimeoutId = window.setTimeout(() => {
+            this.shortcutSyncTimeoutId = undefined;
+            void this.syncShortcutFromSDK();
+        }, delayMs);
+    }
+
+    private ensureDialogObserver(): void {
+        if (this.dialogObserver) {
+            return;
+        }
+        const dialogContainer = document.getElementById('wz-dialog-container');
+        if (dialogContainer) {
+            this.dialogObserver = new MutationObserver(() => {
+                this.scheduleShortcutSync();
+            });
+            this.dialogObserver.observe(dialogContainer, {
+                childList: true,
+                subtree: true,
+                characterData: true,
+            });
+        }
+    }
+
+    private isAnyDialogOpen(): boolean {
+        this.ensureDialogObserver();
+        return (
+            (document.getElementById('wz-dialog-container')?.childElementCount ?? 0) > 0 ||
+            Boolean(document.querySelector('wz-dialog, dialog[open], [role="dialog"]'))
+        );
+    }
+
+    private registerShortcutPersistenceListeners(): void {
+        if (this.shortcutListenersRegistered) {
+            return;
+        }
+        this.shortcutListenersRegistered = true;
+
+        this.ensureDialogObserver();
+
+        const handleDialogInteraction = (): void => {
+            if (this.isAnyDialogOpen()) {
+                this.scheduleShortcutSync(150);
+            }
+        };
+
+        document.addEventListener('keyup', handleDialogInteraction, true);
+        document.addEventListener('click', handleDialogInteraction, true);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                void this.syncShortcutFromSDK();
+            }
+        });
+        (unsafeWindow ?? window).addEventListener('beforeunload', () => {
+            void this.syncShortcutFromSDK();
+        });
+    }
+
+    private async syncShortcutWithPreferences(): Promise<void> {
+        if (this.shortcutSyncTimeoutId !== undefined) {
+            await this.syncShortcutFromSDK();
+        }
+
+        try {
+            const allShortcuts = await this.mediator.wmeSDK.Shortcuts.getAllShortcuts();
+            const existing = allShortcuts.find((s: KeyboardShortcut) => s.shortcutId === UserInterfaceController.SHORTCUT_ID);
+            const currentKeys = existing ? Utils.normalizeShortcutKeys(existing.shortcutKeys) : undefined;
+            const desiredKeys = this.getDesiredShortcutKeys();
+
+            if (currentKeys !== desiredKeys) {
+                if (await this.mediator.wmeSDK.Shortcuts.isShortcutRegistered({ shortcutId: UserInterfaceController.SHORTCUT_ID })) {
+                    await this.mediator.wmeSDK.Shortcuts.deleteShortcut({ shortcutId: UserInterfaceController.SHORTCUT_ID });
+                }
+                await this.registerShortcutFromPreferences();
+            }
+        } catch (e) {
+            this.debugLog('Failed to synchronize SDK shortcut with preferences:', e);
         }
     }
 
@@ -2433,6 +2582,7 @@ export default class UserInterfaceController extends AbstractController {
     public async updatePreferencesUI(): Promise<void> {
         await this.updatePreferenceValues();
         await this.updateRoutingModePanel();
+        await this.syncShortcutWithPreferences();
     }
 
     /**

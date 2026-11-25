@@ -276,7 +276,7 @@ export default class SVLMediator extends AbstractMediator {
         );
     }
 
-    public notify(sender: unknown, event: AcceptedControllerEvents): void {
+    public notify(sender: unknown, event: AcceptedControllerEvents, data?: unknown): void {
         switch (event) {
             case AcceptedControllerEvents.SVL_SHOULD_AUTOMATICALLY_DISABLE:
                 this.emit(SVLEvents.AUTOMATICALLY_DISABLED);
@@ -299,8 +299,16 @@ export default class SVLMediator extends AbstractMediator {
             case AcceptedControllerEvents.KEYBOARD_SHORTCUT_TRIGGERED:
                 void this.layerStateController.toggleSVLLayerEnabledState();
                 break;
+            case AcceptedControllerEvents.KEYBOARD_SHORTCUT_CHANGED:
+                this.preferencesController.saveShortcutKeys((data as string | null) ?? null);
+                return;
             case AcceptedControllerEvents.PREFERENCES_SAVE_REQUEST:
-                this.preferencesController.savePreferences();
+                void (this.userInterfaceController
+                    ? this.userInterfaceController.syncShortcutFromSDK()
+                    : Promise.resolve()
+                ).finally(() => {
+                    this.preferencesController.savePreferences();
+                });
                 return;
             case AcceptedControllerEvents.PREFERENCES_ROLLBACK_REQUEST:
                 this.preferencesController.rollbackPreferences();
